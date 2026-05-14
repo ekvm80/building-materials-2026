@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>BuildMate AI — 스마트 건축 설계 어시스턴트</title>
+<style>
+/* ══════════════════════════════════════════
+   TOKENS & RESET
+══════════════════════════════════════════ */
+:root{
+  --ink:#0c0c0e;
+  --ink2:#2a2a30;
+  --ink3:#52525e;
+  --mist:#f4f3f0;
+  --mist2:#e8e6e1;
+  --mist3:#d4d1c9;
+  --white:#ffffff;
+  --blue:#1b4fd8;
+  --blue2:#3468e8;
+  --blue-pale:#eef2fd;
+  --gold:#b8902a;
+  --gold-pale:#fdf6e3;
+  --green:#1a6b45;
+  --green-pale:#e6f4ed;
+  --red:#b83232;
+  --shadow-xs:0 1px 3px rgba(0,0,0,.07);
+  --shadow-sm:0 4px 12px rgba(0,0,0,.08);
+  --shadow-md:0 12px 36px rgba(0,0,0,.12);
+  --shadow-lg:0 28px 72px rgba(0,0,0,.18);
+  --r:16px;--r-sm:10px;--r-lg:24px;
+  --dur:.38s;--ease:cubic-bezier(.4,0,.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Noto Sans KR',system-ui,sans-serif;
+  background:var(--mist);
+  color:var(--ink);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ══════════════════════════════════════════
+   GOOGLE FONT FALLBACK (system)
+══════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&family=DM+Serif+Display:ital@0;1&display=swap');
+
+/* ══════════════════════════════════════════
+   SCREEN SWITCHER
+══════════════════════════════════════════ */
+.screen{display:none}
+.screen.active{display:block}
+
+/* ══════════════════════════════════════════
+   ── INPUT SCREEN ──
+══════════════════════════════════════════ */
+#screen-input{background:var(--mist)}
+
+/* NAV */
+.nav{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;
+  background:rgba(244,243,240,.88);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--mist2);
+}
+.nav-logo{
+  font-family:'DM Serif Display',serif;
+  font-size:20px;letter-spacing:-.5px;color:var(--ink);
+}
+.nav-logo span{color:var(--blue)}
+.nav-chip{
+  font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  background:var(--ink);color:var(--white);
+  padding:4px 10px;border-radius:100px;
+}
+
+/* HERO BLOCK */
+.input-hero{
+  padding:40px 20px 32px;
+  position:relative;overflow:hidden;
+}
+.input-hero::before{
+  content:'';position:absolute;
+  top:-80px;right:-60px;
+  width:280px;height:280px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(27,79,216,.12) 0%,transparent 70%);
+  pointer-events:none;
+}
+.ih-eyebrow{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+  color:var(--blue);margin-bottom:14px;
+}
+.ih-eyebrow::before{content:'';width:24px;height:2px;background:var(--blue);border-radius:1px}
+.ih-title{
+  font-family:'DM Serif Display',serif;
+  font-size:clamp(28px,7vw,42px);
+  line-height:1.1;letter-spacing:-.5px;
+  color:var(--ink);margin-bottom:12px;
+}
+.ih-title em{font-style:italic;color:var(--blue)}
+.ih-sub{font-size:14px;color:var(--ink3);line-height:1.7;max-width:340px}
+
+/* STEP INDICATOR */
+.steps-row{
+  display:flex;align-items:center;gap:0;
+  padding:0 20px;margin-bottom:4px;
+}
+.step-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;
+  position:relative;
+}
+.step-item:not(:last-child)::after{
+  content:'';position:absolute;top:12px;left:60%;width:80%;height:1px;
+  background:var(--mist3);
+}
+.step-num{
+  width:24px;height:24px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:800;
+  background:var(--mist2);color:var(--ink3);
+  position:relative;z-index:1;
+  transition:background var(--dur) var(--ease),color var(--dur) var(--ease);
+}
+.step-num.filled{background:var(--blue);color:var(--white)}
+.step-label{font-size:9px;font-weight:600;color:var(--ink3);text-align:center;letter-spacing:.5px}
+
+/* FORM SECTIONS */
+.form-body{padding:4px 16px 100px}
+
+.fsec{margin-bottom:24px}
+.fsec-label{
+  display:flex;align-items:center;gap:8px;
+  font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  color:var(--ink3);margin-bottom:10px;padding:0 4px;
+}
+.fsec-label span{
+  width:20px;height:20px;border-radius:6px;
+  background:var(--ink);color:var(--white);
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:900;
+}
+
+/* OPTION CARDS */
+.opt-grid{display:grid;gap:10px}
+.opt-grid.col2{grid-template-columns:1fr 1fr}
+.opt-grid.col3{grid-template-columns:repeat(3,1fr)}
+.opt-grid.col5{grid-template-columns:repeat(5,1fr)}
+
+.opt-card{
+  background:var(--white);
+  border:2px solid var(--mist2);
+  border-radius:var(--r);
+  padding:14px 10px 12px;
+  cursor:pointer;
+  text-align:center;
+  transition:border-color var(--dur) var(--ease),
+             box-shadow var(--dur) var(--ease),
+             transform var(--dur) var(--ease);
+  user-select:none;
+  -webkit-user-select:none;
+  position:relative;
+  overflow:hidden;
+}
+.opt-card:active{transform:scale(.97)}
+.opt-card.sel{
+  border-color:var(--blue);
+  background:var(--blue-pale);
+  box-shadow:0 0 0 3px rgba(27,79,216,.15);
+}
+.opt-card .oc-icon{
+  font-size:26px;line-height:1;
+  margin-bottom:7px;display:block;
+}
+.opt-card .oc-name{
+  font-size:12px;font-weight:700;color:var(--ink);
+  transition:color var(--dur) var(--ease);
+}
+.opt-card.sel .oc-name{color:var(--blue)}
+.opt-card .oc-hint{
+  font-size:10px;color:var(--ink3);margin-top:3px;line-height:1.3;
+}
+.opt-card .sel-tick{
+  position:absolute;top:7px;right:8px;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--blue);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transform:scale(.5);
+  transition:opacity .2s,transform .2s;
+}
+.opt-card.sel .sel-tick{opacity:1;transform:scale(1)}
+.sel-tick::after{content:'✓';font-size:9px;color:#fff;font-weight:900}
+
+/* CTA */
+.cta-fixed{
+  position:fixed;bottom:0;left:0;right:0;z-index:40;
+  padding:16px 20px 28px;
+  background:linear-gradient(to top,var(--mist) 60%,transparent);
+}
+.cta-btn{
+  width:100%;
+  background:var(--ink);color:var(--white);
+  border:none;border-radius:var(--r);
+  padding:18px 24px;
+  font-family:inherit;font-size:16px;font-weight:700;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:transform .2s,box-shadow .2s,background .2s;
+  box-shadow:var(--shadow-lg);
+  position:relative;overflow:hidden;
+}
+.cta-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,var(--blue2) 0%,var(--ink) 100%);
+  opacity:0;transition:opacity .3s;
+}
+.cta-btn:hover::before{opacity:1}
+.cta-btn:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg),0 0 40px rgba(27,79,216,.3)}
+.cta-btn:active{transform:translateY(0)}
+.cta-btn *{position:relative}
+.cta-icon{font-size:18px}
+.cta-err{
+  text-align:center;font-size:12px;color:var(--red);
+  margin-top:8px;height:16px;
+  transition:opacity .3s;opacity:0;
+}
+.cta-err.show{opacity:1}
+
+/* ══════════════════════════════════════════
+   ── LOADING SCREEN ──
+══════════════════════════════════════════ */
+#screen-loading{
+  position:fixed;inset:0;z-index:999;
+  background:var(--ink);
+  display:none;
+  flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:32px;
+}
+#screen-loading.active{display:flex}
+
+.load-logo{
+  font-family:'DM Serif Display',serif;
+  font-size:32px;color:var(--white);
+  letter-spacing:-.5px;
+}
+.load-logo span{color:#5a8af0}
+
+.load-steps{display:flex;flex-direction:column;gap:12px;width:260px}
+.load-step{
+  display:flex;align-items:center;gap:12px;
+  font-size:12px;color:rgba(255,255,255,.35);
+  transition:color .4s;
+}
+.load-step.done{color:rgba(255,255,255,.85)}
+.ls-dot{
+  width:28px;height:28px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;flex-shrink:0;
+  transition:border-color .4s,background .4s;
+}
+.load-step.done .ls-dot{border-color:#5a8af0;background:#5a8af0;color:#fff}
+.ls-dot-inner{opacity:.4;transition:opacity .4s}
+.load-step.done .ls-dot-inner{opacity:0}
+
+.load-bar-wrap{width:200px}
+.load-bar-track{
+  width:100%;height:2px;
+  background:rgba(255,255,255,.1);border-radius:1px;overflow:hidden;
+}
+.load-bar-fill{
+  height:100%;width:0%;
+  background:linear-gradient(90deg,#3468e8,#7aa8ff);
+  border-radius:1px;
+  transition:width .4s var(--ease);
+}
+.load-pct{
+  text-align:center;font-size:11px;letter-spacing:1px;
+  color:rgba(255,255,255,.4);margin-top:8px;
+}
+
+/* ══════════════════════════════════════════
+   ── RESULT SCREEN ──
+══════════════════════════════════════════ */
+#screen-result{background:var(--mist)}
+
+/* RESULT NAV */
+.rnav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;
+  background:var(--white);
+  border-bottom:1px solid var(--mist2);
+  position:sticky;top:0;z-index:50;
+}
+.rnav-logo{
+  font-family:'DM Serif Display',serif;
+  font-size:18px;color:var(--ink);
+}
+.rnav-logo span{color:var(--blue)}
+.rnav-back{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:700;color:var(--ink3);
+  background:var(--mist);border:1px solid var(--mist2);
+  border-radius:100px;padding:6px 14px;
+  cursor:pointer;transition:background .2s;
+}
+.rnav-back:hover{background:var(--mist2)}
+
+/* RESULT HERO */
+.rhero{
+  background:var(--ink);
+  padding:28px 20px 36px;
+  position:relative;overflow:hidden;
+}
+.rhero::after{
+  content:'';position:absolute;
+  bottom:-60px;right:-40px;
+  width:220px;height:220px;border-radius:50%;
+  background:radial-gradient(circle,rgba(90,138,240,.25) 0%,transparent 70%);
+}
+.rh-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(90,138,240,.2);border:1px solid rgba(90,138,240,.35);
+  color:#7aa8ff;
+  font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  padding:5px 12px;border-radius:100px;margin-bottom:14px;
+}
+.rh-title{
+  font-family:'DM Serif Display',serif;
+  font-size:24px;color:var(--white);
+  margin-bottom:6px;position:relative;z-index:1;
+}
+.rh-sel{
+  display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;position:relative;z-index:1;
+}
+.rh-pill{
+  font-size:11px;font-weight:600;
+  background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);
+  padding:4px 10px;border-radius:100px;
+  border:1px solid rgba(255,255,255,.15);
+}
+
+/* VISUAL PAIR */
+.vis-pair{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;
+  padding:16px;
+  margin-top:-16px;position:relative;z-index:2;
+}
+.vis-card{
+  background:var(--white);
+  border-radius:var(--r);
+  overflow:hidden;
+  box-shadow:var(--shadow-md);
+}
+.vc-label{
+  padding:10px 14px 6px;
+  font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  color:var(--ink3);border-bottom:1px solid var(--mist);
+}
+.vc-canvas-wrap{padding:8px 8px 8px}
+canvas.vc{width:100%;display:block;border-radius:8px}
+
+/* RESULT BODY */
+.rbody{padding:0 16px 100px}
+
+/* CARDS */
+.rcard{
+  background:var(--white);
+  border-radius:var(--r);
+  padding:20px;
+  margin-bottom:12px;
+  box-shadow:var(--shadow-xs);
+  animation:slideUp .5s var(--ease) both;
+}
+@keyframes slideUp{
+  from{opacity:0;transform:translateY(20px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+.rcard-head{
+  display:flex;align-items:flex-start;gap:14px;
+  margin-bottom:14px;
+}
+.rcard-ico{
+  width:42px;height:42px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;flex-shrink:0;
+}
+.ico-blue{background:var(--blue-pale)}
+.ico-gold{background:var(--gold-pale)}
+.ico-green{background:var(--green-pale)}
+.ico-ink{background:var(--mist)}
+
+.rcard-meta{}
+.rcard-eyebrow{
+  font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--ink3);margin-bottom:3px;
+}
+.rcard-val{
+  font-family:'DM Serif Display',serif;
+  font-size:20px;color:var(--ink);line-height:1.1;
+}
+
+.tag-row{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.tag{
+  font-size:11px;font-weight:600;
+  padding:4px 11px;border-radius:100px;
+}
+.tag-blue{background:var(--blue-pale);color:var(--blue)}
+.tag-gold{background:var(--gold-pale);color:var(--gold)}
+.tag-green{background:var(--green-pale);color:var(--green)}
+.tag-ink{background:var(--mist);color:var(--ink3)}
+
+.rcard-desc{
+  font-size:13.5px;line-height:1.85;color:var(--ink3);
+  padding-top:12px;border-top:1px solid var(--mist);
+}
+
+/* COST CARD */
+.cost-card{
+  background:linear-gradient(145deg,var(--ink) 0%,#1a1f35 100%);
+  border-radius:var(--r);padding:24px 20px;
+  margin-bottom:12px;
+  box-shadow:var(--shadow-md);
+  animation:slideUp .5s .15s var(--ease) both;
+}
+.cc-label{
+  font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  color:rgba(255,255,255,.45);margin-bottom:6px;
+}
+.cc-amount{
+  font-family:'DM Serif Display',serif;
+  font-size:36px;color:#f5c842;
+  line-height:1;margin-bottom:4px;
+}
+.cc-basis{font-size:12px;color:rgba(255,255,255,.4);margin-bottom:18px}
+.cc-rows{display:flex;flex-direction:column;gap:0}
+.cc-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:9px 0;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.cc-row:last-child{border:none}
+.cc-rname{font-size:12px;color:rgba(255,255,255,.55)}
+.cc-rval{font-size:13px;font-weight:700;color:var(--white)}
+
+/* ADVICE */
+.advice-card{
+  background:linear-gradient(145deg,#1b4fd8 0%,#0d2f8a 100%);
+  border-radius:var(--r);padding:22px 20px;
+  margin-bottom:12px;
+  animation:slideUp .5s .2s var(--ease) both;
+}
+.adv-top{
+  display:flex;align-items:center;gap:10px;margin-bottom:14px;
+}
+.adv-ico{
+  width:36px;height:36px;border-radius:10px;
+  background:rgba(255,255,255,.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;
+}
+.adv-eyebrow{
+  font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  color:rgba(255,255,255,.5);
+}
+.adv-title{font-size:16px;font-weight:700;color:var(--white)}
+.adv-points{display:flex;flex-direction:column;gap:8px}
+.adv-pt{
+  display:flex;align-items:flex-start;gap:10px;
+  font-size:13px;line-height:1.6;color:rgba(255,255,255,.85);
+}
+.adv-bullet{
+  width:6px;height:6px;border-radius:50%;
+  background:rgba(255,255,255,.5);
+  flex-shrink:0;margin-top:6px;
+}
+
+/* EXPERT SECTION */
+.expert-card{
+  background:linear-gradient(145deg,#0d0f1e 0%,#111428 100%);
+  border-radius:var(--r-lg);
+  padding:24px 20px;
+  margin-bottom:12px;
+  position:relative;overflow:hidden;
+  animation:slideUp .5s .25s var(--ease) both;
+}
+.expert-card::before{
+  content:'';position:absolute;
+  top:-80px;right:-60px;width:240px;height:240px;border-radius:50%;
+  background:radial-gradient(circle,rgba(184,144,42,.15) 0%,transparent 60%);
+}
+.expert-card::after{
+  content:'';position:absolute;
+  bottom:-60px;left:-40px;width:180px;height:180px;border-radius:50%;
+  background:radial-gradient(circle,rgba(90,138,240,.12) 0%,transparent 60%);
+}
+.exp-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(184,144,42,.15);
+  border:1px solid rgba(184,144,42,.3);
+  color:#f5c842;
+  font-size:9px;font-weight:900;letter-spacing:2.5px;text-transform:uppercase;
+  padding:5px 12px;border-radius:100px;
+  margin-bottom:18px;position:relative;z-index:1;
+}
+.exp-title{
+  font-family:'DM Serif Display',serif;
+  font-size:22px;color:var(--white);
+  margin-bottom:18px;position:relative;z-index:1;
+}
+.exp-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  position:relative;z-index:1;margin-bottom:20px;
+}
+.exp-item{
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:var(--r-sm);padding:14px;
+}
+.exp-item-lbl{
+  font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;
+  color:rgba(255,255,255,.35);margin-bottom:6px;
+}
+.exp-item-val{
+  font-size:15px;font-weight:700;color:var(--white);line-height:1.3;
+}
+.exp-item-note{font-size:10px;color:rgba(255,255,255,.35);margin-top:3px}
+
+.exp-alt-title{
+  font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
+  color:rgba(255,255,255,.35);
+  margin-bottom:10px;position:relative;z-index:1;
+}
+.alt-mat-row{
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:var(--r-sm);
+  padding:12px 14px;margin-bottom:8px;
+  position:relative;z-index:1;
+}
+.amr-left{}
+.amr-name{font-size:13px;font-weight:700;color:var(--white)}
+.amr-note{font-size:11px;color:rgba(255,255,255,.35);margin-top:2px}
+.amr-price{font-size:13px;font-weight:700;color:#f5c842}
+
+/* ENV NOTE */
+.env-card{
+  background:var(--white);border-radius:var(--r);
+  padding:18px 20px;margin-bottom:12px;
+  border-left:3px solid var(--blue);
+  animation:slideUp .5s .3s var(--ease) both;
+}
+.env-head{
+  display:flex;align-items:center;gap:8px;
+  font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--blue);margin-bottom:8px;
+}
+.env-text{font-size:13.5px;line-height:1.8;color:var(--ink3)}
+
+/* BACK BTN */
+.back-btn{
+  width:100%;background:var(--white);color:var(--ink);
+  border:2px solid var(--mist2);border-radius:var(--r);
+  padding:16px;font-family:inherit;font-size:14px;font-weight:700;
+  cursor:pointer;transition:border-color .2s,transform .2s;
+  margin-bottom:20px;
+}
+.back-btn:hover{border-color:var(--ink);transform:translateY(-1px)}
+
+/* ══════════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════════ */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.fade-in{animation:fadeIn .6s var(--ease) both}
+
+.rcard:nth-child(1){animation-delay:.05s}
+.rcard:nth-child(2){animation-delay:.1s}
+.rcard:nth-child(3){animation-delay:.15s}
+.rcard:nth-child(4){animation-delay:.2s}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     INPUT SCREEN
+═══════════════════════════════════════ -->
+<div id="screen-input" class="screen active">
+
+  <nav class="nav">
+    <div class="nav-logo">Build<span>Mate</span></div>
+    <div class="nav-chip">AI BETA</div>
+  </nav>
+
+  <div class="input-hero">
+    <div class="ih-eyebrow">스마트 건축 분석</div>
+    <h1 class="ih-title">당신의 집,<br><em>AI가 설계합니다</em></h1>
+    <p class="ih-sub">토지·예산·가족 정보를 입력하면 AI가 최적의 건축 플랜과 비용 견적을 즉시 생성합니다.</p>
+  </div>
+
+  <div class="steps-row" id="steps-row">
+    <div class="step-item"><div class="step-num" id="sn1">1</div><div class="step-label">토지</div></div>
+    <div class="step-item"><div class="step-num" id="sn2">2</div><div class="step-label">예산</div></div>
+    <div class="step-item"><div class="step-num" id="sn3">3</div><div class="step-label">가족</div></div>
+    <div class="step-item"><div class="step-num" id="sn4">4</div><div class="step-label">환경</div></div>
+  </div>
+
+  <div class="form-body">
+
+    <!-- A. 토지 -->
+    <div class="fsec">
+      <div class="fsec-label"><span>A</span> 토지 조건</div>
+      <div class="opt-grid col5" id="land-grid">
+        <div class="opt-card" data-g="land" data-v="평지" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">🏞️</span>
+          <div class="oc-name">평지</div>
+          <div class="oc-hint">넓고 평탄</div>
+        </div>
+        <div class="opt-card" data-g="land" data-v="경사지" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">⛰️</span>
+          <div class="oc-name">경사지</div>
+          <div class="oc-hint">언덕·경사</div>
+        </div>
+        <div class="opt-card" data-g="land" data-v="해안가" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">🌊</span>
+          <div class="oc-name">해안가</div>
+          <div class="oc-hint">바다 인접</div>
+        </div>
+        <div class="opt-card" data-g="land" data-v="산지" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">🌲</span>
+          <div class="oc-name">산지</div>
+          <div class="oc-hint">숲·자연</div>
+        </div>
+        <div class="opt-card" data-g="land" data-v="도심지" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">🏙️</span>
+          <div class="oc-name">도심지</div>
+          <div class="oc-hint">도시 부지</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B. 예산 -->
+    <div class="fsec">
+      <div class="fsec-label"><span>B</span> 예산 규모</div>
+      <div class="opt-grid col3" id="budget-grid">
+        <div class="opt-card" data-g="budget" data-v="저예산" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">💚</span>
+          <div class="oc-name">저예산</div>
+          <div class="oc-hint">~2억 원</div>
+        </div>
+        <div class="opt-card" data-g="budget" data-v="중예산" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">💛</span>
+          <div class="oc-name">중예산</div>
+          <div class="oc-hint">2~5억 원</div>
+        </div>
+        <div class="opt-card" data-g="budget" data-v="고예산" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">💎</span>
+          <div class="oc-name">고예산</div>
+          <div class="oc-hint">5억 원+</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- C. 가족 -->
+    <div class="fsec">
+      <div class="fsec-label"><span>C</span> 가족 구성원</div>
+      <div class="opt-grid col3" id="family-grid">
+        <div class="opt-card" data-g="family" data-v="1~2인" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">👫</span>
+          <div class="oc-name">1~2인</div>
+          <div class="oc-hint">소형 가구</div>
+        </div>
+        <div class="opt-card" data-g="family" data-v="3~4인" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">👨‍👩‍👧</span>
+          <div class="oc-name">3~4인</div>
+          <div class="oc-hint">표준 가족</div>
+        </div>
+        <div class="opt-card" data-g="family" data-v="5인이상" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">👨‍👩‍👧‍👦</span>
+          <div class="oc-name">5인 이상</div>
+          <div class="oc-hint">대가족</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- D. 환경 -->
+    <div class="fsec">
+      <div class="fsec-label"><span>D</span> 환경 조건</div>
+      <div class="opt-grid col2" id="env-grid">
+        <div class="opt-card" data-g="env" data-v="추운지역" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">❄️</span>
+          <div class="oc-name">추운 지역</div>
+          <div class="oc-hint">한랭 기후</div>
+        </div>
+        <div class="opt-card" data-g="env" data-v="더운지역" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">☀️</span>
+          <div class="oc-name">더운 지역</div>
+          <div class="oc-hint">고온 기후</div>
+        </div>
+        <div class="opt-card" data-g="env" data-v="습한지역" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">💧</span>
+          <div class="oc-name">습한 지역</div>
+          <div class="oc-hint">고습도 기후</div>
+        </div>
+        <div class="opt-card" data-g="env" data-v="강풍지역" onclick="pick(this)">
+          <div class="sel-tick"></div>
+          <span class="oc-icon">💨</span>
+          <div class="oc-name">바람이 강한 지역</div>
+          <div class="oc-hint">강풍·해풍</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:120px"></div>
+  </div>
+
+  <div class="cta-fixed">
+    <button class="cta-btn" onclick="startAnalysis()">
+      <span class="cta-icon">✦</span>
+      <span>AI 분석 시작</span>
+      <span class="cta-icon">→</span>
+    </button>
+    <div class="cta-err" id="cta-err">모든 항목을 선택해 주세요</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     LOADING SCREEN
+═══════════════════════════════════════ -->
+<div id="screen-loading" class="screen">
+  <div class="load-logo">Build<span>Mate</span></div>
+
+  <div class="load-steps">
+    <div class="load-step" id="lst0">
+      <div class="ls-dot"><span class="ls-dot-inner">01</span></div>
+      <span>토지 조건 및 지형 분석 중...</span>
+    </div>
+    <div class="load-step" id="lst1">
+      <div class="ls-dot"><span class="ls-dot-inner">02</span></div>
+      <span>최적 구조 방식 계산 중...</span>
+    </div>
+    <div class="load-step" id="lst2">
+      <div class="ls-dot"><span class="ls-dot-inner">03</span></div>
+      <span>건축 재료 데이터베이스 조회 중...</span>
+    </div>
+    <div class="load-step" id="lst3">
+      <div class="ls-dot"><span class="ls-dot-inner">04</span></div>
+      <span>비용 견적 산출 중...</span>
+    </div>
+    <div class="load-step" id="lst4">
+      <div class="ls-dot"><span class="ls-dot-inner">05</span></div>
+      <span>AI 비주얼 렌더링 중...</span>
+    </div>
+  </div>
+
+  <div class="load-bar-wrap">
+    <div class="load-bar-track">
+      <div class="load-bar-fill" id="load-fill"></div>
+    </div>
+    <div class="load-pct" id="load-pct">0%</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     RESULT SCREEN
+═══════════════════════════════════════ -->
+<div id="screen-result" class="screen">
+
+  <nav class="rnav">
+    <div class="rnav-logo">Build<span>Mate</span></div>
+    <div class="rnav-back" onclick="goBack()">← 다시 분석</div>
+  </nav>
+
+  <div class="rhero">
+    <div class="rh-tag">✦ AI 분석 완료</div>
+    <div class="rh-title" id="rh-title">맞춤형 건축 플랜</div>
+    <div class="rh-sel" id="rh-pills"></div>
+  </div>
+
+  <div class="vis-pair">
+    <div class="vis-card">
+      <div class="vc-label">추천 부지 이미지</div>
+      <div class="vc-canvas-wrap">
+        <canvas class="vc" id="cv-land" width="300" height="200"></canvas>
+      </div>
+    </div>
+    <div class="vis-card">
+      <div class="vc-label">추천 주택 이미지</div>
+      <div class="vc-canvas-wrap">
+        <canvas class="vc" id="cv-house" width="300" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="rbody">
+    <!-- Type -->
+    <div class="rcard" id="rc-type">
+      <div class="rcard-head">
+        <div class="rcard-ico ico-blue">🏠</div>
+        <div class="rcard-meta">
+          <div class="rcard-eyebrow">추천 주택 형태</div>
+          <div class="rcard-val" id="rv-type">—</div>
+        </div>
+      </div>
+      <div class="tag-row" id="rt-type"></div>
+      <div class="rcard-desc" id="rd-type"></div>
+    </div>
+
+    <!-- Style -->
+    <div class="rcard" id="rc-style">
+      <div class="rcard-head">
+        <div class="rcard-ico ico-gold">✏️</div>
+        <div class="rcard-meta">
+          <div class="rcard-eyebrow">추천 건축 스타일</div>
+          <div class="rcard-val" id="rv-style">—</div>
+        </div>
+      </div>
+      <div class="tag-row" id="rt-style"></div>
+      <div class="rcard-desc" id="rd-style"></div>
+    </div>
+
+    <!-- Material -->
+    <div class="rcard" id="rc-mat">
+      <div class="rcard-head">
+        <div class="rcard-ico ico-ink">🧱</div>
+        <div class="rcard-meta">
+          <div class="rcard-eyebrow">추천 건축 재료</div>
+          <div class="rcard-val" id="rv-mat">—</div>
+        </div>
+      </div>
+      <div class="tag-row" id="rt-mat"></div>
+      <div class="rcard-desc" id="rd-mat"></div>
+    </div>
+
+    <!-- Structure -->
+    <div class="rcard" id="rc-struct">
+      <div class="rcard-head">
+        <div class="rcard-ico ico-green">⚙️</div>
+        <div class="rcard-meta">
+          <div class="rcard-eyebrow">추천 구조 방식</div>
+          <div class="rcard-val" id="rv-struct">—</div>
+        </div>
+      </div>
+      <div class="tag-row" id="rt-struct"></div>
+      <div class="rcard-desc" id="rd-struct"></div>
+    </div>
+
+    <!-- Cost -->
+    <div class="cost-card" id="rc-cost">
+      <div class="cc-label">예상 건축 비용</div>
+      <div class="cc-amount" id="rv-cost">—</div>
+      <div class="cc-basis" id="rv-cost-basis">부지비 제외 · 설계비 포함 추정가</div>
+      <div class="cc-rows" id="rv-cost-rows"></div>
+    </div>
+
+    <!-- Advice -->
+    <div class="advice-card">
+      <div class="adv-top">
+        <div class="adv-ico">🤖</div>
+        <div>
+          <div class="adv-eyebrow">AI 건축 조언</div>
+          <div class="adv-title">종합 분석 의견</div>
+        </div>
+      </div>
+      <div class="adv-points" id="rv-advice"></div>
+    </div>
+
+    <!-- Env note -->
+    <div class="env-card">
+      <div class="env-head">🌡️ 환경 조건 대응 전략</div>
+      <div class="env-text" id="rv-env"></div>
+    </div>
+
+    <!-- Expert -->
+    <div class="expert-card">
+      <div class="exp-badge">★ 전문가 모드</div>
+      <div class="exp-title">심층 견적 분석</div>
+      <div class="exp-grid" id="exp-grid"></div>
+      <div class="exp-alt-title">대체 자재 추천</div>
+      <div id="exp-alt"></div>
+    </div>
+
+    <button class="back-btn" onclick="goBack()">← 처음으로 돌아가기</button>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════ */
+const S = {land:null, budget:null, family:null, env:null};
+
+/* ══════════════════════════════════════════════════
+   PICK
+══════════════════════════════════════════════════ */
+function pick(el){
+  const g = el.dataset.g, v = el.dataset.v;
+  document.querySelectorAll(`.opt-card[data-g="${g}"]`).forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  S[g] = v;
+  updateSteps();
+}
+
+function updateSteps(){
+  const map = {land:'sn1', budget:'sn2', family:'sn3', env:'sn4'};
+  Object.entries(map).forEach(([k,id])=>{
+    document.getElementById(id).classList.toggle('filled', !!S[k]);
+  });
+}
+
+/* ══════════════════════════════════════════════════
+   SCREENS
+══════════════════════════════════════════════════ */
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>{
+    s.classList.remove('active');
+    if(s.id==='screen-loading') s.style.display='none';
+  });
+  const el = document.getElementById(id);
+  el.classList.add('active');
+  if(id==='screen-loading') el.style.display='flex';
+}
+
+/* ══════════════════════════════════════════════════
+   START
+══════════════════════════════════════════════════ */
+function startAnalysis(){
+  if(!S.land||!S.budget||!S.family||!S.env){
+    const e=document.getElementById('cta-err');
+    e.classList.add('show');
+    setTimeout(()=>e.classList.remove('show'),2500);
+    return;
+  }
+  show('screen-loading');
+  runLoader();
+}
+
+function runLoader(){
+  const steps=['lst0','lst1','lst2','lst3','lst4'];
+  const pcts=[20,40,60,80,100];
+  const fill=document.getElementById('load-fill');
+  const pctEl=document.getElementById('load-pct');
+  steps.forEach(id=>document.getElementById(id).classList.remove('done'));
+  fill.style.width='0%'; pctEl.textContent='0%';
+  let i=0;
+  const iv=setInterval(()=>{
+    if(i<steps.length){
+      document.getElementById(steps[i]).classList.add('done');
+      fill.style.width=pcts[i]+'%';
+      pctEl.textContent=pcts[i]+'%';
+      i++;
+    } else {
+      clearInterval(iv);
+      setTimeout(()=>{
+        buildResults();
+        show('screen-result');
+        window.scrollTo(0,0);
+      },400);
+    }
+  },480);
+}
+
+/* ══════════════════════════════════════════════════
+   DATA ENGINE
+══════════════════════════════════════════════════ */
+const DB = {
+  land:{
+    '평지':{
+      type:'평지형 단독주택',
+      typeTags:['수평 레이아웃','넓은 마당 확보','단층~2층 자유'],
+      typeDesc:'평지는 가장 이상적인 건축 부지입니다. 기초 공사가 단순하고 공사비를 절감할 수 있으며, 마당과 정원 공간을 자유롭게 확보할 수 있습니다. 수평으로 펼쳐지는 레이아웃 덕분에 생활 동선이 효율적으로 구성되고, 향후 증축이나 리모델링에도 유리합니다.',
+      struct:'라멘 구조 (RC 일체형)',
+      structTags:['내진 1등급','공간 자유도 최대','개구부 유연'],
+      structDesc:'라멘 구조는 기둥과 보를 일체화한 방식으로 평지에 가장 널리 쓰입니다. 내진 성능이 탁월하고 창호와 개구부를 자유롭게 계획할 수 있어 대형 거실 창이나 오픈 플랜 설계에 유리합니다. 향후 리모델링 시 내부 공간 변경도 상대적으로 용이합니다.',
+      landDraw:'flat'
+    },
+    '경사지':{
+      type:'필로티·테라스 하우스',
+      typeTags:['필로티 1층','스플릿 레벨','테라스 전망'],
+      typeDesc:'경사지는 지형을 역이용하는 설계 접근이 핵심입니다. 필로티 구조로 건물을 들어올려 안정적인 수평 기초를 만들고, 스플릿 레벨 설계로 각 층에서 서로 다른 경관을 즐길 수 있습니다. 계단식 테라스는 경사지의 단점을 오히려 입체적인 외부 공간으로 전환합니다.',
+      struct:'필로티 + 슬래브 혼합 구조',
+      structTags:['지형 최적화','레벨 분리','부동침하 방지'],
+      structDesc:'경사지에서는 지반이 불균일하게 침하할 위험이 있어 지점별 강성이 다른 필로티+슬래브 혼합 구조가 필수입니다. 각 기둥의 길이를 지형에 맞게 달리하여 수평 기준선을 잡고, 레벨을 분리한 슬래브 구조로 자연 채광과 조망을 극대화합니다.',
+      landDraw:'hill'
+    },
+    '해안가':{
+      type:'오션뷰 개방형 주택',
+      typeTags:['대형 파노라마 창','내부식 설계','데크·테라스'],
+      typeDesc:'해안가 주택의 핵심은 바다 조망과 내구성의 균형입니다. 염분과 습기에 강한 재료를 선택하고, 바다를 향해 열린 대형 창과 외부 데크를 배치합니다. 해풍의 방향을 고려한 공기 흐름 설계로 자연 환기를 극대화하고, 창호는 내부식 코팅 처리된 스테인리스·알루미늄 프레임을 사용합니다.',
+      struct:'내부식 RC 구조',
+      structTags:['에폭시 도막 철근','특수 방수 콘크리트','내염해 설계'],
+      structDesc:'해안가 염분 환경에서는 일반 철근이 부식되어 구조 수명이 급격히 단축됩니다. 에폭시 코팅 철근과 해양용 혼화재를 사용한 특수 콘크리트를 적용하고, 기초부터 외벽까지 방수층을 반복 처리합니다. 창틀과 난간은 316 스테인리스 또는 해양급 알루미늄만 사용해야 합니다.',
+      landDraw:'coast'
+    },
+    '산지':{
+      type:'자연 친화형 산장 주택',
+      typeTags:['친환경 목재','자연석 마감','숲 조망 창'],
+      typeDesc:'산지 주택은 자연과의 조화가 미적·환경적 필수 조건입니다. 주변 수목과 어울리는 천연 목재와 현지 석재를 주재료로 사용하고, 부지 훼손을 최소화하는 컴팩트한 배치를 지향합니다. 숲 조망을 극대화하는 창 계획과 기후에 맞춘 높은 단열 성능이 거주 쾌적성을 결정합니다.',
+      struct:'헤비팀버 목구조 (Heavy Timber)',
+      structTags:['친환경 인증','내진 유연성','자연 단열'],
+      structDesc:'헤비팀버 목구조는 대형 원목 부재를 사용하는 방식으로 산지의 자연경관과 완벽히 어울립니다. 목재의 유연성이 지진 에너지를 효율적으로 분산시키며, 두꺼운 목재 자체가 훌륭한 단열재 역할을 합니다. 화재 시에도 단면이 커 붕괴 속도가 느려 안전성 측면에서도 유리합니다.',
+      landDraw:'forest'
+    },
+    '도심지':{
+      type:'수직형 미니멀 타운하우스',
+      typeTags:['수직 레이아웃','옥상 활용','미니멀 외관'],
+      typeDesc:'도심지의 좁은 부지에서는 수직으로 공간을 최대화하는 설계가 핵심입니다. 현대적 미니멀 외관으로 도시 경관과 조화를 이루고, 각 층을 용도별로 분리하여 프라이버시와 기능성을 동시에 확보합니다. 옥상 정원·테라스를 활용하면 도심 한복판에서도 외부 공간을 충분히 누릴 수 있습니다.',
+      struct:'철골 커튼월 구조',
+      structTags:['경량 고층','수직 확장성','외장 자유도'],
+      structDesc:'도심지 좁은 부지에서 고층화에 최적화된 구조입니다. 철골 프레임이 구조를 담당하고 커튼월 외장 시스템이 외관을 독립적으로 구성하므로 설계 자유도가 극대화됩니다. 공장 제작 후 현장 조립하는 방식으로 공사 기간이 단축되고 도심 공사에 따른 소음·분진도 줄일 수 있습니다.',
+      landDraw:'urban'
+    }
+  },
+  budget:{
+    '저예산':{
+      style:'심플 모던 (Simple Modern)',
+      styleTags:['기능 중심','군더더기 없음','직선미'],
+      styleDesc:'저예산에서 최선의 결과를 얻으려면 불필요한 장식을 완전히 배제하고 기능에 집중해야 합니다. 복잡한 지붕 형태나 돌출부를 없애고 단순한 박스 형태를 기반으로 설계하면 시공 오차가 줄고 자재 낭비도 최소화됩니다. 단순한 외관 속에 내부 공간의 비례와 채광을 세밀하게 계획하면 비용 대비 높은 삶의 질을 얻을 수 있습니다.',
+      mat:'경량목구조 + 시멘트사이딩',
+      matTags:['경제성 최고','시공 속도 빠름','유지관리 쉬움'],
+      matDesc:'경량목구조는 단위 면적당 건축비가 가장 낮으면서도 단열 성능이 우수한 공법입니다. 시멘트사이딩은 목재 외관과 달리 페인트 재도장 없이 수십 년 유지되어 유지관리비가 거의 없습니다. 창호는 PVC 이중유리 시스템을 선택하면 단열과 경제성을 동시에 잡을 수 있습니다.',
+      cost:'9,000만~1억 8,000만 원',
+      costBasis:'연면적 60~85㎡ / 3.3㎡당 250~360만 원 기준',
+      breakdown:[
+        {n:'기초·구조 공사',v:'2,800만 원'},
+        {n:'외벽·지붕 공사',v:'3,200만 원'},
+        {n:'내장 마감 공사',v:'3,500만 원'},
+        {n:'설계·감리비',v:'1,200만 원'},
+        {n:'설비 (전기·배관)',v:'2,100만 원'},
+      ],
+      expertItems:[
+        {l:'예상 연면적',v:'60~85㎡',n:'가족 규모 반영 전'},
+        {l:'공사 기간',v:'3~5개월',n:'경량목구조 기준'},
+        {l:'에너지 효율',v:'3~4등급',n:'기본 단열 시공 시'},
+        {l:'설계비 비중',v:'약 8~10%',n:'총 공사비 대비'},
+      ],
+      altMats:[
+        {n:'OSB 구조패널',p:'㎡당 3.2만 원',note:'뒤틀림 적음, 빠른 시공'},
+        {n:'EPS 단열재',p:'㎡당 1.8만 원',note:'저비용 고단열 효과'},
+        {n:'아스팔트 슁글',p:'㎡당 2.5만 원',note:'경량 지붕, 시공 간편'},
+      ]
+    },
+    '중예산':{
+      style:'컨템포러리 패밀리 (Contemporary Family)',
+      styleTags:['실용성+미학','따뜻한 소재','가족 친화'],
+      styleDesc:'중예산은 기능과 디자인 미학이 균형을 이루는 최적의 구간입니다. 획일적이지 않은 창 배치와 외장 소재의 혼합(벽돌+금속, 목재+콘크리트 등)으로 개성 있는 외관을 만들 수 있습니다. 내부는 오픈 키친·다이닝 구성으로 가족의 소통을 유도하고, 단열·기밀 성능에 투자하여 장기 에너지 비용을 절감합니다.',
+      mat:'RC조 + 외단열복합패널',
+      matTags:['균형 잡힌 성능','복합 마감','중장기 내구성'],
+      matDesc:'철근콘크리트 구조에 외단열복합패널(EIFS)을 조합하면 단열·방수·마감을 한 번에 해결할 수 있습니다. 창호는 알루미늄 이중 로이유리 시스템을 적용하여 열손실을 줄이고, 외장 포인트에 나무 루버나 컬러 금속 패널을 더해 디자인 차별성을 줄 수 있습니다. 유지관리 주기가 7~10년으로 길어 장기적으로 경제적입니다.',
+      cost:'2억 2,000만~3억 8,000만 원',
+      costBasis:'연면적 100~145㎡ / 3.3㎡당 450~650만 원 기준',
+      breakdown:[
+        {n:'기초·구조 공사',v:'7,200만 원'},
+        {n:'외벽·지붕·창호',v:'8,500만 원'},
+        {n:'내장 마감 공사',v:'9,000만 원'},
+        {n:'설계·감리비',v:'3,500만 원'},
+        {n:'설비 (전기·배관·냉난방)',v:'5,800만 원'},
+      ],
+      expertItems:[
+        {l:'예상 연면적',v:'100~145㎡',n:'가족 규모 반영 전'},
+        {l:'공사 기간',v:'6~10개월',n:'RC조 기준'},
+        {l:'에너지 효율',v:'2등급',n:'외단열 시스템 적용 시'},
+        {l:'설계비 비중',v:'약 10~12%',n:'총 공사비 대비'},
+      ],
+      altMats:[
+        {n:'복합 알루미늄 패널',p:'㎡당 8.5만 원',note:'디자인 자유도 높음'},
+        {n:'세라믹 외장 타일',p:'㎡당 11만 원',note:'내구성 탁월, 세척 용이'},
+        {n:'경질 우레탄 단열',p:'㎡당 5.5만 원',note:'최고 단열 성능'},
+      ]
+    },
+    '고예산':{
+      style:'럭셔리 모던 아키텍처 (Luxury Modern)',
+      styleTags:['대형 유리창','프리미엄 석재','건축 예술성'],
+      styleDesc:'고예산 건축은 단순한 집을 넘어 건축 예술 작품이 됩니다. 층고를 높이고 대형 유리를 적극 활용하여 내외부 경계를 허물며, 프리미엄 천연석과 코르텐강 등 특수 외장재로 세월이 지날수록 깊어지는 외관을 만듭니다. 공간 구성은 건축가와 함께 사용자 맞춤 설계(Bespoke Design)로 진행하여 완전한 개성을 실현합니다.',
+      mat:'프리미엄 석재 + 코르텐강 + 트리플 로이유리',
+      matTags:['최고급 마감','내후성 극대화','패시브 수준 단열'],
+      matDesc:'코르텐강은 산화 피막이 보호층을 형성하여 별도 도장 없이 수십 년을 유지하는 친환경 외장재입니다. 천연 석회석·대리석 외장은 시간이 지날수록 품격이 높아지며, 트리플 로이유리 시스템은 패시브하우스 수준의 단열성과 동시에 압도적인 개방감을 제공합니다. 내부 마감은 원목 무구 플로어링과 벽난로 등 프리미엄 요소로 완성합니다.',
+      cost:'5억 5,000만~9억 원+',
+      costBasis:'연면적 200㎡+ / 3.3㎡당 900~1,500만 원 기준',
+      breakdown:[
+        {n:'기초·구조 공사',v:'1억 6,000만 원'},
+        {n:'프리미엄 외장·창호',v:'2억 2,000만 원'},
+        {n:'인테리어·마감 공사',v:'2억 5,000만 원'},
+        {n:'설계·감리비',v:'8,500만 원'},
+        {n:'스마트홈·설비',v:'1억 2,000만 원'},
+      ],
+      expertItems:[
+        {l:'예상 연면적',v:'200~350㎡',n:'가족 규모 반영 전'},
+        {l:'공사 기간',v:'12~20개월',n:'맞춤 설계 포함'},
+        {l:'에너지 효율',v:'패시브 1등급',n:'트리플글레이징 적용 시'},
+        {l:'설계비 비중',v:'약 13~15%',n:'총 공사비 대비'},
+      ],
+      altMats:[
+        {n:'포르투갈산 석회석',p:'㎡당 42만 원',note:'고급 자연석, 반영구적'},
+        {n:'코르텐 내후성강',p:'㎡당 38만 원',note:'시간이 만드는 미학'},
+        {n:'트리플 로이유리',p:'㎡당 28만 원',note:'패시브 단열+개방감'},
+      ]
+    }
+  },
+  family:{
+    '1~2인':{size:'소형 단층 주택 (60~85㎡)',floorMod:1,areaHint:'부부 또는 1인 가구에 최적화된 컴팩트 플랜으로, 불필요한 공간 낭비를 없애고 각 공간의 밀도와 완성도를 높이는 방향으로 설계합니다.'},
+    '3~4인':{size:'표준 2층 주택 (120~160㎡)',floorMod:2,areaHint:'자녀방과 부부 공간을 분리하는 2층 구성이 기본입니다. 1층은 공용 생활 공간, 2층은 개인 침실과 욕실로 구분하면 생활 동선이 명쾌해집니다.'},
+    '5인이상':{size:'대형 다층 주택 (200㎡+)',floorMod:3,areaHint:'구성원이 많을수록 독립성과 공용성의 균형이 중요합니다. 각 자녀에게 독립 침실을 부여하고, 가족 공용 공간은 넉넉하게 확보하며 수납 계획을 입체적으로 짜야 합니다.'}
+  },
+  env:{
+    '추운지역':{
+      label:'추운 지역 (한랭 기후)',
+      strategy:'고단열·기밀 설계',
+      tags:['삼중 로이유리','외단열 200mm+','열교 차단'],
+      text:'한랭 기후에서는 단열과 기밀이 건물 성능의 90%를 결정합니다. 외벽 단열재는 200mm 이상 외단열로 시공하고, 창호는 트리플 로이유리(U값 0.8 이하)를 의무 적용합니다. 열교(thermal bridge)가 발생하는 구조체 접합부는 단열 브레이크를 삽입하여 결로를 원천 차단하고, 열회수 환기장치(HRV)로 신선 공기를 공급하면서도 열손실을 최소화합니다.'
+    },
+    '더운지역':{
+      label:'더운 지역 (고온 기후)',
+      strategy:'차양·환기 중심 설계',
+      tags:['처마 깊이 최적화','맞통풍 설계','차양 시스템'],
+      text:'고온 기후에서는 태양복사열 차단이 가장 우선입니다. 처마 깊이를 남향 기준 90~120cm로 설계하여 여름 직달일사를 차단하고 겨울 햇빛은 유입시킵니다. 개구부는 맞통풍 원리에 따라 배치하고, 외부 전동 블라인드나 루버 시스템으로 일사 제어를 능동적으로 합니다. 지붕은 반사율 높은 쿨루프 소재를 사용하고 다락 환기를 확보합니다.'
+    },
+    '습한지역':{
+      label:'습한 지역 (고습도 기후)',
+      strategy:'방습·결로 방지 설계',
+      tags:['습기차단막','가압 통기층','방수 기초'],
+      text:'고습 환경에서는 결로와 곰팡이가 구조체와 거주 건강을 위협하는 최대 위험 요소입니다. 기초 바닥과 외벽 내부에 방습막을 완전히 연속 시공하고, 외벽 구조 내부에 30mm 이상의 가압 통기층을 형성하여 구조체 내 수분이 자연 건조되도록 합니다. 지붕 처마를 깊게 내어 빗물 튐을 방지하고, 창호 하부 방수 처리를 강화합니다.'
+    },
+    '강풍지역':{
+      label:'바람이 강한 지역 (강풍·해풍)',
+      strategy:'내풍 보강·공기역학 설계',
+      tags:['유선형 지붕','긴결재 보강','내풍 창호'],
+      text:'강풍 지역에서 지붕 들림은 가장 흔하고 치명적인 피해입니다. 지붕 경사를 30° 이하로 낮추거나 유선형(곡면) 지붕을 채택하여 풍압 계수를 낮추고, 지붕-벽체 접합부에 허리케인 타이(hurricane tie) 긴결재를 촘촘히 설치합니다. 창호는 내풍 등급 인증 제품을 사용하고, 건물 모서리는 라운딩 처리하여 와류 형성을 억제합니다.'
+    }
+  }
+};
+
+/* ══════════════════════════════════════════════════
+   ADVICE POINTS (dynamic)
+══════════════════════════════════════════════════ */
+function getAdvice(land, budget, family, env){
+  return [
+    `${land}에 ${budget}을 투입하는 이 조합은 ${getAdviceIntro(land,budget)}`,
+    `${family} 가족을 위한 이상적인 연면적은 ${DB.family[family].size}이며, ${DB.family[family].areaHint}`,
+    `${DB.env[env].label} 조건에서는 ${DB.env[env].strategy}이 가장 중요한 설계 원칙입니다. ${DB.env[env].text.split('.')[0]}.`,
+    `예산의 10~15%는 반드시 설계·감리비로 배정하세요. 검증된 건축사의 감리 없이는 자재 품질과 시공 정확도를 보장할 수 없습니다.`,
+    `착공 전 지질조사(ground survey)와 측량을 완료하고, 해당 지역의 건폐율·용적률·일조권 규정을 반드시 확인하세요.`
+  ];
+}
+function getAdviceIntro(land, budget){
+  const m = {
+    '평지저예산':'비용 효율이 매우 높습니다. 단순한 형태와 경제적 공법의 조합으로 예산 내에서 최고의 거주성을 실현할 수 있습니다.',
+    '평지중예산':'가장 무난하고 완성도 높은 조합입니다. 넓은 부지와 적당한 예산이 만나 여유 있는 가족 주택을 구현합니다.',
+    '평지고예산':'잠재력이 극대화되는 조합입니다. 넓은 평지에 충분한 예산을 투입하면 건축 작품 수준의 주택이 탄생합니다.',
+    '경사지저예산':'도전적이지만 가능합니다. 필로티와 단순한 박스 형태를 조합하면 경사지의 멋을 살리면서도 예산 내 완성이 가능합니다.',
+    '경사지중예산':'최고의 가성비를 보여주는 조합입니다. 적당한 예산으로 경사지의 드라마틱한 뷰를 가진 테라스 하우스를 실현합니다.',
+    '경사지고예산':'경사지의 진가를 완전히 실현하는 조합입니다. 레벨 차를 활용한 다층 테라스와 전면 유리 설계로 압도적인 주택을 만듭니다.',
+  };
+  const key = land+budget;
+  return m[key] || `${land}의 특성을 ${budget} 범위에서 최대한 활용하는 설계 방향이 권장됩니다.`;
+}
+
+/* ══════════════════════════════════════════════════
+   BUILD RESULTS
+══════════════════════════════════════════════════ */
+function buildResults(){
+  const {land,budget,family,env} = S;
+  const ld = DB.land[land], bd = DB.budget[budget], fd = DB.family[family], ed = DB.env[env];
+
+  // Hero
+  document.getElementById('rh-title').textContent = `${land} × ${budget} 맞춤 플랜`;
+  const pills = document.getElementById('rh-pills');
+  pills.innerHTML = [land,budget,family.replace('이상','인+'),ed.label].map(t=>`<div class="rh-pill">${t}</div>`).join('');
+
+  // Type
+  document.getElementById('rv-type').textContent = ld.type;
+  setTags('rt-type', ld.typeTags, 'tag-blue');
+  document.getElementById('rd-type').textContent = ld.typeDesc;
+
+  // Style
+  document.getElementById('rv-style').textContent = bd.style;
+  setTags('rt-style', bd.styleTags, 'tag-gold');
+  document.getElementById('rd-style').textContent = bd.styleDesc;
+
+  // Material
+  document.getElementById('rv-mat').textContent = bd.mat;
+  setTags('rt-mat', bd.matTags, 'tag-ink');
+  document.getElementById('rd-mat').textContent = bd.matDesc;
+
+  // Structure
+  document.getElementById('rv-struct').textContent = ld.struct;
+  setTags('rt-struct', ld.structTags, 'tag-green');
+  document.getElementById('rd-struct').textContent = ld.structDesc;
+
+  // Cost
+  document.getElementById('rv-cost').textContent = bd.cost;
+  document.getElementById('rv-cost-basis').textContent = bd.costBasis;
+  document.getElementById('rv-cost-rows').innerHTML = bd.breakdown.map(r=>
+    `<div class="cc-row"><span class="cc-rname">${r.n}</span><span class="cc-rval">${r.v}</span></div>`
+  ).join('');
+
+  // Advice
+  const advPts = getAdvice(land, budget, family, env);
+  document.getElementById('rv-advice').innerHTML = advPts.map(p=>
+    `<div class="adv-pt"><div class="adv-bullet"></div><span>${p}</span></div>`
+  ).join('');
+
+  // Env
+  document.getElementById('rv-env').textContent = `[${ed.strategy}] ${ed.text}`;
+
+  // Expert grid
+  document.getElementById('exp-grid').innerHTML = bd.expertItems.map(it=>
+    `<div class="exp-item"><div class="exp-item-lbl">${it.l}</div><div class="exp-item-val">${it.v}</div><div class="exp-item-note">${it.n}</div></div>`
+  ).join('');
+
+  // Alt mats
+  document.getElementById('exp-alt').innerHTML = bd.altMats.map(m=>
+    `<div class="alt-mat-row"><div class="amr-left"><div class="amr-name">${m.n}</div><div class="amr-note">${m.note}</div></div><div class="amr-price">${m.p}</div></div>`
+  ).join('');
+
+  // Draw canvases
+  setTimeout(()=>{
+    drawLand(document.getElementById('cv-land'), land, env);
+    drawHouse(document.getElementById('cv-house'), land, budget, family, env);
+  }, 80);
+}
+
+function setTags(id, tags, cls){
+  document.getElementById(id).innerHTML = tags.map(t=>`<span class="tag ${cls}">${t}</span>`).join('');
+}
+
+/* ══════════════════════════════════════════════════
+   CANVAS — LAND
+══════════════════════════════════════════════════ */
+function drawLand(cv, land, env){
+  const W=cv.width, H=cv.height;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const d = {flat:drawL_flat, hill:drawL_hill, coast:drawL_coast, forest:drawL_forest, urban:drawL_urban};
+  (d[DB.land[land].landDraw]||drawL_flat)(ctx,W,H,env);
+}
+
+function skyGrad(ctx,W,H,top,bot,frac){
+  frac=frac||0.55;
+  const g=ctx.createLinearGradient(0,0,0,H*frac);
+  g.addColorStop(0,top); g.addColorStop(1,bot);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H*frac);
+}
+function groundGrad(ctx,W,H,top,bot,yfrac){
+  const g=ctx.createLinearGradient(0,H*yfrac,0,H);
+  g.addColorStop(0,top); g.addColorStop(1,bot);
+  ctx.fillStyle=g; ctx.fillRect(0,H*yfrac,W,H*(1-yfrac));
+}
+function cloud(ctx,x,y,r){
+  ctx.fillStyle='rgba(255,255,255,.82)';
+  [[0,0,r],[-.6*r,.2*r,.72*r],[.6*r,.15*r,.65*r],[-.3*r,.35*r,.55*r],[.3*r,.38*r,.52*r]].forEach(([dx,dy,rr])=>{
+    ctx.beginPath(); ctx.arc(x+dx,y+dy,rr,0,Math.PI*2); ctx.fill();
+  });
+}
+function pineTree(ctx,x,y,h,c){
+  ctx.fillStyle=c||'#2d6e1a';
+  [[0,0,.38],[0,.28,.34],[0,.52,.28]].forEach(([ox,oy,w])=>{
+    ctx.beginPath(); ctx.moveTo(x+ox-h*w,y-h*oy); ctx.lineTo(x+ox,y-h*(oy+.36)); ctx.lineTo(x+ox+h*w,y-h*oy); ctx.closePath(); ctx.fill();
+  });
+  ctx.fillStyle='#7a4520'; ctx.fillRect(x-4,y-h*.14,8,h*.14);
+}
+function sun(ctx,x,y,r,c){
+  const g=ctx.createRadialGradient(x,y,0,x,y,r*2.5);
+  g.addColorStop(0,(c||'rgba(255,220,60,.95)')); g.addColorStop(1,'transparent');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r*2.5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=c||'#ffe040'; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+}
+
+function drawL_flat(ctx,W,H,env){
+  skyGrad(ctx,W,H,'#85c8f0','#c5e8f8',.58);
+  if(env==='추운지역'){skyGrad(ctx,W,H,'#c8d8e8','#e0e8f0',.58);}
+  sun(ctx,W*.8,H*.18,18,'#ffe840');
+  cloud(ctx,W*.22,H*.14,16); cloud(ctx,W*.58,H*.1,12);
+  groundGrad(ctx,W,H,'#72c44a','#4a9a28',.58);
+  if(env==='추운지역'){groundGrad(ctx,W,H,'#e8eef2','#d0dce6',.58);}
+  // road
+  ctx.fillStyle='#c0b898'; ctx.fillRect(W*.42,H*.55,W*.16,H*.45);
+  ctx.setLineDash([8,8]); ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(W*.5,H*.55); ctx.lineTo(W*.5,H); ctx.stroke(); ctx.setLineDash([]);
+  // trees
+  pineTree(ctx,W*.1,H*.58,H*.36,'#3a8a20'); pineTree(ctx,W*.88,H*.58,H*.32,'#2d7018');
+}
+function drawL_hill(ctx,W,H,env){
+  skyGrad(ctx,W,H,'#6ab2e8','#b8dff5',.65);
+  cloud(ctx,W*.25,H*.1,14); cloud(ctx,W*.65,H*.06,11);
+  // hills
+  ctx.fillStyle='#5fa035';
+  ctx.beginPath(); ctx.moveTo(0,H*.78); ctx.bezierCurveTo(W*.2,H*.22,W*.5,H*.3,W,H*.62); ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.fill();
+  ctx.fillStyle='#7dba4a';
+  ctx.beginPath(); ctx.moveTo(0,H*.88); ctx.bezierCurveTo(W*.3,H*.52,W*.65,H*.58,W,H*.82); ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.fill();
+  // contour lines
+  ctx.strokeStyle='rgba(0,80,0,.13)'; ctx.lineWidth=1.2;
+  for(let i=0;i<5;i++){ctx.beginPath(); ctx.moveTo(0,H*(.78+i*.04)); ctx.bezierCurveTo(W*.2,H*(.24+i*.04),W*.5,H*(.3+i*.04),W,H*(.62+i*.04)); ctx.stroke();}
+  pineTree(ctx,W*.72,H*.62,H*.28,'#2a6018'); pineTree(ctx,W*.82,H*.64,H*.24,'#1e4d12');
+}
+function drawL_coast(ctx,W,H,env){
+  skyGrad(ctx,W,H,'#1a68b8','#5ab0e8',.48);
+  sun(ctx,W*.72,H*.16,20,'#fff88a');
+  // ocean
+  const oc=ctx.createLinearGradient(0,H*.48,0,H*.74);
+  oc.addColorStop(0,'#1e80c8'); oc.addColorStop(1,'#0a4888');
+  ctx.fillStyle=oc; ctx.fillRect(0,H*.48,W,H*.26);
+  // waves
+  ctx.strokeStyle='rgba(255,255,255,.45)'; ctx.lineWidth=1.5;
+  for(let i=0;i<3;i++){ctx.beginPath(); for(let x=0;x<=W;x+=6)ctx.lineTo(x,H*(.54+i*.05)+Math.sin(x/15+i)*3.5); ctx.stroke();}
+  // sand
+  const sand=ctx.createLinearGradient(0,H*.74,0,H);
+  sand.addColorStop(0,'#f2da8a'); sand.addColorStop(1,'#d4b848');
+  ctx.fillStyle=sand; ctx.fillRect(0,H*.74,W,H*.26);
+  // horizon glow
+  ctx.fillStyle='rgba(255,200,60,.18)'; ctx.fillRect(0,H*.44,W,H*.08);
+}
+function drawL_forest(ctx,W,H,env){
+  skyGrad(ctx,W,H,'#90cce0','#bce0ec',.52);
+  cloud(ctx,W*.3,H*.1,13);
+  // mountain bg
+  ctx.fillStyle='#8ab870';
+  ctx.beginPath(); ctx.moveTo(0,H*.52); ctx.lineTo(W*.22,H*.16); ctx.lineTo(W*.5,H*.36); ctx.lineTo(W*.76,H*.08); ctx.lineTo(W,H*.38); ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.fill();
+  // forest floor
+  ctx.fillStyle='#3a6a20'; ctx.fillRect(0,H*.58,W,H*.42);
+  const colors=['#1e5510','#2a7018','#3a8a24','#4a9e2e'];
+  for(let i=0;i<9;i++) pineTree(ctx, W*(i*.12-.02), H*.58, H*(.26+Math.sin(i)*0.04), colors[i%4]);
+}
+function drawL_urban(ctx,W,H,env){
+  skyGrad(ctx,W,H,'#96b4cc','#c4d4e2',.62);
+  // bg buildings
+  const bldgs=[[.02,.28,.14,.58],[.17,.18,.18,.66],[.36,.3,.1,.52],[.47,.12,.2,.7],[.68,.22,.14,.58],[.83,.15,.16,.66]];
+  bldgs.forEach(([x,yf,w,h])=>{
+    const hue=200+Math.random()*20;
+    ctx.fillStyle=`hsl(${hue},12%,${48+Math.random()*16}%)`;
+    ctx.fillRect(W*x,H*yf,W*w,H*h);
+    ctx.fillStyle='rgba(255,230,100,.55)';
+    for(let r=0;r<5;r++) for(let c=0;c<2;c++)
+      ctx.fillRect(W*x+W*w*.15+c*W*w*.42, H*yf+H*h*.08+r*H*h*.16, W*w*.22,H*h*.1);
+  });
+  // road
+  ctx.fillStyle='#555'; ctx.fillRect(0,H*.82,W,H*.18);
+  ctx.setLineDash([10,10]); ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,H*.91); ctx.lineTo(W,H*.91); ctx.stroke(); ctx.setLineDash([]);
+}
+
+/* ══════════════════════════════════════════════════
+   CANVAS — HOUSE
+══════════════════════════════════════════════════ */
+function drawHouse(cv, land, budget, family, env){
+  const W=cv.width, H=cv.height;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const floors = family==='5인이상'?3 : family==='3~4인'?2 : 1;
+  const luxury = budget==='고예산';
+  const mid = budget==='중예산';
+  const d={평지:drawH_flat, 경사지:drawH_piloti, 해안가:drawH_coast, 산지:drawH_cabin, 도심지:drawH_urban};
+  (d[land]||drawH_flat)(ctx,W,H,floors,luxury,mid,env);
+}
+
+function drawH_flat(ctx,W,H,fl,lux,mid,env){
+  // sky + ground
+  skyGrad(ctx,W,H,'#c0d8ee','#d8ecf8',.64);
+  if(env==='추운지역'){skyGrad(ctx,W,H,'#d0dce8','#e4eaf0',.64);}
+  groundGrad(ctx,W,H,'#7ec84a','#58a830',.64);
+  if(env==='추운지역'){groundGrad(ctx,W,H,'#e8eef2','#ccd8e0',.64);}
+
+  const bw=lux?W*.72:mid?W*.62:W*.52;
+  const bh=H*(0.18+fl*0.1);
+  const bx=(W-bw)/2, by=H*.64-bh;
+
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.06)'; ctx.fillRect(bx+6,by+bh-4,bw,H*.12);
+
+  // body
+  const bg=ctx.createLinearGradient(bx,by,bx,by+bh);
+  if(lux){bg.addColorStop(0,'#e8e4e0'); bg.addColorStop(1,'#f5f2ee');}
+  else if(mid){bg.addColorStop(0,'#d8cdb8'); bg.addColorStop(1,'#ece4d0');}
+  else{bg.addColorStop(0,'#c8bc98'); bg.addColorStop(1,'#dcd0b0');}
+  ctx.fillStyle=bg; ctx.fillRect(bx,by,bw,bh);
+
+  if(lux){
+    // flat roof + overhang
+    ctx.fillStyle='#2a2a30'; ctx.fillRect(bx-8,by-10,bw+16,13);
+    // large glass panels
+    ctx.fillStyle='rgba(120,190,248,.78)'; ctx.fillRect(bx+bw*.06,by+bh*.08,bw*.88,bh*.55);
+    ctx.strokeStyle='rgba(150,150,150,.6)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(bx+bw*.5,by+bh*.08); ctx.lineTo(bx+bw*.5,by+bh*.63); ctx.stroke();
+    for(let f=0;f<fl;f++){ctx.beginPath(); ctx.moveTo(bx+bw*.06,by+bh*(.08+f*(bh*.55/(fl*bh))));} // floor dividers
+  } else {
+    // pitched roof
+    ctx.fillStyle=mid?'#8a7055':'#6a4a28';
+    ctx.beginPath(); ctx.moveTo(bx-12,by); ctx.lineTo(W/2,by-H*.2); ctx.lineTo(bx+bw+12,by); ctx.closePath(); ctx.fill();
+    // chimney
+    if(env==='추운지역'){ctx.fillStyle='#8a7055'; ctx.fillRect(W/2+bw*.15,by-H*.28,W*.04,H*.15);}
+    // windows
+    const winColor='rgba(140,200,248,.75)';
+    ctx.fillStyle=winColor;
+    for(let f=0;f<fl;f++){
+      ctx.fillRect(bx+bw*.1,by+bh*(.12+f*.38),bw*.24,bh*.24);
+      ctx.fillRect(bx+bw*.65,by+bh*(.12+f*.38),bw*.24,bh*.24);
+    }
+  }
+
+  // door
+  ctx.fillStyle=lux?'#1a1a20':'#8B5a2B';
+  ctx.fillRect(W/2-W*.045,by+bh*.62,W*.09,bh*.38);
+
+  // snow
+  if(env==='추운지역'){
+    ctx.fillStyle='rgba(240,246,254,.85)';
+    if(lux) ctx.fillRect(bx-8,by-10,bw+16,7);
+    else{ctx.beginPath(); ctx.moveTo(bx-12,by); ctx.lineTo(W/2,by-H*.2); ctx.lineTo(bx+bw+12,by); ctx.lineTo(bx,by); ctx.fill();}
+  }
+}
+
+function drawH_piloti(ctx,W,H,fl,lux,mid,env){
+  skyGrad(ctx,W,H,'#b2d0e8','#d4e8f4',.65);
+  // hill
+  ctx.fillStyle='#60a038';
+  ctx.beginPath(); ctx.moveTo(0,H*.8); ctx.bezierCurveTo(W*.3,H*.38,W*.7,H*.44,W,H*.72); ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.fill();
+  // piloti columns
+  const cols=[W*.28,W*.5,W*.72];
+  ctx.fillStyle='#b0a898';
+  cols.forEach(x=>{ctx.fillRect(x-5,H*.5,10,H*.3);});
+  // house body
+  const bw=W*.62, bh=H*(0.22+fl*0.08), bx=W*.19, by=H*.28;
+  ctx.fillStyle=lux?'#e8e4e0':mid?'#d8cdb8':'#c8bc98';
+  ctx.fillRect(bx,by,bw,bh);
+  // flat roof
+  ctx.fillStyle=lux?'#1a1a22':'#666'; ctx.fillRect(bx-6,by-8,bw+12,11);
+  // terrace
+  ctx.fillStyle='#c8c0b0'; ctx.fillRect(bx+bw*.55,by+2,bw*.43,6);
+  // large window
+  ctx.fillStyle=lux?'rgba(100,180,248,.85)':'rgba(140,200,248,.72)';
+  ctx.fillRect(bx+bw*.06,by+bh*.1,bw*.42,bh*.62);
+  ctx.strokeStyle='#aaa'; ctx.lineWidth=1.2; ctx.strokeRect(bx+bw*.06,by+bh*.1,bw*.42,bh*.62);
+}
+
+function drawH_coast(ctx,W,H,fl,lux,mid,env){
+  skyGrad(ctx,W,H,'#1860a8','#72b8e8',.5);
+  sun(ctx,W*.76,H*.14,18,'#fff8a0');
+  const oc=ctx.createLinearGradient(0,H*.5,0,H*.74);
+  oc.addColorStop(0,'#1e7cc8'); oc.addColorStop(1,'#0a4888');
+  ctx.fillStyle=oc; ctx.fillRect(0,H*.5,W,H*.24);
+  ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=1.5;
+  for(let i=0;i<2;i++){ctx.beginPath(); for(let x=0;x<=W;x+=6)ctx.lineTo(x,H*(.56+i*.06)+Math.sin(x/14+i)*3); ctx.stroke();}
+  const sand=ctx.createLinearGradient(0,H*.74,0,H);
+  sand.addColorStop(0,'#f0d888'); sand.addColorStop(1,'#d0b040');
+  ctx.fillStyle=sand; ctx.fillRect(0,H*.74,W,H*.26);
+
+  const bw=W*.66, bh=H*(0.24+fl*0.08), bx=W*.17, by=H*.44-bh;
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.05)'; ctx.fillRect(bx+5,by+bh-3,bw,H*.1);
+  ctx.fillStyle=lux?'#f0ece8':'#e8e4de'; ctx.fillRect(bx,by,bw,bh);
+  // roof overhang
+  ctx.fillStyle='#7a7875'; ctx.fillRect(bx-14,by-10,bw+28,14);
+  // panorama window — the whole front
+  ctx.fillStyle=lux?'rgba(80,170,248,.88)':'rgba(120,190,248,.78)';
+  ctx.fillRect(bx+bw*.05,by+bh*.06,bw*.9,bh*.5);
+  ctx.strokeStyle='#bbb'; ctx.lineWidth=1.5;
+  for(let i=1;i<3;i++) ctx.strokeRect(bx+bw*(i*.3+.05),by+bh*.06,bw*.28,bh*.5);
+  // deck
+  ctx.fillStyle='#c8a870'; ctx.fillRect(bx-12,by+bh*.72,bw+24,H*.055);
+  for(let i=0;i<10;i++) ctx.fillRect(bx-12+i*(bw+24)/9,by+bh*.72,2,H*.055);
+}
+
+function drawH_cabin(ctx,W,H,fl,lux,mid,env){
+  skyGrad(ctx,W,H,'#9acea0','#c0e0c8',.56);
+  // bg trees
+  pineTree(ctx,W*.04,H*.56,H*.38,'#1e5510'); pineTree(ctx,W*.9,H*.56,H*.34,'#1a4c0e');
+  groundGrad(ctx,W,H,'#5a8030','#3a6020',.56);
+
+  const bw=W*.54, bh=H*(0.22+fl*0.08), bx=W*.23, by=H*.36;
+  // log layers
+  for(let i=0;i<5;i++){
+    ctx.fillStyle=i%2===0?'#8B5a2B':'#a47038';
+    ctx.fillRect(bx,by+i*bh/5,bw,bh/5);
+    ctx.strokeStyle='rgba(0,0,0,.08)'; ctx.lineWidth=.8; ctx.strokeRect(bx,by+i*bh/5,bw,bh/5);
+  }
+  // steep roof
+  ctx.fillStyle=lux?'#4a3020':'#3a2015';
+  ctx.beginPath(); ctx.moveTo(bx-14,by); ctx.lineTo(W/2,by-H*.26); ctx.lineTo(bx+bw+14,by); ctx.closePath(); ctx.fill();
+  if(env==='추운지역'){
+    ctx.fillStyle='rgba(238,246,255,.88)';
+    ctx.beginPath(); ctx.moveTo(bx-13,by); ctx.lineTo(W/2,by-H*.26); ctx.lineTo(bx+bw+13,by); ctx.closePath(); ctx.fill();
+  }
+  // windows
+  ctx.fillStyle='rgba(255,220,100,.85)';
+  ctx.fillRect(bx+bw*.1,by+bh*.15,bw*.26,bh*.5); ctx.fillRect(bx+bw*.64,by+bh*.15,bw*.26,bh*.5);
+  ctx.strokeStyle='#7a4520'; ctx.lineWidth=2;
+  ctx.strokeRect(bx+bw*.1,by+bh*.15,bw*.26,bh*.5); ctx.strokeRect(bx+bw*.64,by+bh*.15,bw*.26,bh*.5);
+}
+
+function drawH_urban(ctx,W,H,fl,lux,mid,env){
+  skyGrad(ctx,W,H,'#b0c4d8','#c8d8e8',.68);
+  // bg buildings
+  [[.02,.22,.16,.6],[.77,.18,.18,.64]].forEach(([x,yf,w,h])=>{
+    ctx.fillStyle='#9aa8b5'; ctx.fillRect(W*x,H*yf,W*w,H*h);
+    ctx.fillStyle='rgba(255,230,100,.4)';
+    for(let r=0;r<4;r++) for(let c=0;c<2;c++) ctx.fillRect(W*x+W*w*.15+c*W*w*.42,H*yf+H*h*.08+r*H*h*.2,W*w*.22,H*h*.1);
+  });
+
+  const bw=W*.48, bh=H*(0.14+fl*0.16), bx=W*.26, by=H*.68-bh;
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.07)'; ctx.fillRect(bx+5,by+bh-4,bw,H*.1);
+  ctx.fillStyle=lux?'#18181e':mid?'#e0dcd8':'#d8d4ce'; ctx.fillRect(bx,by,bw,bh);
+  if(lux){
+    // curtain wall
+    ctx.fillStyle='rgba(80,158,238,.82)'; ctx.fillRect(bx+bw*.06,by+bh*.04,bw*.88,bh*.9);
+    ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.lineWidth=1;
+    for(let f=1;f<fl*2;f++){ctx.beginPath(); ctx.moveTo(bx+bw*.06,by+bh*.04+f*bh*.9/(fl*2)); ctx.lineTo(bx+bw*.94,by+bh*.04+f*bh*.9/(fl*2)); ctx.stroke();}
+    ctx.beginPath(); ctx.moveTo(bx+bw*.5,by+bh*.04); ctx.lineTo(bx+bw*.5,by+bh*.94); ctx.stroke();
+  } else {
+    for(let f=0;f<fl;f++){
+      [.12,.58].forEach(wx=>{ctx.fillStyle='rgba(140,200,248,.72)'; ctx.fillRect(bx+bw*wx,by+bh*(.08+f*(1/fl)*.82),bw*.3,bh*.22);});
+    }
+  }
+  // road + pavement
+  ctx.fillStyle='#525258'; ctx.fillRect(0,H*.7,W,H*.3);
+  ctx.setLineDash([10,10]); ctx.strokeStyle='rgba(255,255,255,.45)'; ctx.lineWidth=1.8;
+  ctx.beginPath(); ctx.moveTo(0,H*.84); ctx.lineTo(W,H*.84); ctx.stroke(); ctx.setLineDash([]);
+}
+
+/* ══════════════════════════════════════════════════
+   BACK
+══════════════════════════════════════════════════ */
+function goBack(){
+  show('screen-input');
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>

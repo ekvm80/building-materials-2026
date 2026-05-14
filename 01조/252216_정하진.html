@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>서울특별시 법적 일조 수인한도 분석 시스템</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body { margin: 0; overflow: hidden; font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; }
+        #canvas-container { position: absolute; top: 0; left: 380px; width: calc(100% - 380px); height: 100vh; }
+        .sidebar {
+            position: absolute; top: 0; left: 0; width: 380px; height: 100vh;
+            background: white; padding: 24px; box-shadow: 10px 0 30px rgba(0,0,0,0.05);
+            overflow-y: auto; z-index: 50; border-right: 1px solid #e2e8f0;
+        }
+        .legal-tag {
+            background: #1e293b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 800;
+        }
+        input[type="range"] { accent-color: #2563eb; }
+        .result-box { border-left: 4px solid #2563eb; background: #f8fafc; transition: all 0.3s ease; }
+        .loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.9); display: none;
+            flex-direction: column; justify-content: center; align-items: center; z-index: 1000; color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading-screen" class="loading-overlay">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-6"></div>
+        <p class="text-xl font-black">진태양시 기반 법적 시뮬레이션 중</p>
+        <p id="progress-text" class="text-blue-400 mt-2 font-mono">서울 위경도 및 경도 시차 보정 적용...</p>
+    </div>
+
+    <div class="sidebar">
+        <header class="mb-10">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="legal-tag">SEOUL LEGAL STD</span>
+                <span class="text-slate-400 text-[10px] font-bold tracking-widest">VER 3.5 PRO</span>
+            </div>
+            <h1 class="text-2xl font-black text-slate-800 leading-tight">일조 수인한도<br>정밀 분석 엔진</h1>
+        </header>
+
+        <div class="space-y-8">
+            <!-- 고정 위치 정보 -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-tighter mb-2">Analysis Location</h2>
+                <p class="text-sm font-bold text-slate-700">서울특별시청 (37.56°N, 126.97°E)</p>
+                <p class="text-[10px] text-blue-600 mt-1 font-semibold italic">표준시 대비 -32.1분 진태양시 자동 보정 중</p>
+            </div>
+
+            <!-- 시뮬레이션 설정 -->
+            <div class="space-y-5">
+                <div>
+                    <label class="text-xs font-black text-slate-500 block mb-2">분석 기준일</label>
+                    <input type="date" id="date-input" class="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm font-bold shadow-sm focus:ring-2 focus:ring-blue-500 outline-none" value="2024-12-21">
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="text-xs font-black text-slate-500">시각 설정 (KST)</label>
+                        <span id="time-display" class="text-lg font-black text-blue-600">12:00</span>
+                    </div>
+                    <input type="range" id="time-slider" min="7.5" max="17.5" step="0.05" value="12" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                    <div id="solar-time-info" class="mt-2 p-2 bg-blue-50 rounded-lg text-[10px] font-bold text-blue-700 flex justify-between">
+                        <span id="solar-time-val">진태양시: 11:28</span>
+                        <span>측정기준: 동지(Winter Solstice)</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs font-black text-slate-500 block mb-2">신축 건물 높이(m)</label>
+                        <input type="number" id="b1-height" value="60" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold">
+                    </div>
+                    <div>
+                        <label class="text-xs font-black text-slate-500 block mb-2">건물 간 이격(m)</label>
+                        <input type="number" id="b2-distance" value="35" class="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold">
+                    </div>
+                </div>
+            </div>
+
+            <button id="run-analysis" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-lg hover:bg-slate-900 transition-all shadow-xl shadow-blue-100 flex justify-center items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                법적 리포트 생성
+            </button>
+
+            <!-- 분석 결과 테이블 -->
+            <div id="report-card" class="hidden animate-in slide-in-from-bottom duration-500">
+                <div class="result-box p-5 rounded-2xl shadow-sm border border-slate-100 mb-4">
+                    <h3 class="text-xs font-black text-slate-400 mb-4 uppercase tracking-widest">Analysis Results</h3>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-500">최저 연속 일조 (09~15시)</span>
+                            <span id="res-continuous" class="text-xl font-black text-slate-900 tracking-tighter">--:--</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-500">최저 총합 일조 (08~16시)</span>
+                            <span id="res-total" class="text-xl font-black text-slate-900 tracking-tighter">--:--</span>
+                        </div>
+                        <div id="res-verdict" class="mt-4 p-4 rounded-xl text-center text-xs font-black uppercase tracking-widest"></div>
+                    </div>
+                </div>
+                <div class="bg-slate-900 p-4 rounded-xl text-[10px] text-slate-400 leading-relaxed font-medium">
+                    <b class="text-white">학술적 안내:</b> 본 시스템은 창문 하단(바닥면 기준 1.2m)의 5개 센서 중 가장 불리한 지점의 데이터를 채택합니다. 이는 건축법 및 대법원 판례의 보수적 판단 기준을 따르는 공학적 설계입니다.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- Seoul Constants ---
+        const SEOUL_LAT = 37.5665;
+        const SEOUL_LNG = 126.9780;
+        const KST_STD_MERIDIAN = 135.0;
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#f8fafc');
+        
+        const camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 1, 3000);
+        camera.position.set(160, 200, 250);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // --- Environment ---
+        const grid = new THREE.GridHelper(500, 50, 0xcbd5e1, 0xf1f5f9);
+        scene.add(grid);
+
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(1000, 1000),
+            new THREE.MeshStandardMaterial({ color: '#ffffff' })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Buildings
+        const analysisGroup = new THREE.Group();
+        scene.add(analysisGroup);
+
+        const b1Mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(25, 1, 25),
+            new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.2 })
+        );
+        b1Mesh.castShadow = true;
+        b1Mesh.receiveShadow = true;
+        analysisGroup.add(b1Mesh);
+
+        const b2Mesh = new THREE.Mesh(
+            new THREE.BoxGeometry(32, 25, 15),
+            new THREE.MeshStandardMaterial({ color: '#94a3b8', roughness: 0.8 })
+        );
+        b2Mesh.castShadow = true;
+        b2Mesh.receiveShadow = true;
+        analysisGroup.add(b2Mesh);
+
+        // Window & Sensor Visualizers
+        const sensorGroup = new THREE.Group();
+        scene.add(sensorGroup);
+
+        // Lights
+        const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambient);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.set(4096, 4096); // High res shadows
+        sunLight.shadow.camera.left = -250;
+        sunLight.shadow.camera.right = 250;
+        sunLight.shadow.camera.top = 250;
+        sunLight.shadow.camera.bottom = -250;
+        scene.add(sunLight);
+
+        // 태양 위치 시각화 구체 (새로 추가된 부분)
+        const sunSphereGeometry = new THREE.SphereGeometry(12, 32, 32);
+        const sunSphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+        const sunSphere = new THREE.Mesh(sunSphereGeometry, sunSphereMaterial);
+        scene.add(sunSphere);
+
+        // --- Core Logic: Solar & Legal ---
+
+        // 진태양시(Solar Time) 계산: 표준시 대비 서울의 시차 보정
+        function calculateSolarDate(baseDate) {
+            const dayOfYear = Math.floor((baseDate - new Date(baseDate.getFullYear(), 0, 0)) / 86400000);
+            const b = (2 * Math.PI * (dayOfYear - 81)) / 365;
+            const eot = 9.87 * Math.sin(2 * b) - 7.53 * Math.cos(b) - 1.5 * Math.sin(b); // 균시차(분)
+            const lngDiff = (SEOUL_LNG - KST_STD_MERIDIAN) * 4; // 경도보정 (1도당 4분)
+            const totalShiftMinutes = eot + lngDiff;
+            return new Date(baseDate.getTime() + totalShiftMinutes * 60000);
+        }
+
+        function updateSimulation() {
+            const dateInput = new Date(document.getElementById('date-input').value);
+            const timeVal = parseFloat(document.getElementById('time-slider').value);
+            const b1H = parseFloat(document.getElementById('b1-height').value);
+            const b2D = parseFloat(document.getElementById('b2-distance').value);
+
+            // 시간 텍스트 업데이트
+            const hh = Math.floor(timeVal);
+            const mm = Math.round((timeVal - hh) * 60);
+            dateInput.setHours(hh, mm);
+            document.getElementById('time-display').innerText = `${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}`;
+
+            // 진태양시 정보 업데이트
+            const solarDate = calculateSolarDate(dateInput);
+            const sH = solarDate.getHours();
+            const sM = solarDate.getMinutes();
+            document.getElementById('solar-time-val').innerText = `진태양시: ${sH.toString().padStart(2,'0')}:${sM.toString().padStart(2,'0')}`;
+
+            // 건물 변형
+            b1Mesh.scale.y = b1H;
+            b1Mesh.position.y = b1H / 2;
+            b2Mesh.position.set(0, 12.5, -b2D);
+
+            // 태양 위치 계산
+            const sunPos = SunCalc.getPosition(solarDate, SEOUL_LAT, SEOUL_LNG);
+            const radius = 450;
+            const x = -radius * Math.cos(sunPos.altitude) * Math.sin(sunPos.azimuth);
+            const y = radius * Math.sin(sunPos.altitude);
+            const z = radius * Math.cos(sunPos.altitude) * Math.cos(sunPos.azimuth);
+
+            sunLight.position.set(x, y, z);
+            sunLight.intensity = sunPos.altitude > 0 ? 1.2 : 0;
+
+            // 태양 구체 위치 동기화 (새로 추가된 부분)
+            sunSphere.position.set(x, y, z);
+            sunSphere.visible = sunPos.altitude > 0;
+
+            // 창문 및 법적 수음점 가이드 시각화
+            drawLegalGuide(b2D);
+        }
+
+        function drawLegalGuide(distance) {
+            sensorGroup.clear();
+            const zPos = -distance + 7.6; // 타겟 건물 전면 외벽
+            const sensorY = 1.2; // 법적 기준 높이
+
+            // 1. 창문 영역 가이드 (반투명 면)
+            const windowGeo = new THREE.PlaneGeometry(10, 8);
+            const windowMat = new THREE.MeshBasicMaterial({ 
+                color: 0x3b82f6, 
+                transparent: true, 
+                opacity: 0.15,
+                side: THREE.DoubleSide
+            });
+            const windowPlane = new THREE.Mesh(windowGeo, windowMat);
+            windowPlane.position.set(0, 4.5, zPos - 0.05); // 창문 위치 시각화
+            sensorGroup.add(windowPlane);
+
+            // 2. 창문 테두리
+            const edgeGeo = new THREE.EdgesGeometry(windowGeo);
+            const edgeLine = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: 0x3b82f6, opacity: 0.5, transparent: true }));
+            edgeLine.position.copy(windowPlane.position);
+            sensorGroup.add(edgeLine);
+
+            // 3. 법적 수음점 (5개 센서) - 창문 하단 라인
+            for(let i=0; i<5; i++) {
+                const sensor = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.35),
+                    new THREE.MeshBasicMaterial({ color: 0xef4444 }) // 센서는 강조를 위해 빨간색
+                );
+                sensor.position.set(-4 + i * 2, sensorY, zPos);
+                sensorGroup.add(sensor);
+            }
+        }
+
+        async function performLegalAnalysis() {
+            const loading = document.getElementById('loading-screen');
+            const progress = document.getElementById('progress-text');
+            loading.style.display = 'flex';
+
+            const b1H = parseFloat(document.getElementById('b1-height').value);
+            const b2D = parseFloat(document.getElementById('b2-distance').value);
+            const dateStr = document.getElementById('date-input').value;
+
+            // 5개 수음점(Sensor) 데이터 초기화
+            const sensors = [];
+            for(let i=0; i<5; i++) {
+                sensors.push({
+                    pos: new THREE.Vector3(-4 + i * 2, 1.2, -b2D + 7.6),
+                    continuous: 0,
+                    maxCont: 0,
+                    total: 0
+                });
+            }
+
+            const raycaster = new THREE.Raycaster();
+            const stepMinutes = 5; // 5분 단위 샘플링
+
+            // 시뮬레이션 타임라인 (08:00 ~ 16:00 표준시)
+            let totalSteps = (8 * 60) / stepMinutes;
+            let currentStep = 0;
+
+            for(let h=8; h<=16; h++) {
+                for(let m=0; m<60; m+=stepMinutes) {
+                    if(h === 16 && m > 0) break;
+
+                    const kstDate = new Date(dateStr);
+                    kstDate.setHours(h, m);
+                    const solarDate = calculateSolarDate(kstDate);
+                    const sunPos = SunCalc.getPosition(solarDate, SEOUL_LAT, SEOUL_LNG);
+
+                    if(sunPos.altitude > 0) {
+                        const dir = new THREE.Vector3(
+                            -Math.cos(sunPos.altitude) * Math.sin(sunPos.azimuth),
+                            Math.sin(sunPos.altitude),
+                            Math.cos(sunPos.altitude) * Math.cos(sunPos.azimuth)
+                        ).normalize();
+
+                        sensors.forEach(s => {
+                            raycaster.set(s.pos, dir);
+                            const hit = raycaster.intersectObject(b1Mesh);
+                            if(hit.length === 0) {
+                                // 09:00 ~ 15:00 사이만 연속 일조 카운트
+                                if(h >= 9 && h < 15) {
+                                    s.continuous += stepMinutes;
+                                    if(s.continuous > s.maxCont) s.maxCont = s.continuous;
+                                }
+                                s.total += stepMinutes;
+                            } else {
+                                s.continuous = 0;
+                            }
+                        });
+                    } else {
+                        sensors.forEach(s => s.continuous = 0);
+                    }
+
+                    currentStep++;
+                    if(currentStep % 12 === 0) {
+                        progress.innerText = `진태양시 보정 분석 중: ${Math.round((currentStep/totalSteps)*100)}%`;
+                        await new Promise(r => setTimeout(r, 10));
+                    }
+                }
+            }
+
+            // 가장 불리한 센서의 결과(Worst-case) 도출
+            const minCont = Math.min(...sensors.map(s => s.maxCont));
+            const minTotal = Math.min(...sensors.map(s => s.total));
+
+            loading.style.display = 'none';
+            document.getElementById('report-card').classList.remove('hidden');
+
+            const format = m => `${Math.floor(m/60)}H ${m%60}M`;
+            document.getElementById('res-continuous').innerText = format(minCont);
+            document.getElementById('res-total').innerText = format(minTotal);
+
+            const verdict = document.getElementById('res-verdict');
+            const isSafe = (minCont >= 120 || minTotal >= 240); // 연속 2H 또는 총합 4H
+            
+            if(isSafe) {
+                verdict.className = "mt-4 p-4 rounded-xl text-center text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-100";
+                verdict.innerText = "✅ PASS: 수인한도 기준 만족";
+            } else {
+                verdict.className = "mt-4 p-4 rounded-xl text-center text-xs font-black bg-rose-50 text-rose-700 border border-rose-100";
+                verdict.innerText = "❌ FAIL: 일조 수인한도 위반";
+            }
+        }
+
+        // --- Listeners & Init ---
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        document.querySelectorAll('input').forEach(el => el.addEventListener('input', updateSimulation));
+        document.getElementById('run-analysis').addEventListener('click', performLegalAnalysis);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        updateSimulation();
+        animate();
+    </script>
+</body>
+</html>

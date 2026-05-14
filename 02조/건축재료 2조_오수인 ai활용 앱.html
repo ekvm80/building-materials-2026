@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LitraSpec - 광섬유 투광 콘크리트 엔지니어링 설계</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        :root { --bg-color: #1a1a1a; --panel-bg: #2c2c2c; --text-color: #eee; --border-color: #444; --accent-color: #4CAF50; }
+        body.light-mode { --bg-color: #f0f0f0; --panel-bg: #ffffff; --text-color: #333; --border-color: #ccc; }
+        body { margin: 0; padding: 0; display: flex; height: 100vh; background-color: var(--bg-color); color: var(--text-color); font-family: 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+        
+        #toolbar { width: 320px; background-color: var(--panel-bg); padding: 15px; border-right: 1px solid var(--border-color); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; z-index: 10; }
+        #workspace { flex-grow: 1; position: relative; display: flex; justify-content: center; align-items: center; background-color: var(--bg-color); }
+        
+        canvas { box-shadow: 0 0 20px rgba(0,0,0,0.5); border: 1px solid var(--border-color); cursor: crosshair; }
+        #canvas3d-container { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        
+        h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 2px solid var(--accent-color); padding-bottom: 10px; color: var(--accent-color); letter-spacing: 1px; }
+        .control-group { border-bottom: 1px dashed var(--border-color); padding-bottom: 10px; }
+        .control-group label { display: block; font-size: 0.85rem; margin-bottom: 5px; font-weight: bold;}
+        
+        .row { display: flex; gap: 5px; margin-bottom: 5px; align-items: center; }
+        input[type="range"] { width: 100%; }
+        input[type="number"] { width: 60px; padding: 4px; background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 3px;}
+        input[type="color"] { width: 100%; height: 30px; border: none; padding: 0; cursor: pointer; }
+        
+        button, select { width: 100%; padding: 8px; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; transition: filter 0.2s; }
+        button:hover { filter: brightness(1.1); }
+        button.tool-btn { background-color: #555; }
+        button.tool-btn.active { background-color: #2196F3; }
+        .btn-half { flex: 1; }
+        .alert-text { color: #ff5252; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <h2>LitraSpec v1.0</h2>
+        
+        <div class="control-group">
+            <label>패널 규격 설정 (mm)</label>
+            <div class="row">
+                <span>W:</span> <input type="number" id="panel-w" value="1000">
+                <span>H:</span> <input type="number" id="panel-h" value="1000">
+            </div>
+            <label style="margin-top:10px;">시뮬레이션 모드</label>
+            <div class="row">
+                <button id="btn-2d" class="tool-btn active btn-half">2D 설계</button>
+                <button id="btn-3d" class="tool-btn btn-half">3D 렌더</button>
+            </div>
+            <select id="shape-3d" style="display:none; margin-top:5px;">
+                <option value="plane">평면 패널</option>
+                <option value="cube">콘크리트 큐브</option>
+                <option value="sphere">구체(Sphere)</option>
+                <option value="hemisphere">돔(Dome)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>설계 도구</label>
+            <div class="row">
+                <button class="tool-btn active btn-half" data-tool="brush">브러쉬</button>
+                <button class="tool-btn btn-half" data-tool="eraser">지우개</button>
+            </div>
+            <div class="row">
+                <button class="tool-btn btn-half" data-tool="line">선형 배열</button>
+                <button class="tool-btn btn-half" data-tool="scatter">랜덤 분산</button>
+            </div>
+            <div class="row">
+                <button class="tool-btn btn-half" data-tool="measure" style="background-color:#9c27b0;">📏 치수 측정</button>
+                <button id="btn-random" class="tool-btn btn-half">자동 채우기</button>
+            </div>
+        </div>
+
+        <div class="control-group" style="background-color: rgba(76, 175, 80, 0.1); padding: 10px; border-radius: 5px; border: 1px solid rgba(76, 175, 80, 0.3);">
+            <label>📊 데이터 분석</label>
+            <div class="row">
+                <span>광섬유 밀도: </span> <span id="density-val">0.00%</span>
+            </div>
+            <label style="margin-top:5px;"><input type="checkbox" id="use-heatmap"> 구조 취약점(Heatmap)</label>
+        </div>
+
+        <div class="control-group">
+            <label>광섬유 사양 (Fiber Optic)</label>
+            <input type="color" id="fiber-color" value="#00ffff">
+            <label>발광 강도 (Glow)</label>
+            <input type="range" id="fiber-glow" min="0" max="50" value="15">
+            <label>직경 (Radius px)</label>
+            <input type="range" id="fiber-size" min="1" max="20" value="3">
+        </div>
+
+        <div class="control-group">
+            <label>워크스페이스 설정</label>
+            <div class="row">
+                <label style="flex:1;"><input type="checkbox" id="use-grid"> 그리드</label>
+                <label style="flex:1;"><input type="checkbox" id="use-snap"> 스냅</label>
+            </div>
+            <label>최소 이격 거리 (px)</label>
+            <input type="range" id="min-spacing" min="0" max="50" value="10">
+        </div>
+
+        <div class="control-group">
+            <div class="row">
+                <button id="btn-undo" class="btn-half">Undo</button>
+                <button id="btn-redo" class="btn-half">Redo</button>
+            </div>
+            <div class="row">
+                <button id="btn-clear" class="btn-half" style="background-color: #f44336;">초기화</button>
+                <button id="btn-save" class="btn-half" style="background-color: #ff9800;">내보내기</button>
+            </div>
+            <button id="btn-theme" class="tool-btn" style="margin-top:5px;">테마 변경</button>
+        </div>
+    </div>
+
+    <div id="workspace">
+        <canvas id="mainCanvas" width="800" height="800"></canvas>
+        <div id="canvas3d-container"></div>
+    </div>
+
+<script>
+    // [기존 스크립트 로직 유지 - LitraSpec의 모든 기능이 정상 작동하도록 연결됨]
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let points = []; 
+    let dimensions = []; 
+    let undoStack = [];
+    let redoStack = [];
+    
+    let isDrawing = false;
+    let currentTool = 'brush'; 
+    let startX, startY;
+    let is3DMode = false;
+    
+    const panelW = document.getElementById('panel-w');
+    const panelH = document.getElementById('panel-h');
+    const colorPicker = document.getElementById('fiber-color');
+    const glowSlider = document.getElementById('fiber-glow');
+    const sizeSlider = document.getElementById('fiber-size');
+    const useGrid = document.getElementById('use-grid');
+    const useSnap = document.getElementById('use-snap');
+    const minSpacing = document.getElementById('min-spacing');
+    const useHeatmap = document.getElementById('use-heatmap');
+    const densityVal = document.getElementById('density-val');
+
+    const concreteCanvas = document.createElement('canvas');
+    concreteCanvas.width = canvas.width;
+    concreteCanvas.height = canvas.height;
+    generateConcreteTexture(false);
+
+    // Three.js Setup
+    const container3d = document.getElementById('canvas3d-container');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    container3d.appendChild(renderer.domElement);
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(5, 5, 5);
+    scene.add(dirLight);
+
+    let mesh3D;
+    let canvasTexture = new THREE.CanvasTexture(canvas);
+
+    function init3D() {
+        const width = container3d.clientWidth || 800;
+        const height = container3d.clientHeight || 800;
+        renderer.setSize(width, height);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        camera.position.z = 5;
+        update3DShape('plane');
+        animate3D();
+    }
+
+    function update3DShape(type) {
+        if (mesh3D) scene.remove(mesh3D);
+        let geometry;
+        if (type === 'cube') geometry = new THREE.BoxGeometry(3, 3, 3);
+        else if (type === 'sphere') geometry = new THREE.SphereGeometry(2, 64, 64);
+        else if (type === 'hemisphere') geometry = new THREE.SphereGeometry(2, 64, 64, 0, Math.PI * 2, 0, Math.PI / 2);
+        else geometry = new THREE.PlaneGeometry(5, 5); 
+
+        const material = new THREE.MeshStandardMaterial({ 
+            map: canvasTexture, roughness: 0.8, metalness: 0.1, side: THREE.DoubleSide
+        });
+        mesh3D = new THREE.Mesh(geometry, material);
+        scene.add(mesh3D);
+    }
+
+    function animate3D() {
+        requestAnimationFrame(animate3D);
+        if (is3DMode) {
+            controls.update();
+            canvasTexture.needsUpdate = true;
+            renderer.render(scene, camera);
+        }
+    }
+
+    function generateConcreteTexture(isLight) {
+        const ctxC = concreteCanvas.getContext('2d');
+        ctxC.fillStyle = isLight ? '#d0d0d0' : '#222';
+        ctxC.fillRect(0, 0, canvas.width, canvas.height);
+        const imgData = ctxC.getImageData(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < imgData.data.length; i += 4) {
+            let noise = (Math.random() - 0.5) * 20;
+            imgData.data[i] += noise;
+            imgData.data[i+1] += noise;
+            imgData.data[i+2] += noise;
+        }
+        ctxC.putImageData(imgData, 0, 0);
+    }
+
+    function calculateMmDistance(p1, p2) {
+        const pxDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        const mmPerPx = parseFloat(panelW.value) / canvas.width;
+        return (pxDist * mmPerPx).toFixed(1);
+    }
+
+    function drawAnalysis() {
+        let totalFiberArea = 0;
+        points.forEach(p => { totalFiberArea += Math.PI * p.size * p.size; });
+        const canvasArea = canvas.width * canvas.height;
+        const ratio = (totalFiberArea / canvasArea) * 100;
+        
+        densityVal.innerText = ratio.toFixed(2) + '%';
+        if(ratio > 5) densityVal.className = 'alert-text';
+        else densityVal.className = '';
+
+        if (useHeatmap.checked) {
+            const cols = 20, rows = 20;
+            const cellW = canvas.width / cols, cellH = canvas.height / rows;
+            let grid = new Array(cols * rows).fill(0);
+            points.forEach(p => {
+                const c = Math.floor(p.x / cellW);
+                const r = Math.floor(p.y / cellH);
+                if(c>=0 && c<cols && r>=0 && r<rows) grid[r * cols + c] += Math.PI * p.size * p.size;
+            });
+            for(let r=0; r<rows; r++){
+                for(let c=0; c<cols; c++){
+                    const density = grid[r * cols + c] / (cellW * cellH);
+                    if (density > 0.08) {
+                        ctx.fillStyle = `rgba(255, 0, 0, 0.6)`;
+                        ctx.fillRect(c * cellW, r * cellH, cellW, cellH);
+                    } else if (density > 0.04) {
+                        ctx.fillStyle = `rgba(255, 165, 0, 0.4)`;
+                        ctx.fillRect(c * cellW, r * cellH, cellW, cellH);
+                    }
+                }
+            }
+        }
+    }
+
+    function render() {
+        ctx.drawImage(concreteCanvas, 0, 0);
+        if (useGrid.checked) {
+            ctx.strokeStyle = document.body.classList.contains('light-mode') ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            for(let x = 0; x <= canvas.width; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
+            for(let y = 0; y <= canvas.height; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
+        }
+        drawAnalysis();
+        points.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.shadowBlur = p.glow;
+            ctx.shadowColor = p.color;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * 0.4, 0, Math.PI * 2);
+            ctx.fillStyle = "white";
+            ctx.shadowBlur = 0;
+            ctx.fill();
+        });
+        ctx.shadowBlur = 0;
+        dimensions.forEach(d => {
+            ctx.beginPath(); ctx.moveTo(d.x1, d.y1); ctx.lineTo(d.x2, d.y2);
+            ctx.strokeStyle = '#e91e63'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = '#e91e63'; ctx.fillRect(d.x1-3, d.y1-3, 6, 6); ctx.fillRect(d.x2-3, d.y2-3, 6, 6);
+            const mx = (d.x1 + d.x2)/2; const my = (d.y1 + d.y2)/2;
+            ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(mx - 25, my - 12, 50, 24);
+            ctx.fillStyle = 'white'; ctx.font = '12px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(d.mm + 'mm', mx, my);
+        });
+        if(is3DMode) canvasTexture.needsUpdate = true;
+    }
+
+    function saveState() {
+        undoStack.push({ points: JSON.parse(JSON.stringify(points)), dims: JSON.parse(JSON.stringify(dimensions)) });
+        if(undoStack.length > 20) undoStack.shift();
+        redoStack = [];
+    }
+
+    function addPoint(x, y) {
+        if (useSnap.checked) { x = Math.round(x / 20) * 20; y = Math.round(y / 20) * 20; }
+        const size = parseFloat(sizeSlider.value);
+        const spacing = parseFloat(minSpacing.value);
+        if (spacing > 0) {
+            for (let p of points) { if (Math.hypot(p.x - x, p.y - y) < spacing) return; }
+        }
+        points.push({ x: x, y: y, color: colorPicker.value, glow: parseFloat(glowSlider.value), size: size });
+        render();
+    }
+
+    function erasePoint(x, y) {
+        const rad = 20;
+        const initialLen = points.length;
+        points = points.filter(p => Math.hypot(p.x - x, p.y - y) > rad);
+        dimensions = dimensions.filter(d => Math.hypot(d.x1 - x, d.y1 - y) > rad && Math.hypot(d.x2 - x, d.y2 - y) > rad);
+        if (points.length !== initialLen || dimensions.length > 0) render();
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        saveState(); isDrawing = true;
+        const rect = canvas.getBoundingClientRect();
+        startX = e.clientX - rect.left; startY = e.clientY - rect.top;
+        if (currentTool === 'brush') addPoint(startX, startY);
+        else if (currentTool === 'eraser') erasePoint(startX, startY);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDrawing) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+        if (currentTool === 'brush') addPoint(x, y);
+        else if (currentTool === 'eraser') erasePoint(x, y);
+        else if (currentTool === 'scatter') { for(let i=0; i<3; i++) addPoint(x + (Math.random()-0.5)*40, y + (Math.random()-0.5)*40); }
+        else if (currentTool === 'line') {
+            render(); ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(x, y);
+            ctx.strokeStyle = colorPicker.value; ctx.lineWidth = 2; ctx.stroke();
+        } else if (currentTool === 'measure') {
+            render(); ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(x, y);
+            ctx.strokeStyle = '#e91e63'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+            const mm = calculateMmDistance({x:startX, y:startY}, {x, y});
+            ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(x+10, y-10, 60, 20);
+            ctx.fillStyle = 'white'; ctx.fillText(mm + 'mm', x+40, y);
+        }
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+        if(!isDrawing) return;
+        isDrawing = false;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+        if (currentTool === 'line') {
+            const dist = Math.hypot(x - startX, y - startY);
+            const steps = Math.max(dist / (parseFloat(minSpacing.value) || 10), 2);
+            for(let i=0; i<=steps; i++) addPoint(startX + (x - startX) * (i/steps), startY + (y - startY) * (i/steps));
+        } else if (currentTool === 'measure') {
+            if(Math.hypot(x - startX, y - startY) > 10) {
+                dimensions.push({ x1: startX, y1: startY, x2: x, y2: y, mm: calculateMmDistance({x:startX, y:startY}, {x, y}) });
+            }
+        }
+        render();
+    });
+
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active'); currentTool = e.target.dataset.tool;
+        });
+    });
+
+    document.getElementById('btn-undo').addEventListener('click', () => {
+        if (undoStack.length > 0) {
+            redoStack.push({ points: JSON.parse(JSON.stringify(points)), dims: JSON.parse(JSON.stringify(dimensions)) });
+            const state = undoStack.pop(); points = state.points; dimensions = state.dims; render();
+        }
+    });
+
+    document.getElementById('btn-redo').addEventListener('click', () => {
+        if (redoStack.length > 0) {
+            undoStack.push({ points: JSON.parse(JSON.stringify(points)), dims: JSON.parse(JSON.stringify(dimensions)) });
+            const state = redoStack.pop(); points = state.points; dimensions = state.dims; render();
+        }
+    });
+
+    document.getElementById('btn-clear').addEventListener('click', () => { saveState(); points = []; dimensions = []; render(); });
+    document.getElementById('btn-save').addEventListener('click', () => {
+        const link = document.createElement('a'); link.download = 'LitraSpec_Design.png';
+        link.href = canvas.toDataURL('image/png'); link.click();
+    });
+
+    document.getElementById('btn-random').addEventListener('click', () => {
+        saveState(); for(let i=0; i<150; i++) addPoint(Math.random() * canvas.width, Math.random() * canvas.height);
+    });
+
+    document.getElementById('btn-theme').addEventListener('click', () => {
+        document.body.classList.toggle('light-mode');
+        generateConcreteTexture(document.body.classList.contains('light-mode')); render();
+    });
+
+    useGrid.addEventListener('change', render);
+    useHeatmap.addEventListener('change', render);
+    panelW.addEventListener('change', render);
+    panelH.addEventListener('change', render);
+
+    document.getElementById('btn-2d').addEventListener('click', () => {
+        is3DMode = false;
+        document.getElementById('btn-2d').classList.add('active');
+        document.getElementById('btn-3d').classList.remove('active');
+        canvas.style.display = 'block'; container3d.style.display = 'none'; shape3dSelect.style.display = 'none';
+    });
+
+    const shape3dSelect = document.getElementById('shape-3d');
+    document.getElementById('btn-3d').addEventListener('click', () => {
+        is3DMode = true;
+        document.getElementById('btn-3d').classList.add('active');
+        document.getElementById('btn-2d').classList.remove('active');
+        canvas.style.display = 'none'; container3d.style.display = 'block'; shape3dSelect.style.display = 'block';
+        const width = container3d.clientWidth; const height = container3d.clientHeight;
+        renderer.setSize(width, height); camera.aspect = width / height; camera.updateProjectionMatrix();
+    });
+
+    shape3dSelect.addEventListener('change', (e) => update3DShape(e.target.value));
+
+    init3D();
+    render();
+    saveState();
+</script>
+</body>
+</html>

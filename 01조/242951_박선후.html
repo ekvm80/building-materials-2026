@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="목재 함수율 계산기 - 건조 전후 중량으로 함수율을 산출하고 5단계 공학적 분기로 판정합니다.">
+<title>목재 함수율 계산기 · Timber Moisture Calculator</title>
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --bg-alt: #FAFAF6;
+    --ivory: #F5F4EE;
+    --ink: #1A2A1F;
+    --muted: #4A5A50;
+    --faint: #6B7268;
+    --line: #E5E3DA;
+    --line-soft: #D9D8CE;
+    --forest: #1A2E1F;
+    --forest-light: #2C5F2D;
+    --moss: #7A9B5E;
+    --moss-light: #97BC62;
+
+    /* 5단계 분기 색상 */
+    --z1: #2F5D3F;   /* 절건 */
+    --z2: #7A9B5E;   /* 기건 */
+    --z3: #C8A24A;   /* 주의 */
+    --z4: #C26A3D;   /* FSP 초과 */
+    --z5: #9B3A3A;   /* 습윤 */
+    --z1-soft: #E8EFE8;
+    --z2-soft: #EEF1E7;
+    --z3-soft: #F5EFDE;
+    --z4-soft: #F4E5DA;
+    --z5-soft: #F2E0E0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
+                 'Pretendard', 'Noto Sans KR', 'Segoe UI', Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .font-display {
+    font-family: 'Fraunces', Georgia, 'Noto Serif KR', 'Apple SD Gothic Neo', serif;
+    font-weight: 400;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  }
+
+  /* ---------- 레이아웃 ---------- */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 6rem;
+  }
+  @media (min-width: 640px) { .container { padding: 5rem 2.5rem 6rem; } }
+
+  /* ---------- 헤더 ---------- */
+  .eyebrow {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.72rem; letter-spacing: 0.25em; text-transform: uppercase;
+    color: var(--faint);
+  }
+  .eyebrow svg { width: 14px; height: 14px; }
+
+  h1.title {
+    margin-top: 1rem;
+    font-family: 'Fraunces', Georgia, 'Noto Serif KR', serif;
+    font-size: clamp(2.2rem, 5vw, 4.4rem);
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    font-weight: 400;
+  }
+  h1.title em {
+    font-style: italic;
+    color: var(--moss);
+  }
+
+  .lead {
+    margin-top: 1.5rem;
+    max-width: 38rem;
+    font-size: 1.05rem;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  .formula-chip {
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    margin-top: 1.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--ivory);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.85rem;
+    color: var(--z1);
+  }
+  .formula-chip .label { color: var(--faint); }
+
+  /* ---------- 메인 그리드 ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    margin-top: 2.5rem;
+  }
+  @media (min-width: 900px) {
+    .grid { grid-template-columns: 5fr 7fr; gap: 2rem; }
+  }
+
+  /* ---------- 카드 공통 ---------- */
+  .card {
+    padding: 1.75rem;
+    background: var(--bg-alt);
+    border: 1px solid var(--line);
+    border-radius: 1.5rem;
+  }
+  @media (min-width: 640px) { .card { padding: 2.25rem; } }
+
+  .card-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+  .card-head h2 {
+    font-family: 'Fraunces', Georgia, 'Noto Serif KR', serif;
+    font-size: 1.4rem; font-weight: 500;
+  }
+  .step {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--faint);
+  }
+
+  /* ---------- 입력 ---------- */
+  .field { margin-top: 2rem; }
+  .field-label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 0.85rem; font-weight: 500;
+  }
+  .field-label .sub { color: var(--faint); font-weight: 400; }
+  .field-label .unit {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; color: var(--faint);
+  }
+
+  .field-input {
+    position: relative;
+    margin-top: 0.5rem;
+  }
+  .field-input input {
+    width: 100%;
+    padding: 0.25rem 1.5rem 0.5rem 0;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--line-soft);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.5rem;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.2s ease;
+    -moz-appearance: textfield;
+  }
+  @media (min-width: 640px) { .field-input input { font-size: 1.75rem; } }
+  .field-input input::-webkit-outer-spin-button,
+  .field-input input::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  .field-input input:focus { border-color: var(--moss); }
+  .field-input .unit-suffix {
+    position: absolute; right: 0.25rem; bottom: 0.7rem;
+    color: var(--faint); font-size: 1rem;
+  }
+
+  .err-box {
+    margin-top: 1.25rem;
+    display: flex; align-items: flex-start; gap: 0.5rem;
+    background: var(--z4-soft);
+    color: #7A3D1F;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    font-size: 0.85rem;
+  }
+  .err-box svg { flex-shrink: 0; margin-top: 2px; }
+
+  .actions {
+    margin-top: 1.75rem;
+    display: flex; align-items: center; gap: 0.75rem;
+  }
+  .btn-reset {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.55rem 1rem;
+    background: var(--bg);
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    font-size: 0.82rem;
+    color: var(--faint);
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+  }
+  .btn-reset:hover { opacity: 0.7; }
+  .live-indicator {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--faint);
+  }
+
+  .quick-examples {
+    margin-top: 1.75rem;
+    padding-top: 1.5rem;
+    border-top: 1px dashed var(--line-soft);
+  }
+  .quick-examples h4 {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-bottom: 0.75rem;
+    font-weight: 500;
+  }
+  .quick-buttons {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+  }
+  .quick-buttons button {
+    padding: 0.4rem 0.85rem;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+    font-family: inherit;
+  }
+  .quick-buttons button:hover { opacity: 0.7; }
+
+  /* ---------- 결과 카드 ---------- */
+  .result-card {
+    position: relative;
+    overflow: hidden;
+    background: var(--ivory);
+    border: 1px solid var(--line);
+    transition: background 600ms ease, border-color 600ms ease;
+  }
+
+  /* 게이지 */
+  .gauge-wrap {
+    margin: 0.5rem -0.5rem;
+  }
+  .gauge-wrap svg {
+    width: 100%; height: auto; overflow: visible;
+  }
+  .needle, .zone-arc {
+    transition: all 500ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .zone-arc { opacity: 0.32; }
+  .zone-arc.active { opacity: 1; }
+
+  /* 상태 카드 */
+  .status-card {
+    margin-top: 0.5rem;
+    padding: 1.25rem;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    transition: border-color 600ms ease;
+  }
+  @media (min-width: 640px) { .status-card { padding: 1.5rem; } }
+
+  .status-card-inner {
+    display: flex; align-items: flex-start; gap: 1rem;
+  }
+  .status-icon {
+    flex-shrink: 0;
+    width: 2.75rem; height: 2.75rem;
+    border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 600ms ease, color 600ms ease;
+  }
+  .status-content { min-width: 0; flex: 1; }
+  .status-title-row {
+    display: flex; flex-wrap: wrap; align-items: baseline;
+    gap: 0.25rem 0.75rem;
+  }
+  .status-title {
+    font-family: 'Fraunces', Georgia, 'Noto Serif KR', serif;
+    font-size: 1.25rem;
+    font-weight: 500;
+  }
+  .status-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--faint);
+  }
+  .status-use {
+    margin-top: 0.5rem;
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+  .status-note {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .placeholder-note {
+    margin-top: 0.5rem;
+    padding: 1.5rem;
+    background: var(--bg);
+    border: 1px dashed var(--line-soft);
+    border-radius: 1rem;
+    font-size: 0.88rem;
+    color: var(--faint);
+  }
+
+  /* 메트릭 카드 */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+  .metric {
+    padding: 1rem;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+  }
+  @media (min-width: 640px) { .metric { padding: 1.25rem; } }
+  .metric-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .metric-value {
+    margin-top: 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  @media (min-width: 640px) { .metric-value { font-size: 1.4rem; } }
+  .metric-hint {
+    margin-top: 0.25rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--faint);
+  }
+
+  /* ---------- 기준표 ---------- */
+  section.reference {
+    margin-top: 4rem;
+  }
+  @media (min-width: 640px) { section.reference { margin-top: 6rem; } }
+
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 1.5rem;
+  }
+  .section-head h3 {
+    font-family: 'Fraunces', Georgia, 'Noto Serif KR', serif;
+    font-size: 1.5rem; font-weight: 500;
+  }
+  @media (min-width: 640px) { .section-head h3 { font-size: 1.85rem; } }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+  }
+  table.ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    min-width: 640px;
+  }
+  table.ref-table thead tr {
+    background: var(--bg-alt);
+    color: var(--faint);
+  }
+  table.ref-table th {
+    text-align: left;
+    font-weight: 500;
+    padding: 0.85rem 1.25rem;
+  }
+  table.ref-table td {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid #EFEDE3;
+    color: var(--muted);
+  }
+  table.ref-table tbody tr {
+    background: var(--bg);
+    transition: background 400ms ease;
+  }
+  .zone-dot {
+    display: inline-block;
+    width: 0.6rem; height: 0.6rem;
+    border-radius: 999px;
+    margin-right: 0.6rem;
+    vertical-align: middle;
+  }
+  .zone-label { color: var(--ink); }
+
+  /* ---------- 공식 해설 ---------- */
+  section.explain {
+    margin-top: 4rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  @media (min-width: 768px) {
+    section.explain { grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  }
+  .explain-card {
+    padding: 1.75rem;
+    background: var(--bg-alt);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+  }
+  .explain-card h4 {
+    margin-top: 0.5rem;
+    font-family: 'Fraunces', Georgia, 'Noto Serif KR', serif;
+    font-size: 1.4rem;
+    font-weight: 500;
+  }
+  .explain-card.dark {
+    background: var(--forest);
+    color: #E8EFE8;
+    border: none;
+  }
+  .explain-card.dark h4 { color: #FFFFFF; }
+  .explain-card .lead-small {
+    margin-top: 1rem;
+    font-size: 0.88rem;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+  .explain-card.dark .lead-small { color: #E8EFE8; }
+  .formula-box {
+    margin-top: 1.25rem;
+    padding: 1.25rem;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    color: var(--ink);
+  }
+  .formula-list {
+    margin-top: 1.25rem;
+    list-style: none;
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+  .formula-list li { padding: 0.25rem 0; }
+  .note-list {
+    margin-top: 1.25rem;
+    list-style: none;
+  }
+  .note-list li {
+    display: flex; gap: 0.75rem;
+    padding: 0.5rem 0;
+    font-size: 0.88rem;
+    line-height: 1.6;
+  }
+  .note-list .num {
+    font-family: 'JetBrains Mono', monospace;
+    color: #A8C29A;
+    flex-shrink: 0;
+  }
+  .note-list strong { color: #FFFFFF; }
+
+  /* ---------- 푸터 ---------- */
+  footer {
+    margin-top: 5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--line);
+    display: flex; flex-wrap: wrap;
+    justify-content: space-between; align-items: center;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--faint);
+  }
+  footer .version {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .fade-up { animation: fadeUp 600ms cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ============= HERO ============= -->
+  <header>
+    <div class="eyebrow">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 22V12M7 12c-3 0-5-2-5-5 0-3 2-5 5-5s5 2 5 5M17 12c3 0 5-2 5-5 0-3-2-5-5-5s-5 2-5 5"/>
+      </svg>
+      <span>Architectural Engineering · 건축재료학</span>
+    </div>
+    <h1 class="title">목재 함수율<em> 계산기</em></h1>
+    <p class="lead">
+      건조 전·후 시료 중량을 입력하면 함수율을 즉시 산출하고,
+      섬유포화점·기건상태 기준으로 시각적 피드백을 제공합니다.
+    </p>
+    <div class="formula-chip">
+      <span class="label">공식</span>
+      <span>u =</span>
+      <span style="color: var(--ink);">(W₁ − W₂) ⁄ W₂</span>
+      <span>× 100</span>
+      <span class="label">%</span>
+    </div>
+  </header>
+
+  <!-- ============= MAIN GRID ============= -->
+  <div class="grid">
+
+    <!-- ---------- 좌: 입력 ---------- -->
+    <section class="card fade-up" aria-label="시료 중량 입력">
+      <div class="card-head">
+        <h2>시료 중량 입력</h2>
+        <span class="step">STEP 01</span>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="w1">
+          <span>W₁ <span class="sub">· 건조 전 중량</span></span>
+          <span class="unit">grams</span>
+        </label>
+        <div class="field-input">
+          <input type="number" id="w1" inputmode="decimal" step="any" min="0" placeholder="예: 125.40" autocomplete="off">
+          <span class="unit-suffix">g</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="w2">
+          <span>W₂ <span class="sub">· 절건(100~105°C) 후 중량</span></span>
+          <span class="unit">grams</span>
+        </label>
+        <div class="field-input">
+          <input type="number" id="w2" inputmode="decimal" step="any" min="0" placeholder="예: 100.00" autocomplete="off">
+          <span class="unit-suffix">g</span>
+        </div>
+      </div>
+
+      <div id="err" class="err-box" style="display:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        <span id="err-msg"></span>
+      </div>
+
+      <div class="actions">
+        <button class="btn-reset" id="btn-reset" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+            <path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/>
+            <path d="M21 3v5h-5M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16"/>
+            <path d="M3 21v-5h5"/>
+          </svg>
+          초기화
+        </button>
+        <span class="live-indicator">실시간 계산</span>
+      </div>
+
+      <div class="quick-examples">
+        <h4>빠른 예시</h4>
+        <div class="quick-buttons">
+          <button type="button" data-w1="115" data-w2="100">기건 (15%)</button>
+          <button type="button" data-w1="108" data-w2="100">절건 후 흡습 (8%)</button>
+          <button type="button" data-w1="128" data-w2="100">FSP (28%)</button>
+          <button type="button" data-w1="180" data-w2="100">생재 (80%)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 우: 결과 + 게이지 ---------- -->
+    <section class="fade-up" style="animation-delay:120ms;">
+      <div id="result-card" class="card result-card">
+        <div class="card-head">
+          <h2>계산 결과</h2>
+          <span class="step">STEP 02</span>
+        </div>
+
+        <div class="gauge-wrap">
+          <svg viewBox="0 0 400 240" aria-hidden="true">
+            <!-- 배경 트랙 -->
+            <path id="track-bg" fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" opacity="0.7"></path>
+            <!-- 컬러 존 (JS로 그림) -->
+            <g id="zones"></g>
+            <!-- 눈금 (JS로 그림) -->
+            <g id="ticks"></g>
+            <!-- 바늘 -->
+            <g class="needle" id="needle-group">
+              <line id="needle" stroke="#9AA39A" stroke-width="3" stroke-linecap="round" x1="200" y1="190" x2="200" y2="190"/>
+              <circle cx="200" cy="190" r="10" fill="#FFFFFF"/>
+              <circle id="needle-dot" cx="200" cy="190" r="6" fill="#9AA39A"/>
+            </g>
+            <!-- 중앙 수치 -->
+            <text id="gauge-value" x="200" y="130" text-anchor="middle" font-size="48"
+                  font-family="JetBrains Mono, ui-monospace, monospace" font-weight="500" fill="#1A2A1F">—</text>
+            <text x="200" y="158" text-anchor="middle" font-size="13" fill="#6B7268"
+                  font-family="Manrope, sans-serif">함수율 (%)</text>
+          </svg>
+        </div>
+
+        <div id="status-area">
+          <div class="placeholder-note">
+            W₁과 W₂를 입력하면 함수율과 상태가 이곳에 표시됩니다.
+          </div>
+        </div>
+      </div>
+
+      <div id="metrics-wrap" style="display:none;" class="metrics fade-up">
+        <div class="metric">
+          <div class="metric-label">수분 중량</div>
+          <div class="metric-value" id="m-water">—</div>
+          <div class="metric-hint">W₁ − W₂</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">건조 비율</div>
+          <div class="metric-value" id="m-ratio">—</div>
+          <div class="metric-hint">W₂ / W₁</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">상태</div>
+          <div class="metric-value" id="m-state">—</div>
+          <div class="metric-hint" id="m-state-hint">—</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============= 기준표 ============= -->
+  <section class="reference fade-up" style="animation-delay:200ms;">
+    <div class="section-head">
+      <h3>함수율 기준표</h3>
+      <span class="step">REFERENCE</span>
+    </div>
+    <div class="table-wrap">
+      <table class="ref-table">
+        <thead>
+          <tr>
+            <th>상태</th>
+            <th>함수율 범위</th>
+            <th>대표 용도</th>
+            <th>공학적 의미</th>
+          </tr>
+        </thead>
+        <tbody id="ref-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============= 공식 해설 ============= -->
+  <section class="explain fade-up" style="animation-delay:260ms;">
+    <div class="explain-card">
+      <div class="eyebrow" style="color: var(--moss);">Formula</div>
+      <h4>함수율 공식의 유도</h4>
+      <p class="lead-small">
+        함수율 <span class="font-mono">u</span>는 시료에 포함된 수분의 중량을
+        <strong>절건상태(oven-dry) 중량</strong>으로 정규화한 값입니다.
+        절건중량을 분모로 두는 이유는, 목재의 '고유 질량'을 변하지 않는 기준점으로 삼아
+        함수율을 일관되게 비교하기 위함입니다.
+      </p>
+      <div class="formula-box">
+        u = ( W₁ − W₂ ) / W₂ × 100&nbsp;(%)
+      </div>
+      <ul class="formula-list">
+        <li>· W₁ : 건조 전 시료의 중량 (g)</li>
+        <li>· W₂ : 100~105°C 절건 후 시료의 중량 (g)</li>
+        <li>· (W₁ − W₂) : 시료에 포함된 수분의 중량</li>
+      </ul>
+    </div>
+
+    <div class="explain-card dark">
+      <div class="eyebrow" style="color: #A8C29A;">Engineer's Note</div>
+      <h4>함수율이 설계에 미치는 영향</h4>
+      <ul class="note-list">
+        <li>
+          <span class="num">01</span>
+          <span><strong>섬유포화점(FSP, ≈28%)</strong>을 기준으로 자유수의 거동이 달라지며,
+          이 이하에서 강도가 급격히 증가합니다.</span>
+        </li>
+        <li>
+          <span class="num">02</span>
+          <span><strong>수축률 비율 1 : 10 : 20</strong> (줄기 : 방사 : 접선) — 비등방성으로 인해
+          정목재가 판목재보다 변형이 적습니다.</span>
+        </li>
+        <li>
+          <span class="num">03</span>
+          <span><strong>부패균 번식 조건</strong> (20~40°C, 습도 90%↑)을 차단하기 위해
+          구조재는 통상 함수율 19% 이하로 관리합니다.</span>
+        </li>
+        <li>
+          <span class="num">04</span>
+          <span>인공건조(열기·제습·진공·마이크로파)로는 <strong>함수율 3%</strong>까지 도달 가능하나,
+          사용 환경 평형함수율보다 과도히 낮추면 시공 후 재흡습으로 변형이 발생합니다.</span>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <span>전남대학교 건축학부 · 건축재료학 학습용 도구</span>
+    <span class="version">v1.0 · KS F 2199 reference</span>
+  </footer>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ===== 5단계 분기 데이터 =====
+  const ZONES = [
+    { id: 'kiln',    range: [0, 12],       label: '절건 · 인공건조 영역', sub: 'Oven-dry / Kiln-dried',
+      use: '정밀 가구재 · 악기재 · 마루재', note: '함수율 8~12%는 마감 후 변형이 거의 없는 최적 영역입니다.',
+      fill: '#2F5D3F', ring: 'rgba(47, 93, 63, 0.18)', soft: '#E8EFE8', icon: 'check' },
+    { id: 'airdry',  range: [12, 19],      label: '기건상태 (Air-dry)', sub: '대기 평형 · 구조용 적합',
+      use: '구조재(기둥·보) · 일반 건축용', note: '한국 평균 평형함수율 약 15%. 구조재 권장 상한은 19%입니다.',
+      fill: '#7A9B5E', ring: 'rgba(122, 155, 94, 0.18)', soft: '#EEF1E7', icon: 'leaf' },
+    { id: 'caution', range: [19, 28],      label: '변형 주의 구간', sub: '수축·팽윤 활성',
+      use: '추가 건조 후 사용 권장', note: '방사·접선방향 수축률(1:10:20) 차이로 뒤틀림 발생 우려.',
+      fill: '#C8A24A', ring: 'rgba(200, 162, 74, 0.20)', soft: '#F5EFDE', icon: 'alert' },
+    { id: 'fsp',     range: [28, 50],      label: '섬유포화점 초과', sub: 'Fiber Saturation Point ↑',
+      use: '구조용 부적합 · 강도 저하', note: '자유수가 존재하기 시작하며 부패균 번식(20~40°C, 습도 90%↑) 활성.',
+      fill: '#C26A3D', ring: 'rgba(194, 106, 61, 0.20)', soft: '#F4E5DA', icon: 'drop' },
+    { id: 'wet',     range: [50, Infinity],label: '습윤상태', sub: 'Green / Wet timber',
+      use: '사용 불가 · 건조 공정 필요', note: '생재 함수율은 60~200%까지도 도달. 자연건조 또는 인공건조 선행.',
+      fill: '#9B3A3A', ring: 'rgba(155, 58, 58, 0.20)', soft: '#F2E0E0', icon: 'flame' },
+  ];
+
+  const findZone = (u) => {
+    if (!isFinite(u) || u < 0) return null;
+    return ZONES.find(z => u >= z.range[0] && u < z.range[1]) || ZONES[ZONES.length - 1];
+  };
+
+  const ICONS = {
+    check: '<path d="M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3"/>',
+    leaf:  '<path d="M11 20A7 7 0 014 13V8h7a7 7 0 017 7v5h-7zM21.41 1.59C18.79 4.21 12 8 12 13"/>',
+    alert: '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+    drop:  '<path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/>',
+    flame: '<path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z"/>',
+    tree:  '<path d="M12 22V12M7 12c-3 0-5-2-5-5 0-3 2-5 5-5s5 2 5 5M17 12c3 0 5-2 5-5 0-3-2-5-5-5s-5 2-5 5"/>',
+  };
+
+  // ===== 게이지 SVG 유틸 =====
+  const GAUGE_MAX = 60;
+  const CX = 200, CY = 190, R = 142;
+  const polar = (deg) => {
+    const rad = ((180 - deg) * Math.PI) / 180;
+    return { x: CX + R * Math.cos(rad), y: CY - R * Math.sin(rad) };
+  };
+  const arcD = (a, b) => {
+    const s = polar(a), e = polar(b);
+    const large = (b - a) > 180 ? 1 : 0;
+    return `M ${s.x} ${s.y} A ${R} ${R} 0 ${large} 1 ${e.x} ${e.y}`;
+  };
+  const valueToAngle = (u) => (Math.max(0, Math.min(GAUGE_MAX, u)) / GAUGE_MAX) * 180;
+
+  // ===== SVG 게이지 초기 렌더 =====
+  document.getElementById('track-bg').setAttribute('d', arcD(0, 180));
+
+  const zonesGroup = document.getElementById('zones');
+  ZONES.forEach((z) => {
+    const startU = z.range[0];
+    const endU = z.range[1] === Infinity ? GAUGE_MAX : Math.min(GAUGE_MAX, z.range[1]);
+    if (startU >= GAUGE_MAX || endU <= startU) return;
+    const a = valueToAngle(startU);
+    const b = valueToAngle(endU);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', arcD(a + 0.4, b - 0.4));
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', z.fill);
+    path.setAttribute('stroke-width', 22);
+    path.setAttribute('stroke-linecap', 'butt');
+    path.classList.add('zone-arc');
+    path.dataset.zone = z.id;
+    zonesGroup.appendChild(path);
+  });
+
+  const ticksGroup = document.getElementById('ticks');
+  [0, 12, 19, 28, 50, 60].forEach((tick) => {
+    const ang = valueToAngle(tick);
+    const inner = polar(ang);
+    const rad = ((180 - ang) * Math.PI) / 180;
+    const outerR = R + 14;
+    const ox = CX + outerR * Math.cos(rad);
+    const oy = CY - outerR * Math.sin(rad);
+    const labelR = R + 30;
+    const lx = CX + labelR * Math.cos(rad);
+    const ly = CY - labelR * Math.sin(rad);
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', inner.x); line.setAttribute('y1', inner.y);
+    line.setAttribute('x2', ox); line.setAttribute('y2', oy);
+    line.setAttribute('stroke', '#9AA39A');
+    line.setAttribute('stroke-width', '1');
+    ticksGroup.appendChild(line);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', lx); text.setAttribute('y', ly);
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('font-size', '11');
+    text.setAttribute('fill', '#6B7268');
+    text.setAttribute('font-family', 'JetBrains Mono, ui-monospace, monospace');
+    text.textContent = tick === 60 ? '60+' : tick;
+    ticksGroup.appendChild(text);
+  });
+
+  // ===== 기준표 렌더 =====
+  const tbody = document.getElementById('ref-tbody');
+  ZONES.forEach((z) => {
+    const tr = document.createElement('tr');
+    tr.dataset.zone = z.id;
+    const rangeText = z.range[1] === Infinity ? `> ${z.range[0]}%` : `${z.range[0]} ~ ${z.range[1]}%`;
+    tr.innerHTML = `
+      <td>
+        <span class="zone-dot" style="background:${z.fill};"></span>
+        <span class="zone-label">${z.label}</span>
+      </td>
+      <td class="font-mono">${rangeText}</td>
+      <td>${z.use}</td>
+      <td>${z.note}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // ===== 상태 =====
+  const $w1 = document.getElementById('w1');
+  const $w2 = document.getElementById('w2');
+  const $err = document.getElementById('err');
+  const $errMsg = document.getElementById('err-msg');
+  const $resultCard = document.getElementById('result-card');
+  const $statusArea = document.getElementById('status-area');
+  const $needle = document.getElementById('needle');
+  const $needleDot = document.getElementById('needle-dot');
+  const $gaugeValue = document.getElementById('gauge-value');
+  const $metricsWrap = document.getElementById('metrics-wrap');
+  const $mWater = document.getElementById('m-water');
+  const $mRatio = document.getElementById('m-ratio');
+  const $mState = document.getElementById('m-state');
+  const $mStateHint = document.getElementById('m-state-hint');
+
+  let animatedU = 0;
+  let rafId = null;
+  let animStart = 0;
+  let animFrom = 0;
+  let animTarget = 0;
+
+  function fmt(n, d) {
+    if (d == null) d = 2;
+    if (!isFinite(n)) return '—';
+    return n.toLocaleString('ko-KR', { maximumFractionDigits: d, minimumFractionDigits: d });
+  }
+
+  function parseInputs() {
+    const a = parseFloat($w1.value);
+    const b = parseFloat($w2.value);
+    if (!isFinite(a) || !isFinite(b)) return { ok: false };
+    if (b <= 0) return { ok: false, err: 'W₂(절건중량)는 0보다 커야 합니다.' };
+    if (a < b) return { ok: false, err: 'W₁(건조 전) ≥ W₂(절건) 이어야 물리적으로 타당합니다.' };
+    return { ok: true, u: ((a - b) / b) * 100, water: a - b, w1: a, w2: b };
+  }
+
+  function updateGauge(u) {
+    const ang = valueToAngle(u);
+    const end = polar(ang);
+    $needle.setAttribute('x2', end.x);
+    $needle.setAttribute('y2', end.y);
+    const zone = findZone(u);
+    if (zone) {
+      $needle.setAttribute('stroke', zone.fill);
+      $needleDot.setAttribute('fill', zone.fill);
+    } else {
+      $needle.setAttribute('stroke', '#9AA39A');
+      $needleDot.setAttribute('fill', '#9AA39A');
+    }
+  }
+
+  function animateTo(target) {
+    if (rafId) cancelAnimationFrame(rafId);
+    animFrom = animatedU;
+    animTarget = target;
+    animStart = performance.now();
+    const dur = 650;
+    const tick = (t) => {
+      const k = Math.min(1, (t - animStart) / dur);
+      const eased = 1 - Math.pow(1 - k, 3);
+      animatedU = animFrom + (animTarget - animFrom) * eased;
+      updateGauge(animatedU);
+      if (k < 1) rafId = requestAnimationFrame(tick);
+      else rafId = null;
+    };
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function render() {
+    const p = parseInputs();
+
+    // 에러 표시
+    if (p.err) {
+      $err.style.display = 'flex';
+      $errMsg.textContent = p.err;
+    } else {
+      $err.style.display = 'none';
+    }
+
+    if (!p.ok) {
+      animateTo(0);
+      $gaugeValue.textContent = '—';
+      // 결과 카드를 기본 상태로
+      $resultCard.style.background = 'var(--ivory)';
+      $resultCard.style.borderColor = 'var(--line)';
+      // 존 강조 해제
+      document.querySelectorAll('.zone-arc').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('#ref-tbody tr').forEach(tr => {
+        tr.style.background = 'var(--bg)';
+        const lbl = tr.querySelector('.zone-label');
+        if (lbl) lbl.style.fontWeight = '500';
+      });
+      // 플레이스홀더
+      $statusArea.innerHTML = '<div class="placeholder-note">W₁과 W₂를 입력하면 함수율과 상태가 이곳에 표시됩니다.</div>';
+      $metricsWrap.style.display = 'none';
+      return;
+    }
+
+    const zone = findZone(p.u);
+    animateTo(p.u);
+
+    // 게이지 중앙 수치는 즉시 보여주되, 애니메이션 중 부드럽게 카운트업
+    const startVal = animFrom;
+    const dur = 650;
+    const startT = performance.now();
+    const updateText = (t) => {
+      const k = Math.min(1, (t - startT) / dur);
+      const eased = 1 - Math.pow(1 - k, 3);
+      const v = startVal + (p.u - startVal) * eased;
+      $gaugeValue.textContent = v.toFixed(1);
+      if (k < 1) requestAnimationFrame(updateText);
+      else $gaugeValue.textContent = p.u.toFixed(1);
+    };
+    requestAnimationFrame(updateText);
+
+    // 결과 카드 배경
+    $resultCard.style.background = zone.soft;
+    $resultCard.style.borderColor = zone.ring;
+
+    // 존 호 강조
+    document.querySelectorAll('.zone-arc').forEach(el => {
+      el.classList.toggle('active', el.dataset.zone === zone.id);
+    });
+
+    // 기준표 강조
+    document.querySelectorAll('#ref-tbody tr').forEach(tr => {
+      const active = tr.dataset.zone === zone.id;
+      tr.style.background = active ? zone.soft : 'var(--bg)';
+      const lbl = tr.querySelector('.zone-label');
+      if (lbl) lbl.style.fontWeight = active ? '600' : '500';
+    });
+
+    // 상태 카드
+    $statusArea.innerHTML = `
+      <div class="status-card" style="border-color:${zone.ring};">
+        <div class="status-card-inner">
+          <div class="status-icon" style="background:${zone.soft}; color:${zone.fill};">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              ${ICONS[zone.icon] || ICONS.tree}
+            </svg>
+          </div>
+          <div class="status-content">
+            <div class="status-title-row">
+              <span class="status-title">${zone.label}</span>
+              <span class="status-sub">${zone.sub}</span>
+            </div>
+            <div class="status-use">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
+              <span>${zone.use}</span>
+            </div>
+            <p class="status-note">${zone.note}</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // 메트릭
+    $metricsWrap.style.display = 'grid';
+    $mWater.textContent = fmt(p.water) + ' g';
+    $mRatio.textContent = fmt((p.w2 / p.w1) * 100) + ' %';
+    $mState.textContent = zone.label.split(' ')[0];
+    $mState.style.color = zone.fill;
+    $mStateHint.textContent = p.u.toFixed(2) + ' %';
+  }
+
+  // ===== 이벤트 바인딩 =====
+  $w1.addEventListener('input', render);
+  $w2.addEventListener('input', render);
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    $w1.value = '';
+    $w2.value = '';
+    render();
+    $w1.focus();
+  });
+
+  document.querySelectorAll('.quick-buttons button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $w1.value = btn.dataset.w1;
+      $w2.value = btn.dataset.w2;
+      render();
+    });
+  });
+
+  // 초기 렌더
+  render();
+})();
+</script>
+</body>
+</html>
