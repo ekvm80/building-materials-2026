@@ -1,0 +1,257 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f5ede3;font-family:'DM Sans',sans-serif;color:#3a2e24}
+input[type=range]{-webkit-appearance:none;appearance:none;height:6px;border-radius:99px;background:#d4c8bb;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:#2D5A27;cursor:pointer;box-shadow:0 1px 4px rgba(45,90,39,0.3)}
+select,input[type=number]{font-family:'DM Sans',sans-serif}
+</style>
+
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>
+const {useState,useEffect,useRef,createElement:h}=React;
+
+const CO2_TO_C=44/12,CARBON=0.5,CONC=0.2,KAU=8500,TREE_RATE=0.005;
+const SPECIES={pine:{ko:"소나무",e:"🌲",d:450,p:0.42},larch:{ko:"낙엽송",e:"🌳",d:550,p:0.44},cedar:{ko:"삼나무",e:"🌿",d:370,p:0.36},oak:{ko:"참나무",e:"🍂",d:740,p:0.50},spruce:{ko:"가문비나무",e:"🌲",d:430,p:0.40},fir:{ko:"전나무",e:"🎄",d:450,p:0.41}};
+const USAGES={structural:{ko:"구조재",f:1.0},interior:{ko:"내장재",f:0.9},floor:{ko:"바닥재",f:0.85},facade:{ko:"외장재",f:0.75}};
+
+function calc(sk,vol,uk){
+  const sp=SPECIES[sk],us=USAGES[uk];
+  const biomass=vol*sp.d,carbonKg=biomass*CARBON;
+  const stored=(carbonKg*CO2_TO_C*us.f)/1000;
+  const tprod=vol*sp.p,cprod=vol*CONC;
+  const tnet=tprod-stored,cnet=cprod;
+  const sav=cnet-tnet;
+  return{stored,tprod,cprod,tnet,cnet,sav,trees:Math.round(stored/TREE_RATE),benefit:Math.round((stored+sav)*KAU)};
+}
+
+function useAnim(target,dur=650){
+  const[cur,set]=useState(0),ref=useRef(null),prev=useRef(0);
+  useEffect(()=>{
+    const from=prev.current,start=performance.now();
+    cancelAnimationFrame(ref.current);
+    const go=now=>{
+      const p=Math.min((now-start)/dur,1),e=1-Math.pow(1-p,3);
+      set(from+(target-from)*e);
+      if(p<1)ref.current=requestAnimationFrame(go);
+      else prev.current=target;
+    };
+    ref.current=requestAnimationFrame(go);
+    return()=>cancelAnimationFrame(ref.current);
+  },[target]);
+  return cur;
+}
+
+function fmt(n,d=1){return isNaN(n)?'0':Number(n.toFixed(d)).toLocaleString('ko-KR')}
+function fmtI(n){return Math.round(n).toLocaleString('ko-KR')}
+
+function Bar({label,value,color,sub}){
+  const[maxW,setMax]=useState(0);
+  return h('div',{style:{marginBottom:16}},
+    h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:5}},
+      h('span',{style:{fontSize:12,color:'#5a4a3a',fontWeight:500}},label),
+      h('span',{style:{fontSize:12,color,fontWeight:700}},(value<0?'−':'')+fmt(Math.abs(value))+' tCO₂')
+    ),
+    h('div',{style:{background:'#e8dfd4',borderRadius:99,height:12,overflow:'hidden'}},
+      h('div',{style:{width:'100%',height:'100%',background:color,borderRadius:99,transformOrigin:'left',transform:`scaleX(1)`,transition:'transform 0.7s cubic-bezier(0.34,1.56,0.64,1)'}})
+    ),
+    sub&&h('div',{style:{fontSize:10,color:'#9a8a7a',marginTop:2}},sub)
+  );
+}
+
+function BarChart({data}){
+  const maxV=Math.max(...data.map(d=>Math.abs(d.value)),1);
+  return h('div',{style:{width:'100%'}},
+    data.map((d,i)=>h('div',{key:i,style:{marginBottom:14}},
+      h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:4}},
+        h('span',{style:{fontSize:12,color:'#5a4a3a',fontWeight:500}},d.label),
+        h('span',{style:{fontSize:12,color:d.color,fontWeight:700}},(d.value<0?'−':'')+fmt(Math.abs(d.value))+' tCO₂')
+      ),
+      h('div',{style:{background:'#e8dfd4',borderRadius:99,height:12,overflow:'hidden'}},
+        h('div',{style:{
+          width:(Math.abs(d.value)/maxV*100)+'%',height:'100%',
+          background:d.color,borderRadius:99,
+          transition:'width 0.7s cubic-bezier(0.34,1.56,0.64,1)'
+        }})
+      ),
+      d.sub&&h('div',{style:{fontSize:10,color:'#9a8a7a',marginTop:2}},d.sub)
+    ))
+  );
+}
+
+function TreeGrid({count}){
+  const show=Math.min(count,96);
+  const trees=[];
+  for(let i=0;i<show;i++)trees.push(i);
+  return h('div',{style:{display:'flex',flexWrap:'wrap',gap:3,marginTop:10}},
+    trees.map(i=>h('span',{key:i,style:{fontSize:16,lineHeight:1}},'🌲')),
+    count>96&&h('span',{style:{fontSize:11,color:'#7a6a5a',alignSelf:'center',marginLeft:4}},'+'+fmtI(count-96)+'그루…')
+  );
+}
+
+function App(){
+  const[species,setSpecies]=useState('pine');
+  const[volume,setVolume]=useState(50);
+  const[usage,setUsage]=useState('structural');
+  const r=calc(species,volume,usage);
+  const aStored=useAnim(r.stored),aSav=useAnim(r.sav),aTrees=useAnim(r.trees),aBen=useAnim(r.benefit);
+
+  const chart=[
+    {label:`${SPECIES[species].ko} — 탄소 저장량`,value:-r.stored,color:'#2D5A27'},
+    {label:'목재 생산 배출',value:r.tprod,color:'#7daa7d',sub:'벌채·운반·제재 포함'},
+    {label:'콘크리트 생산 배출',value:r.cprod,color:'#b5795a',sub:'시멘트 소성 포함'},
+    {label:'목재 순 배출 (저장 차감)',value:r.tnet,color:'#2D5A27'},
+    {label:'콘크리트 순 배출',value:r.cnet,color:'#b5795a'},
+  ];
+
+  const card={background:'#fff',borderRadius:14,padding:'18px 20px',marginBottom:14,boxShadow:'0 2px 10px rgba(45,90,39,0.07)',border:'1px solid rgba(45,90,39,0.1)'};
+  const secLabel={fontSize:10,fontWeight:500,letterSpacing:'0.1em',textTransform:'uppercase',color:'#7a6a5a',marginBottom:12,display:'flex',alignItems:'center',gap:5};
+  const dot=(c='#b5795a')=>h('span',{style:{width:6,height:6,borderRadius:'50%',background:c,display:'inline-block'}});
+
+  return h('div',{style:{background:'#f5ede3',minHeight:'100vh'}},
+    // Header
+    h('div',{style:{background:'#2D5A27',padding:'22px 24px 20px',position:'relative',overflow:'hidden'}},
+      h('div',{style:{position:'absolute',top:-20,right:40,fontSize:100,opacity:0.06,lineHeight:1,userSelect:'none'}},'🌿'),
+      h('div',{style:{position:'absolute',top:0,right:0,bottom:0,width:180,background:'rgba(255,255,255,0.04)',clipPath:'polygon(40% 0%,100% 0%,100% 100%,0% 100%)'}}),
+      h('div',{style:{display:'inline-block',background:'rgba(255,255,255,0.15)',border:'1px solid rgba(255,255,255,0.25)',borderRadius:20,padding:'3px 12px',fontSize:10,color:'#b5e0b0',letterSpacing:'0.08em',textTransform:'uppercase',marginBottom:8}},'🌿 Carbon Calculator'),
+      h('h1',{style:{fontSize:28,fontWeight:700,color:'#fff',margin:'0 0 3px',fontFamily:'Lora,Georgia,serif',letterSpacing:'-0.5px'}},
+        h('span',{style:{color:'#7dcc78',marginRight:6}},'🍃'),'TimberCarbon AI'
+      ),
+      h('p',{style:{fontSize:12,color:'rgba(255,255,255,0.55)',fontStyle:'italic',margin:0}},'목재가 품은 탄소의 가치를 계산하고 지구에 미치는 영향을 확인하세요')
+    ),
+
+    h('div',{style:{padding:'20px 18px 40px',maxWidth:680,margin:'0 auto'}},
+
+      // Inputs
+      h('div',{style:card},
+        h('div',{style:secLabel},dot(),' 재료 정보 입력'),
+        h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}},
+          h('div',null,
+            h('div',{style:{fontSize:11,color:'#7a6a5a',marginBottom:5}},'수종 선택'),
+            h('select',{value:species,onChange:e=>setSpecies(e.target.value),style:{width:'100%',padding:'9px 10px',border:'1.5px solid #d4c8bb',borderRadius:9,fontSize:13,color:'#3a2e24',background:'#faf6f0',outline:'none'}},
+              Object.entries(SPECIES).map(([k,v])=>h('option',{key:k,value:k},v.e+' '+v.ko))
+            )
+          ),
+          h('div',null,
+            h('div',{style:{fontSize:11,color:'#7a6a5a',marginBottom:5}},'건물 용도'),
+            h('select',{value:usage,onChange:e=>setUsage(e.target.value),style:{width:'100%',padding:'9px 10px',border:'1.5px solid #d4c8bb',borderRadius:9,fontSize:13,color:'#3a2e24',background:'#faf6f0',outline:'none'}},
+              Object.entries(USAGES).map(([k,v])=>h('option',{key:k,value:k},v.ko))
+            )
+          )
+        ),
+        h('div',null,
+          h('div',{style:{display:'flex',alignItems:'center',gap:10,marginBottom:8}},
+            h('span',{style:{fontSize:26,fontWeight:700,color:'#2D5A27',minWidth:60}},fmtI(volume)),
+            h('span',{style:{fontSize:14,color:'#7a6a5a'}},'m³'),
+            h('input',{type:'number',min:1,max:5000,step:1,value:volume,
+              onChange:e=>{const v=Number(e.target.value);if(v>=1&&v<=5000)setVolume(v)},
+              style:{width:80,padding:'5px 8px',border:'1.5px solid #d4c8bb',borderRadius:8,fontSize:13,color:'#3a2e24',background:'#faf6f0',outline:'none',textAlign:'center'}
+            })
+          ),
+          h('input',{type:'range',min:1,max:500,step:1,value:Math.min(volume,500),
+            onChange:e=>setVolume(Number(e.target.value)),
+            style:{width:'100%',accentColor:'#2D5A27'}
+          }),
+          h('div',{style:{display:'flex',justifyContent:'space-between',fontSize:10,color:'#9a8a7a',marginTop:3}},
+            h('span',null,'1 m³'),h('span',null,'500 m³')
+          )
+        )
+      ),
+
+      // Metrics
+      h('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:14}},
+        [
+          {label:'탄소 저장량',val:fmt(aStored),unit:'tCO₂',accent:'#2D5A27'},
+          {label:'콘크리트 대비 절감',val:fmt(aSav),unit:'tCO₂',accent:'#b5795a'},
+          {label:'배출권 환산 가치',val:fmtI(aBen/10000),unit:'만 원',accent:'#c9973a'},
+        ].map((m,i)=>h('div',{key:i,style:{background:'#fff',border:`1.5px solid ${m.accent}25`,borderRadius:12,padding:'13px 12px',borderTop:`4px solid ${m.accent}`,textAlign:'center'}},
+          h('div',{style:{fontSize:20,fontWeight:700,color:m.accent,lineHeight:1.1}},(m.val)),
+          h('div',{style:{fontSize:10,color:'#9a8a7a',margin:'2px 0 3px'}},(m.unit)),
+          h('div',{style:{fontSize:10,color:'#7a6a5a'}},(m.label))
+        ))
+      ),
+
+      // Tree card
+      h('div',{style:{...card,background:'#eef6ec',border:'1.5px solid rgba(45,90,39,0.2)'}},
+        h('div',{style:secLabel},dot('#2D5A27'),' 생태 환산 효과'),
+        h('div',{style:{fontSize:42,fontWeight:700,color:'#2D5A27',lineHeight:1,marginBottom:5}},fmtI(Math.round(aTrees)),' 그루'),
+        h('p',{style:{fontSize:14,color:'#5a4a3a',lineHeight:1.7,marginBottom:12}},
+          '이 목재가 저장하는 탄소는 ',
+          h('strong',{style:{color:'#2D5A27'}},'소나무 '+fmtI(Math.round(aTrees))+'그루'),
+          '를 ',
+          h('strong',{style:{color:'#2D5A27'}},'1년간'),
+          ' 심은 효과와 같습니다.'
+        ),
+        h(TreeGrid,{count:Math.round(r.trees)}),
+        h('div',{style:{fontSize:10,color:'#7a9a77',marginTop:8}},'* 소나무 1그루 연간 CO₂ 흡수량 5 kg 기준 (국립산림과학원)')
+      ),
+
+      // Chart
+      h('div',{style:card},
+        h('div',{style:secLabel},dot(),' 탄소 배출 비교 — 목재 vs 콘크리트'),
+        h(BarChart,{data:chart}),
+        h('div',{style:{display:'flex',gap:16,marginTop:8,fontSize:11,color:'#7a6a5a'}},
+          h('span',null,h('span',{style:{display:'inline-block',width:10,height:10,background:'#2D5A27',borderRadius:2,marginRight:4,verticalAlign:'middle'}}),'목재 (음수=흡수)'),
+          h('span',null,h('span',{style:{display:'inline-block',width:10,height:10,background:'#b5795a',borderRadius:2,marginRight:4,verticalAlign:'middle'}}),'콘크리트')
+        )
+      ),
+
+      // Species compare
+      h('div',{style:card},
+        h('div',{style:secLabel},dot(),' 수종별 저장량 비교 ('+fmt(volume,0)+' m³)'),
+        h('div',null,
+          Object.entries(SPECIES)
+            .map(([k,v])=>({k,v,stored:calc(k,volume,usage).stored}))
+            .sort((a,b)=>b.stored-a.stored)
+            .map(({k,v,stored})=>{
+              const maxS=Math.max(...Object.keys(SPECIES).map(sk=>calc(sk,volume,usage).stored));
+              const sel=k===species;
+              return h('div',{key:k,onClick:()=>setSpecies(k),style:{
+                display:'flex',alignItems:'center',gap:8,padding:'7px 9px',
+                borderRadius:9,marginBottom:3,cursor:'pointer',
+                background:sel?'#eef6ec':'transparent',
+                border:`1.5px solid ${sel?'rgba(45,90,39,0.3)':'transparent'}`,
+                transition:'all 0.2s'
+              }},
+                h('span',{style:{fontSize:16,minWidth:20}},v.e),
+                h('span',{style:{fontSize:12,minWidth:70,color:'#3a2e24',fontWeight:sel?600:400}},v.ko),
+                h('div',{style:{flex:1,background:'#e8dfd4',borderRadius:99,height:10,overflow:'hidden'}},
+                  h('div',{style:{width:(stored/maxS*100)+'%',height:'100%',background:sel?'#2D5A27':'#8fbc8f',borderRadius:99,transition:'width 0.6s'}})
+                ),
+                h('span',{style:{fontSize:11,color:sel?'#2D5A27':'#7a6a5a',fontWeight:sel?700:400,minWidth:50,textAlign:'right'}},fmt(stored)+' t')
+              );
+            })
+        ),
+        h('div',{style:{fontSize:10,color:'#9a8a7a',marginTop:6}},'클릭하면 해당 수종으로 전환됩니다')
+      ),
+
+      // Economic
+      h('div',{style:{...card,background:'#fdf5ea',border:'1.5px solid rgba(201,151,58,0.2)'}},
+        h('div',{style:secLabel},dot('#c9973a'),' 탄소배출권 경제적 가치'),
+        h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}},
+          [
+            {l:'배출권 기준 시세',v:'₩ '+KAU.toLocaleString('ko-KR')+' / tCO₂'},
+            {l:'탄소 저장 가치',v:'₩ '+Math.round(r.stored*KAU).toLocaleString('ko-KR')},
+            {l:'절감 가치',v:'₩ '+Math.round(r.sav*KAU).toLocaleString('ko-KR')},
+            {l:'총 환경 편익',v:'₩ '+r.benefit.toLocaleString('ko-KR'),accent:true},
+          ].map((item,i)=>h('div',{key:i,style:{background:item.accent?'#fff8ec':'#fff',borderRadius:9,padding:'11px 13px',border:`1.5px solid ${item.accent?'rgba(201,151,58,0.4)':'#e8dfd4'}`}},
+            h('div',{style:{fontSize:10,color:'#9a8a7a',marginBottom:3}},item.l),
+            h('div',{style:{fontSize:14,fontWeight:700,color:item.accent?'#c9973a':'#3a2e24'}},item.v)
+          ))
+        ),
+        h('div',{style:{fontSize:10,color:'#9a8a7a',marginTop:10}},'📊 KAU 2024 기준가 · 실제 시세에 따라 달라질 수 있습니다')
+      ),
+
+      h('div',{style:{textAlign:'center',fontSize:10,color:'#9a8a7a',marginTop:4}},
+        'TimberCarbon AI · IPCC 2006 Guidelines & 국립산림과학원 기준'
+      )
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
