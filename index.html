@@ -1,217 +1,449 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>건축재료 2026 프로젝트 발표</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-      background: #f5f7fa;
-      color: #222;
-      min-height: 100vh;
-    }
-    header {
-      background: #1a3a5c;
-      color: white;
-      padding: 2rem 1.5rem;
-      text-align: center;
-    }
-    header h1 { font-size: 1.8rem; margin-bottom: 0.4rem; }
-    header p  { font-size: 1rem; opacity: 0.8; }
-    main {
-      max-width: 800px;
-      margin: 2rem auto;
-      padding: 0 1rem;
-    }
-    .group {
-      background: white;
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      margin-bottom: 2rem;
-      overflow: hidden;
-    }
-    .group-header {
-      background: #2563eb;
-      color: white;
-      padding: 0.9rem 1.4rem;
-      font-size: 1.1rem;
-      font-weight: bold;
-    }
-    .group-header.group2 { background: #059669; }
-    ul { list-style: none; }
-    ul li a {
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
-      padding: 0.9rem 1.4rem;
-      text-decoration: none;
-      color: #1a3a5c;
-      border-bottom: 1px solid #f0f0f0;
-      transition: background 0.15s;
-      font-size: 0.97rem;
-    }
-    ul li:last-child a { border-bottom: none; }
-    ul li a:hover { background: #eff6ff; }
-    ul li a .icon { font-size: 1.2rem; }
-    ul li a .label { flex: 1; }
-    ul li a .arrow { color: #94a3b8; font-size: 0.85rem; }
-    footer {
-      text-align: center;
-      padding: 2rem;
-      font-size: 0.82rem;
-      color: #94a3b8;
-    }
-  </style>
-  <style>
-    #lock-overlay {
-      position: fixed; inset: 0;
-      background: #1a3a5c;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      z-index: 9999;
-    }
-    #lock-overlay h2 { color: white; font-size: 1.3rem; margin-bottom: 0.4rem; }
-    #lock-overlay p  { color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 2rem; }
-    #pin-display {
-      display: flex; gap: 1rem; margin-bottom: 2rem;
-    }
-    .pin-dot {
-      width: 18px; height: 18px;
-      border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.5);
-      background: transparent;
-      transition: background 0.15s;
-    }
-    .pin-dot.filled { background: white; border-color: white; }
-    #pin-error {
-      color: #f87171; font-size: 0.85rem;
-      margin-bottom: 1.2rem; min-height: 1.2em;
-    }
-    #keypad {
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      gap: 0.8rem;
-    }
-    .key {
-      width: 72px; height: 72px;
-      border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.25);
-      background: rgba(255,255,255,0.08);
-      color: white; font-size: 1.4rem;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .key:hover  { background: rgba(255,255,255,0.2); }
-    .key:active { background: rgba(255,255,255,0.35); }
-    .key.del    { font-size: 1rem; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>건축재료 2026 프로젝트 발표</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+    background: #f4f6f9;
+    color: #222;
+  }
+
+  /* ── PIN 화면 ── */
+  #pin-screen {
+    position: fixed; inset: 0;
+    background: #1a3a5c;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999;
+  }
+  #pin-screen h1 {
+    color: #fff;
+    font-size: 1.5rem;
+    margin-bottom: 8px;
+    letter-spacing: 0.05em;
+  }
+  #pin-screen p { color: #90aecb; font-size: 0.9rem; margin-bottom: 32px; }
+  .pin-dots {
+    display: flex; gap: 14px; margin-bottom: 28px;
+  }
+  .pin-dot {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 2px solid #90aecb;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .pin-dot.filled { background: #fff; border-color: #fff; }
+  .keypad {
+    display: grid; grid-template-columns: repeat(3, 64px);
+    gap: 12px;
+  }
+  .key {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    font-size: 1.4rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .key:hover { background: rgba(255,255,255,0.22); }
+  .key:active { background: rgba(255,255,255,0.35); }
+  .key.del { font-size: 1rem; }
+  #pin-error {
+    color: #ff7070;
+    font-size: 0.85rem;
+    margin-top: 18px;
+    height: 20px;
+  }
+
+  /* ── 메인 콘텐츠 ── */
+  #main { display: none; }
+
+  header {
+    background: #1a3a5c;
+    color: #fff;
+    padding: 36px 24px 28px;
+    text-align: center;
+  }
+  header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: 0.03em; }
+  header p { margin-top: 6px; color: #90aecb; font-size: 0.95rem; }
+
+  .container {
+    max-width: 860px;
+    margin: 36px auto;
+    padding: 0 20px 60px;
+  }
+
+  .group-block {
+    margin-bottom: 36px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    overflow: hidden;
+  }
+  .group-header {
+    background: #1a3a5c;
+    color: #fff;
+    padding: 14px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+  .group-header span {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: #90aecb;
+    margin-left: 10px;
+  }
+
+  .student-row {
+    display: flex;
+    align-items: flex-start;
+    padding: 18px 24px;
+    border-bottom: 1px solid #eef0f4;
+    gap: 16px;
+  }
+  .student-row:last-child { border-bottom: none; }
+
+  .student-name {
+    flex-shrink: 0;
+    width: 70px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding-top: 2px;
+    color: #1a3a5c;
+  }
+
+  .student-info { flex: 1; }
+  .app-name {
+    font-weight: 600;
+    font-size: 0.98rem;
+    color: #1a3a5c;
+    margin-bottom: 4px;
+  }
+  .app-desc {
+    font-size: 0.85rem;
+    color: #555;
+    line-height: 1.5;
+  }
+
+  .btn-link {
+    flex-shrink: 0;
+    display: inline-block;
+    margin-top: 2px;
+    padding: 6px 16px;
+    background: #1a3a5c;
+    color: #fff;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s;
+    align-self: center;
+  }
+  .btn-link:hover { background: #2a5a8c; }
+
+  @media (max-width: 580px) {
+    .student-row { flex-wrap: wrap; }
+    .student-name { width: 100%; margin-bottom: 4px; }
+    .btn-link { margin-top: 8px; }
+  }
+</style>
 </head>
 <body>
-  <div id="lock-overlay">
-    <h2>건축재료 2026 프로젝트 발표</h2>
-    <p>비밀번호 4자리를 입력하세요</p>
-    <div id="pin-display">
-      <div class="pin-dot"></div>
-      <div class="pin-dot"></div>
-      <div class="pin-dot"></div>
-      <div class="pin-dot"></div>
-    </div>
-    <div id="pin-error"></div>
-    <div id="keypad">
-      <button class="key" onclick="pressKey('1')">1</button>
-      <button class="key" onclick="pressKey('2')">2</button>
-      <button class="key" onclick="pressKey('3')">3</button>
-      <button class="key" onclick="pressKey('4')">4</button>
-      <button class="key" onclick="pressKey('5')">5</button>
-      <button class="key" onclick="pressKey('6')">6</button>
-      <button class="key" onclick="pressKey('7')">7</button>
-      <button class="key" onclick="pressKey('8')">8</button>
-      <button class="key" onclick="pressKey('9')">9</button>
-      <button class="key del" onclick="pressKey('del')">⌫</button>
-      <button class="key" onclick="pressKey('0')">0</button>
-      <button class="key" style="visibility:hidden"></button>
-    </div>
+
+<!-- PIN 화면 -->
+<div id="pin-screen">
+  <h1>건축재료 2026</h1>
+  <p>프로젝트 발표 포털</p>
+  <div class="pin-dots">
+    <div class="pin-dot" id="d0"></div>
+    <div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div>
+    <div class="pin-dot" id="d3"></div>
   </div>
-  <script>
-    (function() {
-      if (sessionStorage.getItem('auth') === '1') {
-        document.getElementById('lock-overlay').style.display = 'none';
-        return;
-      }
-      var pin = '';
-      var correct = '2026';
-      window.pressKey = function(k) {
-        var err = document.getElementById('pin-error');
-        if (k === 'del') { pin = pin.slice(0, -1); }
-        else if (pin.length < 4) { pin += k; }
-        var dots = document.querySelectorAll('.pin-dot');
-        dots.forEach(function(d, i) { d.classList.toggle('filled', i < pin.length); });
-        err.textContent = '';
-        if (pin.length === 4) {
-          if (pin === correct) {
-            sessionStorage.setItem('auth', '1');
-            document.getElementById('lock-overlay').style.display = 'none';
-          } else {
-            err.textContent = '비밀번호가 올바르지 않습니다';
-            pin = '';
-            dots.forEach(function(d) { d.classList.remove('filled'); });
-          }
-        }
-      };
-    })();
-  </script>
+  <div class="keypad">
+    <button class="key" onclick="pressKey('1')">1</button>
+    <button class="key" onclick="pressKey('2')">2</button>
+    <button class="key" onclick="pressKey('3')">3</button>
+    <button class="key" onclick="pressKey('4')">4</button>
+    <button class="key" onclick="pressKey('5')">5</button>
+    <button class="key" onclick="pressKey('6')">6</button>
+    <button class="key" onclick="pressKey('7')">7</button>
+    <button class="key" onclick="pressKey('8')">8</button>
+    <button class="key" onclick="pressKey('9')">9</button>
+    <button class="key del" onclick="delKey()">←</button>
+    <button class="key" onclick="pressKey('0')">0</button>
+    <button class="key" style="opacity:0;pointer-events:none;"></button>
+  </div>
+  <div id="pin-error"></div>
+</div>
+
+<!-- 메인 콘텐츠 -->
+<div id="main">
   <header>
-    <h1>건축재료 2026 프로젝트 발표</h1>
-    <p>AI 활용 앱 모음</p>
+    <h1>건축재료 2026 프로젝트 발표</html>
+    <p>AI 활용 앱 모음 — 2026년 1학기</p>
   </header>
-  <main>
-    <div class="group">
-      <div class="group-header">1조 — 목재 (Timber)</div>
-      <ul>
-        <li><a href="01조/242951_박선후.html">
-          <span class="icon">📄</span>
-          <span class="label">박선후</span>
-          <span class="arrow">열기 →</span>
-        </a></li>
-        <li><a href="01조/252216_정하진.html">
-          <span class="icon">📄</span>
-          <span class="label">정하진</span>
-          <span class="arrow">열기 →</span>
-        </a></li>
-        <li><a href="01조/251283_강나림.html">
-          <span class="icon">📄</span>
-          <span class="label">강나림</span>
-          <span class="arrow">열기 →</span>
-        </a></li>
-      </ul>
+
+  <div class="container">
+
+    <!-- 01조 -->
+    <div class="group-block">
+      <div class="group-header">01조 <span>목재</span></div>
+
+      <div class="student-row">
+        <div class="student-name">강나림</div>
+        <div class="student-info">
+          <div class="app-name">TimberCarbon AI</div>
+          <div class="app-desc">수종·용도·목재 부피 입력 → 탄소 저장량 및 배출권 환산 가치, 콘크리트 대비 절감 효과를 소나무 그루 수로 환산 분석</div>
+        </div>
+        <a class="btn-link" href="01조_강나림.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">박선후</div>
+        <div class="student-info">
+          <div class="app-name">목재 함수율 계산기</div>
+          <div class="app-desc">건조 전후 시료 중량 기반 함수율 즉시 산출, 섬유포화점 및 기건 상태 기준 시각적 피드백 제공</div>
+        </div>
+        <a class="btn-link" href="01조_박선후.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">정하진</div>
+        <div class="student-info">
+          <div class="app-name">서울 법적 일조 수인한도 분석 시스템</div>
+          <div class="app-desc">서울 위경도 및 진태양시 보정 적용 → 신축 건물 높이·이격 거리에 따른 법적 일조 수인한도 정밀 분석</div>
+        </div>
+        <a class="btn-link" href="01조_정하진.html" target="_blank">앱 열기</a>
+      </div>
     </div>
-    <div class="group">
-      <div class="group-header group2">2조 — 석재 (Stone)</div>
-      <ul>
-        <li><a href="02조/건축재료 2조_강이지 ai활용 앱.html">
-          <span class="icon">🤖</span>
-          <span class="label">강이지 — AI 활용 앱</span>
-          <span class="arrow">열기 →</span>
-        </a></li>
-        <li><a href="02조/건축재료 2조_김태균 ai활용 앱.html">
-          <span class="icon">🤖</span>
-          <span class="label">김태균 — AI 활용 앱</span>
-          <span class="arrow">열기 →</span>
-        </a></li>
-        <li><a href="02조/건축재료 2조_배서준 ai활용 앱.html">
-          <span class="icon">🤖</span>
-          <span class="label">배서준 — AI 활용 앱</span>
-          <span class="arrow">열기 →</span>
-        </a></li>
-        <li><a href="02조/건축재료 2조_오수인 ai활용 앱.html">
-          <span class="icon">🤖</span>
-          <span class="label">오수인 — AI 활용 앱</span>
-          <span class="arrow">열기 →</span>
-        </a></li>
-      </ul>
+
+    <!-- 02조 -->
+    <div class="group-block">
+      <div class="group-header">02조 <span>석재</span></div>
+
+      <div class="student-row">
+        <div class="student-name">강이지</div>
+        <div class="student-info">
+          <div class="app-name">GeoAI Stone Predictor</div>
+          <div class="app-desc">FT-Transformer 기반 ML 모델로 석재의 물리·역학적 특성 및 기후 변수를 통해 동결융해 수명 예측</div>
+        </div>
+        <a class="btn-link" href="02조_강이지.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">김태균</div>
+        <div class="student-info">
+          <div class="app-name">Material Fit AI</div>
+          <div class="app-desc">공간 용도·적용 부위·면적·예산·요구 성능 입력 → 바닥·벽·천장·파사드 최적 건축 마감재 추천 및 비교</div>
+        </div>
+        <a class="btn-link" href="02조_김태균.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">배서준</div>
+        <div class="student-info">
+          <div class="app-name">BuildMate AI</div>
+          <div class="app-desc">토지 조건·예산·가족 구성 등 기반으로 최적 건축 플랜과 비용 견적을 즉시 도출하는 스마트 설계 어시스턴트</div>
+        </div>
+        <a class="btn-link" href="02조_배서준.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">오수인</div>
+        <div class="student-info">
+          <div class="app-name">LitraSpec</div>
+          <div class="app-desc">패널 규격·광섬유 사양 설정 → 광섬유 투광 콘크리트의 밀도·구조 취약점(Heatmap)·발광 강도를 2D/3D로 설계 및 분석</div>
+        </div>
+        <a class="btn-link" href="02조_오수인.html" target="_blank">앱 열기</a>
+      </div>
     </div>
-  </main>
-  <footer>건축재료 강의 · 2026년 1학기</footer>
+
+    <!-- 03조 -->
+    <div class="group-block">
+      <div class="group-header">03조 <span>점토벽돌 / 인테리어</span></div>
+
+      <div class="student-row">
+        <div class="student-name">김세윤</div>
+        <div class="student-info">
+          <div class="app-name">Interior Design Calculator</div>
+          <div class="app-desc">방 치수·단가 기준 페인트·타일 소요량 산출, 3D 가구 배치 및 충돌 감지, 브랜드별 견적·전체 예산 플래닝</div>
+        </div>
+        <a class="btn-link" href="03조_김세윤.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">서효원</div>
+        <div class="student-info">
+          <div class="app-name">HumidiSmart AI</div>
+          <div class="app-desc">주택 규모·실외 날씨·실내 센서 기반 방별 온도·습도·결로 위험도 모니터링 및 가습/제습 에너지 소모 시뮬레이션</div>
+        </div>
+        <a class="btn-link" href="03조_서효원.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">황현지</div>
+        <div class="student-info">
+          <div class="app-name">점토벽돌 소성공정 변수제어 시뮬레이터</div>
+          <div class="app-desc">배합비(규사)·소성 온도 변수 조정 → 강도·흡수율·건조수축·균열 발생율·열효율 등 최종 물성 분석</div>
+        </div>
+        <a class="btn-link" href="03조_황현지.html" target="_blank">앱 열기</a>
+      </div>
+    </div>
+
+    <!-- 04조 -->
+    <div class="group-block">
+      <div class="group-header">04조 <span>조적조 / 콘크리트</span></div>
+
+      <div class="student-row">
+        <div class="student-name">김승표</div>
+        <div class="student-info">
+          <div class="app-name">AI 기반 조적조 통합 시뮬레이터 (BIM Pro)</div>
+          <div class="app-desc">방 정보·벽 치수·쌓기 방식 입력 → 벽돌 소요 수량·공사비 계산 및 AI 전문가 보고서 생성</div>
+        </div>
+        <a class="btn-link" href="04조_김승표.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">심건</div>
+        <div class="student-info">
+          <div class="app-name">콘크리트 역학 시뮬레이터</div>
+          <div class="app-desc">콘크리트 배합·하중 시험 데이터 기반 응력-변형률 곡선, 균열 패턴 및 역학적 거동 3D 시각화</div>
+        </div>
+        <a class="btn-link" href="04조_심건.html" target="_blank">앱 열기</a>
+      </div>
+    </div>
+
+    <!-- 05조 -->
+    <div class="group-block">
+      <div class="group-header">05조 <span>하자 진단 / 주거</span></div>
+
+      <div class="student-row">
+        <div class="student-name">박소현</div>
+        <div class="student-info">
+          <div class="app-name">하자 진단 시스템 v3.0</div>
+          <div class="app-desc">현장 계측 데이터(온도·습도) 입력 → 결로·단열 하자 판정 및 보수 가이드·예상 견적서 자동 생성</div>
+        </div>
+        <a class="btn-link" href="05조_박소현.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">이하늘</div>
+        <div class="student-info">
+          <div class="app-name">전대방안심 AI</div>
+          <div class="app-desc">단과대학 위치·통학 거리·예산·거래 유형 필터 설정 → 전남대 주변 대학생 맞춤형 원룸 비교 및 분석 대시보드</div>
+        </div>
+        <a class="btn-link" href="05조_이하늘.html" target="_blank">앱 열기</a>
+      </div>
+    </div>
+
+    <!-- 06조 -->
+    <div class="group-block">
+      <div class="group-header">06조 <span>폐기물 / 플라스틱</span></div>
+
+      <div class="student-row">
+        <div class="student-name">박승민</div>
+        <div class="student-info">
+          <div class="app-name">EcoBuild AI</div>
+          <div class="app-desc">건축물 명칭·주소·용도 분류 기반 건설 폐기물 사전 발생량 예측 및 감축 방안 제공 플랫폼</div>
+        </div>
+        <a class="btn-link" href="06조_박승민.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">서석준</div>
+        <div class="student-info">
+          <div class="app-name">플라스틱 자외선 노화 시뮬레이터</div>
+          <div class="app-desc">지역 기후·소재 두께·UV 차단제 배합비 입력 → ABS·PVC 등 고분자 소재의 시간에 따른 물성 열화(황변 지수) 예측</div>
+        </div>
+        <a class="btn-link" href="06조_서석준.html" target="_blank">앱 열기</a>
+      </div>
+    </div>
+
+    <!-- 07조 -->
+    <div class="group-block">
+      <div class="group-header">07조 <span>단열재</span></div>
+
+      <div class="student-row">
+        <div class="student-name">강동인</div>
+        <div class="student-info">
+          <div class="app-name">단열재 추천 및 현장 감리 시뮬레이터</div>
+          <div class="app-desc">시공 지역 법정 열관류율 기준 및 시공 부위에 따라 최적 단열재 순위 구성·추천, 규격 준수 여부 검증</div>
+        </div>
+        <a class="btn-link" href="07조_강동인.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">김경민</div>
+        <div class="student-info">
+          <div class="app-name">BuildCare AI</div>
+          <div class="app-desc">대지 용도지역 분석·설계사무소 매칭·도면 단열 검토·실시간 견적·현장 관리를 원스톱 제공하는 예비 건축주 지원 플랫폼</div>
+        </div>
+        <a class="btn-link" href="07조_김경민.html" target="_blank">앱 열기</a>
+      </div>
+
+      <div class="student-row">
+        <div class="student-name">송승은</div>
+        <div class="student-info">
+          <div class="app-name">ThermoAI 2.0</div>
+          <div class="app-desc">전국 지역별 기후·단열재 두께 기반 계절별 난방·냉방 에너지 비용 절감액, 탄소 배출 저감 및 단열 경제성 실시간 시뮬레이션</div>
+        </div>
+        <a class="btn-link" href="07조_송승은.html" target="_blank">앱 열기</a>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+</div><!-- /main -->
+
+<script>
+  const CORRECT = '2026';
+  let entered = '';
+
+  if (sessionStorage.getItem('auth') === '1') showMain();
+
+  function pressKey(k) {
+    if (entered.length >= 4) return;
+    entered += k;
+    updateDots();
+    if (entered.length === 4) checkPin();
+  }
+
+  function delKey() {
+    entered = entered.slice(0, -1);
+    updateDots();
+    document.getElementById('pin-error').textContent = '';
+  }
+
+  function updateDots() {
+    for (let i = 0; i < 4; i++) {
+      document.getElementById('d' + i).classList.toggle('filled', i < entered.length);
+    }
+  }
+
+  function checkPin() {
+    if (entered === CORRECT) {
+      sessionStorage.setItem('auth', '1');
+      showMain();
+    } else {
+      document.getElementById('pin-error').textContent = '비밀번호가 올바르지 않습니다.';
+      entered = '';
+      updateDots();
+    }
+  }
+
+  function showMain() {
+    document.getElementById('pin-screen').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+  }
+</script>
 </body>
 </html>

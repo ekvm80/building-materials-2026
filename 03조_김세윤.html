@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Interior Design Calculator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --p:#4f46e5;--pd:#3730a3;--ac:#06b6d4;
+      --ok:#10b981;--warn:#f59e0b;--err:#ef4444;
+      --bg:#f0f4ff;--sur:#fff;--txt:#1e293b;--mu:#64748b;--bd:#e2e8f0;
+      --r:14px;--sh:0 6px 28px rgba(0,0,0,.10);--tr:.22s ease;
+    }
+    body{font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+    header{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 50%,#06b6d4 100%);color:#fff;padding:2.6rem 1.5rem 2rem;text-align:center;position:relative;overflow:hidden}
+    header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 70% 40%,rgba(255,255,255,.13) 0%,transparent 70%)}
+    header h1{font-size:clamp(1.7rem,5vw,2.7rem);font-weight:900;letter-spacing:-.5px;margin-bottom:.4rem;position:relative}
+    header .sub{font-size:.95rem;opacity:.88;position:relative}
+    .htags{display:flex;justify-content:center;gap:.45rem;flex-wrap:wrap;margin-top:.9rem;position:relative}
+    .htag{background:rgba(255,255,255,.17);border:1px solid rgba(255,255,255,.32);border-radius:999px;padding:.22rem .8rem;font-size:.75rem;font-weight:600;backdrop-filter:blur(6px)}
+    .tab-bar{max-width:1200px;margin:0 auto;padding:1.4rem 1.2rem .4rem;display:flex;gap:.5rem;flex-wrap:wrap}
+    .tab{padding:.55rem 1.15rem;border:none;border-radius:999px;font-size:.87rem;font-weight:700;cursor:pointer;background:var(--sur);color:var(--mu);border:1.5px solid var(--bd);transition:all var(--tr)}
+    .tab.active{background:var(--p);color:#fff;border-color:var(--p);box-shadow:0 4px 12px rgba(79,70,229,.3)}
+    .tab:hover:not(.active){background:#ede9fe;color:var(--p)}
+    main{max-width:1200px;margin:0 auto;padding:.6rem 1.2rem 3rem}
+    .panel{display:none}.panel.active{display:block}
+    .card{background:var(--sur);border-radius:var(--r);box-shadow:var(--sh);padding:1.7rem 1.5rem;display:flex;flex-direction:column;gap:.95rem;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.9);transition:transform var(--tr),box-shadow var(--tr)}
+    .card:hover{transform:translateY(-3px);box-shadow:0 10px 36px rgba(0,0,0,.13)}
+    .card::after{content:'';position:absolute;top:0;left:0;right:0;height:5px;border-radius:var(--r) var(--r) 0 0}
+    .card-paint::after{background:linear-gradient(90deg,#f59e0b,#ef4444)}
+    .card-tile::after{background:linear-gradient(90deg,#10b981,#06b6d4)}
+    .card-brand::after{background:linear-gradient(90deg,#7c3aed,#ec4899)}
+    .card-budget::after{background:linear-gradient(90deg,#4f46e5,#06b6d4)}
+    .card-head{display:flex;align-items:center;gap:.8rem;padding-bottom:.8rem;border-bottom:1.5px solid var(--bd)}
+    .card-icon{font-size:1.85rem;line-height:1}
+    .card-head h2{font-size:1.1rem;font-weight:800}
+    .sec-b{margin-left:auto;min-width:2rem;height:2rem;border-radius:999px;padding:0 .5rem;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:900;color:#fff;white-space:nowrap}
+    .card-paint .sec-b{background:linear-gradient(135deg,#f59e0b,#ef4444)}
+    .card-tile .sec-b{background:linear-gradient(135deg,#10b981,#06b6d4)}
+    .card-brand .sec-b{background:linear-gradient(135deg,#7c3aed,#ec4899)}
+    .card-budget .sec-b{background:linear-gradient(135deg,#4f46e5,#06b6d4)}
+    .fg{display:flex;flex-direction:column;gap:.28rem}
+    label{font-size:.73rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px}
+    input[type=number],input[type=text],select{width:100%;padding:.62rem .88rem;border:1.5px solid var(--bd);border-radius:9px;font-size:.93rem;color:var(--txt);background:#f8faff;outline:none;transition:border-color var(--tr),box-shadow var(--tr),background var(--tr)}
+    input:focus,select:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(79,70,229,.13);background:#fff}
+    input::placeholder{color:#b0bec5}
+    .r2{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+    .r3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.65rem}
+    .cbrow{display:flex;align-items:center;gap:.5rem}
+    .cbrow input[type=checkbox]{width:1.05rem;height:1.05rem;accent-color:var(--p);cursor:pointer}
+    .cbrow label{text-transform:none;font-size:.88rem;color:var(--txt);letter-spacing:0;cursor:pointer;font-weight:600}
+    .btn{padding:.7rem 1.15rem;border:none;border-radius:9px;font-size:.9rem;font-weight:800;cursor:pointer;transition:filter var(--tr),transform var(--tr);display:inline-flex;align-items:center;justify-content:center;gap:.4rem}
+    .btn:hover{filter:brightness(1.07);transform:translateY(-1px)}
+    .btn:active{filter:brightness(.95);transform:translateY(0)}
+    .btn-p{background:linear-gradient(135deg,var(--p),var(--pd));color:#fff;width:100%;box-shadow:0 4px 14px rgba(79,70,229,.28)}
+    .btn-g{background:linear-gradient(135deg,#10b981,#059669);color:#fff;width:100%;box-shadow:0 4px 14px rgba(16,185,129,.28)}
+    .btn-o{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;width:100%;box-shadow:0 4px 14px rgba(245,158,11,.28)}
+    .btn-v{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;width:100%;box-shadow:0 4px 14px rgba(124,58,237,.28)}
+    .btn-add{background:#f0fdf4;color:var(--ok);border:1.5px solid #a7f3d0;width:100%;font-weight:700}
+    .btn-del{background:#fff1f1;color:var(--err);border:1.5px solid #fecaca;padding:.28rem .6rem;font-size:.74rem;font-weight:700;border-radius:6px;cursor:pointer}
+    .btn-sm{padding:.42rem .85rem;font-size:.8rem;font-weight:700;border-radius:7px;border:none;cursor:pointer}
+    .btn-outline{background:transparent;border:1.5px solid var(--bd);color:var(--mu)}
+    .btn-outline:hover{background:var(--bg);color:var(--p);border-color:var(--p)}
+    .res-box{background:linear-gradient(135deg,#f8faff,#f0f4ff);border:1.5px solid var(--bd);border-radius:11px;padding:.95rem 1.1rem;display:flex;flex-direction:column;gap:.32rem;min-height:56px}
+    .rr{display:flex;justify-content:space-between;align-items:center;padding:.18rem 0;border-bottom:1px dashed var(--bd);font-size:.86rem}
+    .rr:last-of-type{border-bottom:none}
+    .rv{font-weight:700;color:var(--txt);font-size:.92rem}
+    .rtot{display:flex;justify-content:space-between;align-items:center;padding-top:.48rem;margin-top:.18rem;border-top:2px solid var(--bd);font-weight:900;font-size:1.03rem;color:var(--p)}
+    .rph{color:#b0bec5;font-size:.84rem;text-align:center;padding:.45rem 0}
+    .prog-w{background:#e9ecef;border-radius:999px;height:7px;overflow:hidden;margin-bottom:.28rem}
+    .prog-f{height:100%;border-radius:999px;transition:width .65s cubic-bezier(.4,0,.2,1)}
+    .badge{display:inline-flex;align-items:center;gap:.28rem;padding:.28rem .85rem;border-radius:999px;font-size:.79rem;font-weight:800;margin-top:.35rem}
+    .b-ok{background:#ecfdf5;color:#059669}.b-warn{background:#fffbeb;color:#d97706}.b-bad{background:#fff1f1;color:#dc2626}
+    .info{background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:.65rem .88rem;font-size:.81rem;color:#1e40af;line-height:1.6}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.3rem}
+    @media(max-width:720px){.two-col{grid-template-columns:1fr}.r3{grid-template-columns:1fr 1fr}}
+
+    /* ── BRAND ── */
+    .brand-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.2rem}
+    @media(max-width:760px){.brand-grid{grid-template-columns:1fr}}
+    .brand-card{border-radius:12px;padding:1.2rem 1.1rem;display:flex;flex-direction:column;gap:.7rem;border:2.5px solid transparent;cursor:pointer;transition:all var(--tr)}
+    .brand-card.economy{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-color:#86efac}
+    .brand-card.midrange{background:linear-gradient(135deg,#eff6ff,#dbeafe);border-color:#93c5fd}
+    .brand-card.premium{background:linear-gradient(135deg,#faf5ff,#ede9fe);border-color:#c4b5fd}
+    .brand-card.selected{box-shadow:0 0 0 3.5px var(--p),0 8px 24px rgba(79,70,229,.25);transform:translateY(-3px)}
+    .brand-card:hover{transform:translateY(-2px)}
+    .brand-tier{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px}
+    .economy .brand-tier{color:#16a34a}.midrange .brand-tier{color:#2563eb}.premium .brand-tier{color:#7c3aed}
+    .brand-name{font-size:1rem;font-weight:900;color:var(--txt)}
+    .brand-desc{font-size:.78rem;color:var(--mu);line-height:1.5}
+    .brand-items{display:flex;flex-direction:column;gap:.35rem}
+    .brand-item{display:flex;justify-content:space-between;align-items:center;font-size:.82rem;padding:.3rem .5rem;background:rgba(255,255,255,.65);border-radius:7px}
+    .brand-item-name{color:var(--txt);font-weight:600}
+    .brand-item-price{font-weight:800;color:var(--p)}
+    .brand-total-row{display:flex;justify-content:space-between;align-items:center;padding:.5rem .5rem;background:rgba(255,255,255,.9);border-radius:8px;border:1px solid rgba(79,70,229,.15)}
+    .brand-total-label{font-size:.8rem;font-weight:700;color:var(--mu)}
+    .brand-total-val{font-size:1rem;font-weight:900}
+    .sim-inputs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem;margin-bottom:1rem}
+    @media(max-width:680px){.sim-inputs{grid-template-columns:1fr 1fr}}
+    .compare-table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:.5rem}
+    .compare-table th{background:var(--p);color:#fff;padding:.55rem .8rem;text-align:left;font-weight:700;font-size:.8rem}
+    .compare-table td{padding:.5rem .8rem;border-bottom:1px solid var(--bd)}
+    .compare-table tr:last-child td{border-bottom:none}
+    .compare-table tr:hover td{background:#f5f3ff}
+    .tier-eco{color:#16a34a;font-weight:700}.tier-mid{color:#2563eb;font-weight:700}.tier-pre{color:#7c3aed;font-weight:700}
+    .diff-pos{color:var(--err);font-weight:700}.diff-neg{color:var(--ok);font-weight:700}
+
+    /* ── 3D FURNITURE ── */
+    .furn-layout{display:grid;grid-template-columns:300px 1fr;gap:1.3rem;align-items:start}
+    @media(max-width:900px){.furn-layout{grid-template-columns:1fr}}
+    .furn-sidebar{display:flex;flex-direction:column;gap:.9rem}
+    .canvas-wrap{background:#0f172a;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;position:relative}
+    #three-canvas{display:block;width:100%}
+    .canvas-toolbar{position:absolute;top:10px;right:10px;display:flex;gap:.35rem;flex-direction:column}
+    .c-btn{background:rgba(255,255,255,.14);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:8px;padding:.38rem .68rem;font-size:.76rem;font-weight:700;cursor:pointer;transition:background var(--tr)}
+    .c-btn:hover{background:rgba(255,255,255,.26)}
+    .canvas-info{position:absolute;bottom:50px;left:12px;color:rgba(255,255,255,.55);font-size:.72rem;line-height:1.7;pointer-events:none}
+    .canvas-legend{position:absolute;top:10px;left:12px;display:flex;flex-direction:column;gap:.22rem;max-height:170px;overflow-y:auto}
+    .leg-item{display:flex;align-items:center;gap:.38rem;font-size:.7rem;color:rgba(255,255,255,.75)}
+    .leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+    .stat-row{display:flex;gap:.8rem;flex-wrap:wrap;padding:.65rem 1rem;background:rgba(0,0,0,.38);border-top:1px solid rgba(255,255,255,.08)}
+    .stat-item{display:flex;flex-direction:column;gap:.08rem}
+    .stat-label{font-size:.66rem;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.4px}
+    .stat-value{font-size:.88rem;font-weight:800;color:#fff}
+    .collision-banner{display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,.93);color:#fff;border-radius:9px;padding:.45rem 1.2rem;font-size:.82rem;font-weight:800;white-space:nowrap;backdrop-filter:blur(6px);z-index:10;animation:pulse 1s ease infinite alternate;box-shadow:0 4px 18px rgba(239,68,68,.4)}
+    @keyframes pulse{from{opacity:.8;transform:translateX(-50%) scale(1)}to{opacity:1;transform:translateX(-50%) scale(1.03)}}
+    .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:.38rem}
+    .preset-btn{background:#f8faff;border:1.5px solid var(--bd);border-radius:8px;padding:.45rem .5rem;font-size:.78rem;font-weight:600;color:var(--txt);cursor:pointer;transition:all var(--tr);text-align:center;line-height:1.4}
+    .preset-btn:hover{background:#ede9fe;border-color:var(--p);color:var(--p)}
+    .furn-placed{display:flex;flex-direction:column;gap:.38rem;max-height:180px;overflow-y:auto}
+    .furn-placed::-webkit-scrollbar{width:4px}
+    .furn-placed::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:9px}
+    .fi-item{display:flex;align-items:center;gap:.45rem;border:1.5px solid var(--bd);border-radius:8px;padding:.42rem .72rem;font-size:.83rem;cursor:pointer;transition:all var(--tr);background:#f8faff}
+    .fi-item:hover{background:#ede9fe;border-color:var(--p)}
+    .fi-item.selected{background:#ede9fe;border-color:var(--p);box-shadow:0 0 0 2px rgba(79,70,229,.2)}
+    .fi-item.colliding{background:#fff1f1;border-color:#fca5a5;animation:shake .35s ease}
+    @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+    .fi-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+    .fi-name{flex:1;font-weight:600}
+    .fi-sz{color:var(--p);font-weight:700;font-size:.76rem}
+    .fi-warn{color:var(--err);font-size:.78rem;font-weight:800}
+    .howto-wrap{max-width:1200px;margin:0 auto 2.5rem;padding:0 1.2rem}
+    .howto-card{background:var(--sur);border-radius:var(--r);box-shadow:0 2px 8px rgba(0,0,0,.06);padding:1.7rem 1.9rem;border:1px solid var(--bd)}
+    .howto-card h3{font-size:.98rem;font-weight:800;color:var(--p);margin-bottom:.9rem}
+    .howto-card ol{padding-left:1.2rem;display:flex;flex-direction:column;gap:.52rem}
+    .howto-card li{font-size:.86rem;color:var(--mu);line-height:1.65}
+    .howto-card li strong{color:var(--txt)}
+    footer{text-align:center;padding:1.4rem 1rem;font-size:.79rem;color:var(--mu);border-top:1px solid var(--bd)}
+    @keyframes slideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .res-box.anim{animation:slideUp .28s ease forwards}
+    kbd{background:#e2e8f0;padding:.1rem .38rem;border-radius:4px;font-family:monospace;font-size:.82em}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🏠 Interior Design Calculator</h1>
+  <p class="sub">Paint · Tile · 3D Furniture + Collision · Brand Compare · Budget</p>
+  <div class="htags">
+    <span class="htag">🎨 Paint</span>
+    <span class="htag">🟫 Tile</span>
+    <span class="htag">🛋️ 3D + 충돌감지</span>
+    <span class="htag">🏷️ 브랜드 비교 NEW</span>
+    <span class="htag">💰 Budget</span>
+    <span class="htag">💾 Auto Save</span>
+  </div>
+</header>
+
+<div class="tab-bar">
+  <button class="tab active" onclick="switchTab('paint')">🎨 ① Paint</button>
+  <button class="tab" onclick="switchTab('tile')">🟫 ② Tile</button>
+  <button class="tab" onclick="switchTab('furniture')">🛋️ ③ 3D Layout</button>
+  <button class="tab" onclick="switchTab('brand')">🏷️ ④ Brand Compare</button>
+  <button class="tab" onclick="switchTab('budget')">💰 ⑤ Budget</button>
+</div>
+
+<main>
+
+<!-- ① PAINT -->
+<div class="panel active" id="panel-paint">
+  <div class="two-col">
+    <section class="card card-paint">
+      <div class="card-head"><span class="card-icon">🎨</span><h2>Paint Estimator</h2><span class="sec-b">①</span></div>
+      <div class="r3">
+        <div class="fg"><label>Width (m)</label><input type="number" id="p-w" placeholder="4.5" min="0" step="0.1"></div>
+        <div class="fg"><label>Length (m)</label><input type="number" id="p-l" placeholder="3.5" min="0" step="0.1"></div>
+        <div class="fg"><label>Height (m)</label><input type="number" id="p-h" placeholder="2.4" min="0" step="0.1"></div>
+      </div>
+      <div class="r2">
+        <div class="fg"><label>개구부 면적 (m²)</label><input type="number" id="p-op" placeholder="3.0" min="0" step="0.1"></div>
+        <div class="fg"><label>페인트 단가 (₩/L)</label><input type="number" id="p-pr" placeholder="12000" min="0"></div>
+      </div>
+      <div class="cbrow"><input type="checkbox" id="p-ceil"><label for="p-ceil">천장 면적 포함</label></div>
+      <button class="btn btn-o" onclick="calcPaint()">🖌️ 페인트 계산</button>
+    </section>
+    <section class="card card-paint" style="border-top:none">
+      <div class="card-head"><span class="card-icon">📊</span><h2>페인트 결과</h2></div>
+      <div class="res-box" id="res-paint"><p class="rph">값 입력 후 계산 버튼을 누르세요</p></div>
+      <div class="info"><strong>계산 공식</strong><br>벽 면적 = 2×(W×H + L×H)<br>천장 = W×L (체크 시)<br>실 면적 = 벽+천장 − 개구부<br>리터 = 면적 ÷ 10 m²/L</div>
+    </section>
+  </div>
+</div>
+
+<!-- ② TILE -->
+<div class="panel" id="panel-tile">
+  <div class="two-col">
+    <section class="card card-tile">
+      <div class="card-head"><span class="card-icon">🟫</span><h2>타일 계산기</h2><span class="sec-b">②</span></div>
+      <div class="r2">
+        <div class="fg"><label>바닥 가로 (m)</label><input type="number" id="t-rw" placeholder="4.5" min="0" step="0.1"></div>
+        <div class="fg"><label>바닥 세로 (m)</label><input type="number" id="t-rl" placeholder="3.5" min="0" step="0.1"></div>
+      </div>
+      <div class="r2">
+        <div class="fg"><label>타일 가로 (cm)</label><input type="number" id="t-tw" placeholder="60" min="0" step="1"></div>
+        <div class="fg"><label>타일 세로 (cm)</label><input type="number" id="t-tl" placeholder="60" min="0" step="1"></div>
+      </div>
+      <div class="r2">
+        <div class="fg"><label>타일 단가 (₩/장)</label><input type="number" id="t-pr" placeholder="2500" min="0"></div>
+        <div class="fg"><label>여유율 (%)</label><input type="number" id="t-ex" placeholder="5" min="0" max="50" value="5"></div>
+      </div>
+      <button class="btn btn-g" onclick="calcTile()">📐 타일 계산</button>
+    </section>
+    <section class="card card-tile" style="border-top:none">
+      <div class="card-head"><span class="card-icon">📊</span><h2>타일 결과</h2></div>
+      <div class="res-box" id="res-tile"><p class="rph">값 입력 후 계산 버튼을 누르세요</p></div>
+      <div class="info"><strong>계산 공식</strong><br>바닥 면적 = W × L<br>타일 면적 = (tw÷100) × (tl÷100)<br>장수 = ceil(바닥÷타일 × (1+여유율%))<br>항상 올림 처리</div>
+    </section>
+  </div>
+</div>
+
+<!-- ③ 3D FURNITURE -->
+<div class="panel" id="panel-furniture">
+  <div class="furn-layout">
+    <aside class="furn-sidebar">
+      <section class="card" style="gap:.8rem">
+        <div class="card-head"><span class="card-icon">📐</span><h2>방 크기 설정</h2></div>
+        <div class="r2">
+          <div class="fg"><label>가로 (m)</label><input type="number" id="f-rw" placeholder="5.0" min="1" max="30" step="0.1" oninput="updateRoom()"></div>
+          <div class="fg"><label>세로 (m)</label><input type="number" id="f-rl" placeholder="4.0" min="1" max="30" step="0.1" oninput="updateRoom()"></div>
+        </div>
+        <div class="fg"><label>높이 (m)</label><input type="number" id="f-rh" placeholder="2.4" min="1.5" max="6" step="0.1" value="2.4" oninput="updateRoom()"></div>
+      </section>
+
+      <section class="card" style="gap:.8rem">
+        <div class="card-head"><span class="card-icon">🛋️</span><h2>가구 추가</h2></div>
+        <div class="fg"><label>빠른 프리셋</label></div>
+        <div class="preset-grid" id="preset-grid"></div>
+        <hr style="border:none;border-top:1px solid var(--bd)">
+        <div class="fg"><label>이름</label><input type="text" id="f-nm" placeholder="예: 옷장"></div>
+        <div class="r3">
+          <div class="fg"><label>W (m)</label><input type="number" id="f-fw" placeholder="1.2" min="0.1" step="0.1"></div>
+          <div class="fg"><label>D (m)</label><input type="number" id="f-fd" placeholder="0.6" min="0.1" step="0.1"></div>
+          <div class="fg"><label>H (m)</label><input type="number" id="f-fh" placeholder="0.8" min="0.1" step="0.1"></div>
+        </div>
+        <div class="fg">
+          <label>색상</label>
+          <select id="f-col">
+            <option value="#7c6fcd">🟣 Purple</option>
+            <option value="#3b82f6">🔵 Blue</option>
+            <option value="#10b981">🟢 Green</option>
+            <option value="#f59e0b">🟡 Yellow</option>
+            <option value="#ef4444">🔴 Red</option>
+            <option value="#8b5cf6">💜 Violet</option>
+            <option value="#06b6d4">🩵 Cyan</option>
+            <option value="#f97316">🟠 Orange</option>
+            <option value="#64748b">⚫ Gray</option>
+            <option value="#84cc16">🟩 Lime</option>
+          </select>
+        </div>
+        <button class="btn btn-add" onclick="addFurniture()">＋ 가구 배치</button>
+      </section>
+
+      <section class="card" style="gap:.8rem">
+        <div class="card-head"><span class="card-icon">📋</span><h2>배치된 가구</h2></div>
+        <div class="furn-placed" id="furn-placed"><p style="font-size:.81rem;color:var(--mu);text-align:center;padding:.4rem 0">아직 가구가 없습니다</p></div>
+        <div class="r2" style="gap:.45rem">
+          <button class="btn btn-sm btn-outline" onclick="clearAll()">🗑️ 전체 삭제</button>
+          <button class="btn btn-sm btn-outline" onclick="resetCamera()">📷 시점 초기화</button>
+        </div>
+      </section>
+
+      <div class="res-box" id="res-furn"><p class="rph">가구를 추가하면 통계가 표시됩니다</p></div>
+    </aside>
+
+    <div style="display:flex;flex-direction:column;gap:.5rem">
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="three-canvas"></canvas>
+        <div class="collision-banner" id="collision-banner">⚠️ 가구 충돌 감지! 겹치는 가구를 확인하세요</div>
+        <div class="canvas-toolbar">
+          <button class="c-btn" onclick="setView('top')">⬆ Top</button>
+          <button class="c-btn" onclick="setView('persp')">👁 3D</button>
+          <button class="c-btn" onclick="setView('front')">🔲 Front</button>
+          <button class="c-btn" onclick="toggleGrid()">⚏ Grid</button>
+        </div>
+        <div class="canvas-info">
+          🖱 드래그: 회전 &nbsp;|&nbsp; 스크롤: 줌 &nbsp;|&nbsp; 우클릭: 이동<br>
+          클릭: 선택 &nbsp;|&nbsp; <kbd>WASD/방향키</kbd>: 이동 &nbsp;|&nbsp; <kbd>Q/E</kbd>: 회전 &nbsp;|&nbsp; <kbd>Del</kbd>: 삭제
+        </div>
+        <div class="canvas-legend" id="canvas-legend"></div>
+        <div class="stat-row">
+          <div class="stat-item"><span class="stat-label">방 면적</span><span class="stat-value" id="st-room">—</span></div>
+          <div class="stat-item"><span class="stat-label">가구 면적</span><span class="stat-value" id="st-furn">—</span></div>
+          <div class="stat-item"><span class="stat-label">여유 공간</span><span class="stat-value" id="st-free">—</span></div>
+          <div class="stat-item"><span class="stat-label">점유율</span><span class="stat-value" id="st-occ">—</span></div>
+          <div class="stat-item"><span class="stat-label">충돌</span><span class="stat-value" id="st-coll">—</span></div>
+          <div class="stat-item"><span class="stat-label">상태</span><span class="stat-value" id="st-status">—</span></div>
+        </div>
+      </div>
+      <p style="font-size:.77rem;color:var(--mu);text-align:center;padding:.2rem 0">
+        <kbd>↑↓←→</kbd> / <kbd>WASD</kbd> 이동 &nbsp;|&nbsp; <kbd>Q</kbd>/<kbd>E</kbd> 회전 &nbsp;|&nbsp; <kbd>Del</kbd> 삭제 &nbsp;|&nbsp;
+        <span style="color:#ef4444;font-weight:700">빨간색 = 충돌 경고</span>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ④ BRAND COMPARE -->
+<div class="panel" id="panel-brand">
+  <section class="card card-brand" style="margin-bottom:1.2rem">
+    <div class="card-head"><span class="card-icon">🏷️</span><h2>자재별 브랜드 비교 시뮬레이터</h2><span class="sec-b">④ NEW</span></div>
+    <div class="info">방 크기를 입력하면 <strong>저가 / 중가 / 고급</strong> 3단계 브랜드 프리셋으로 총 공사 비용을 자동 시뮬레이션합니다.<br>원하는 등급 카드를 클릭하면 <strong>⑤ 예산 탭에 자동 반영</strong>됩니다.</div>
+    <div class="sim-inputs">
+      <div class="fg">
+        <label>가로 × 세로 (m)</label>
+        <div class="r2" style="gap:.4rem">
+          <input type="number" id="br-w" placeholder="가로 m" min="0" step="0.1" oninput="syncBrandArea()">
+          <input type="number" id="br-l" placeholder="세로 m" min="0" step="0.1" oninput="syncBrandArea()">
+        </div>
+      </div>
+      <div class="fg"><label>바닥 면적 (m²)</label><input type="number" id="br-area" placeholder="15.75" min="0" step="0.1"></div>
+      <div class="fg"><label>벽 면적 (m²)</label><input type="number" id="br-wall" placeholder="40.0" min="0" step="0.1"></div>
+    </div>
+    <button class="btn btn-v" onclick="runBrandSim()">🔍 브랜드 비용 시뮬레이션 실행</button>
+  </section>
+  <div class="brand-grid" id="brand-grid">
+    <p style="color:var(--mu);font-size:.88rem;text-align:center;padding:2rem;grid-column:1/-1">방 크기를 입력하고 시뮬레이션 버튼을 누르세요</p>
+  </div>
+  <div id="brand-compare-wrap"></div>
+</div>
+
+<!-- ⑤ BUDGET -->
+<div class="panel" id="panel-budget">
+  <div class="two-col">
+    <section class="card card-budget">
+      <div class="card-head"><span class="card-icon">💰</span><h2>전체 예산 플래너</h2><span class="sec-b">⑤</span></div>
+      <div class="info">① 페인트 · ② 타일 결과가 자동 반영됩니다.<br>④ 브랜드 등급 선택 시에도 자동 입력됩니다.</div>
+      <div class="fg"><label>페인트 비용 (₩)</label><input type="number" id="b-paint" placeholder="자동 반영" min="0"></div>
+      <div class="fg"><label>타일 비용 (₩)</label><input type="number" id="b-tile" placeholder="자동 반영" min="0"></div>
+      <div class="fg"><label>가구 구입 예산 (₩)</label><input type="number" id="b-furn" placeholder="500000" min="0"></div>
+      <div class="fg"><label>인건비 (₩)</label><input type="number" id="b-labor" placeholder="300000" min="0"></div>
+      <div class="fg"><label>기타 비용 (₩)</label><input type="number" id="b-misc" placeholder="100000" min="0"></div>
+      <div class="fg"><label>총 예산 한도 (₩)</label><input type="number" id="b-lim" placeholder="2000000" min="0"></div>
+      <button class="btn btn-p" onclick="calcBudget()">💳 예산 계산</button>
+    </section>
+    <section class="card card-budget" style="border-top:none">
+      <div class="card-head"><span class="card-icon">📊</span><h2>예산 내역</h2></div>
+      <div class="res-box" id="res-budget"><p class="rph">① ② 또는 ④ 섹션 계산 후 확인하세요</p></div>
+    </section>
+  </div>
+</div>
+
+</main>
+
+<section class="howto-wrap">
+  <div class="howto-card">
+    <h3>📖 사용 방법</h3>
+    <ol>
+      <li><strong>① 페인트</strong> — 방 치수·개구부 입력. 커버리지 10 m²/L 기준 자동 계산.</li>
+      <li><strong>② 타일</strong> — 바닥·타일 크기 입력. 기본 5% 여유분 포함, 항상 올림 처리.</li>
+      <li><strong>③ 3D 가구 배치</strong> — 프리셋 또는 커스텀으로 가구 배치. 클릭 선택 후 <kbd>WASD/방향키</kbd> 이동, <kbd>Q/E</kbd> 회전. <span style="color:#ef4444;font-weight:700">가구가 겹치거나 벽을 벗어나면 빨간색 충돌 경고</span>.</li>
+      <li><strong>④ 브랜드 비교</strong> — 면적 입력 후 시뮬레이션. <strong>저가 / 중가 / 고급</strong> 3단계 총비용 동시 비교. 등급 선택 시 ⑤ 예산에 자동 반영.</li>
+      <li><strong>⑤ 예산 플래너</strong> — ①②④ 결과 자동 반영. 항목별 비중 차트와 예산 초과 여부 확인.</li>
+    </ol>
+  </div>
+</section>
+<footer><p>🏠 Interior Design Calculator — 모든 계산은 브라우저에서만 처리됩니다.</p></footer>
+
+<script>
+/* ─── SHARED STATE ─── */
+let sharedPaintCost=0,sharedTileCost=0;
+let furnList=[],selectedFurn=null,furnIdCounter=0;
+
+/* ─── TAB ─── */
+function switchTab(n){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('panel-'+n).classList.add('active');
+  const map=['paint','tile','furniture','brand','budget'];
+  document.querySelectorAll('.tab').forEach((t,i)=>{if(map[i]===n)t.classList.add('active')});
+  if(n==='furniture')onFurnVisible();
+}
+
+/* ─── UTILS ─── */
+const won=n=>Math.ceil(Number(n)).toLocaleString('ko-KR');
+const f2=n=>Number(n).toFixed(2);
+function showResult(id,html){
+  const el=document.getElementById(id);
+  el.innerHTML=html;el.classList.remove('anim');void el.offsetWidth;el.classList.add('anim');
+}
+function getNum(id,label){
+  const v=parseFloat(document.getElementById(id).value);
+  if(isNaN(v)||v<0)throw new Error(`"${label}"에 올바른 숫자를 입력하세요.`);
+  return v;
+}
+const rRow=(l,v,u='')=>`<div class="rr"><span>${l}</span><span class="rv">${v}${u}</span></div>`;
+const rTot=(l,v)=>`<div class="rtot"><span>${l}</span><span>${v}</span></div>`;
+const prog=(c,p)=>`<div class="prog-w"><div class="prog-f" style="width:${p}%;background:${c}"></div></div>`;
+
+/* ─── STORAGE ─── */
+const LS=id=>'sic5_'+id;
+function lsSave(id){localStorage.setItem(LS(id),document.getElementById(id).value)}
+function lsLoad(id){const v=localStorage.getItem(LS(id));if(v!=null)document.getElementById(id).value=v}
+const FIELDS=['p-w','p-l','p-h','p-op','p-pr','t-rw','t-rl','t-tw','t-tl','t-pr','t-ex',
+              'f-rw','f-rl','f-rh','br-w','br-l','br-area','br-wall','b-furn','b-labor','b-misc','b-lim'];
+window.addEventListener('DOMContentLoaded',()=>{
+  FIELDS.forEach(id=>{lsLoad(id);const el=document.getElementById(id);if(el)el.addEventListener('input',()=>lsSave(id))});
+  const cb=document.getElementById('p-ceil');
+  const v=localStorage.getItem(LS('p-ceil'));if(v)cb.checked=v==='true';
+  cb.addEventListener('change',()=>localStorage.setItem(LS('p-ceil'),cb.checked));
+  if(!document.getElementById('f-rw').value)document.getElementById('f-rw').value='5.0';
+  if(!document.getElementById('f-rl').value)document.getElementById('f-rl').value='4.0';
+  if(!document.getElementById('f-rh').value)document.getElementById('f-rh').value='2.4';
+  buildPresetGrid();
+});
+
+/* ① PAINT */
+function calcPaint(){
+  try{
+    const w=getNum('p-w','Width'),l=getNum('p-l','Length'),h=getNum('p-h','Height');
+    const op=getNum('p-op','개구부'),pr=getNum('p-pr','페인트 단가');
+    const ceil=document.getElementById('p-ceil').checked;
+    const wallArea=2*(w*h+l*h),ceilArea=ceil?w*l:0;
+    const paintArea=Math.max(0,wallArea+ceilArea-op);
+    const liters=paintArea/10,cost=liters*pr;
+    sharedPaintCost=cost;
+    document.getElementById('b-paint').value=Math.ceil(cost);
+    showResult('res-paint',
+      rRow('벽 면적',f2(wallArea),' m²')+(ceil?rRow('천장 면적',f2(ceilArea),' m²'):'')+
+      rRow('개구부 차감','−'+f2(op),' m²')+rRow('실 도장 면적',f2(paintArea),' m²')+
+      rRow('필요 페인트',liters.toFixed(1),' L')+rTot('💰 예상 비용','₩ '+won(cost)));
+  }catch(e){alert('⚠️ '+e.message)}
+}
+
+/* ② TILE */
+function calcTile(){
+  try{
+    const rw=getNum('t-rw','바닥 가로'),rl=getNum('t-rl','바닥 세로');
+    const tw=getNum('t-tw','타일 가로'),tl=getNum('t-tl','타일 세로');
+    const pr=getNum('t-pr','타일 단가'),ex=getNum('t-ex','여유율')/100;
+    if(tw===0||tl===0)throw new Error('타일 크기는 0이 될 수 없습니다.');
+    const floorArea=rw*rl,tileArea=(tw/100)*(tl/100);
+    const base=floorArea/tileArea,total=Math.ceil(base*(1+ex));
+    const cost=total*pr;sharedTileCost=cost;
+    document.getElementById('b-tile').value=Math.ceil(cost);
+    showResult('res-tile',
+      rRow('바닥 면적',f2(floorArea),' m²')+rRow('타일 1장',tileArea.toFixed(4),' m²')+
+      rRow('기본 장수',Math.ceil(base),' 장')+rRow(`여유분 (${(ex*100).toFixed(0)}%)`,total-Math.ceil(base),' 장')+
+      rRow('총 필요 장수',total,' 장')+rTot('💰 예상 비용','₩ '+won(cost)));
+  }catch(e){alert('⚠️ '+e.message)}
+}
+
+/* ③ THREE.JS */
+let renderer,scene,camera,gridHelper,raycaster,mouse;
+let isDragging=false,isRightDrag=false,prevMouse={x:0,y:0};
+let camTheta=Math.PI/4,camPhi=Math.PI/3,camRadius=10;
+let camTarget=new THREE.Vector3();
+let threeInited=false,showGrid=true;
+let roomMeshes=[];
+function getAABB(f){
+  const box=new THREE.Box3().setFromObject(f.mesh);
+  const e=0.015;
+  box.min.x+=e;box.min.z+=e;box.max.x-=e;box.max.z-=e;
+  return box;
+}
+function checkCollisions(){
+  furnList.forEach(f=>f.colliding=false);
+  let any=false;
+  for(let i=0;i<furnList.length;i++){
+    for(let j=i+1;j<furnList.length;j++){
+      if(getAABB(furnList[i]).intersectsBox(getAABB(furnList[j]))){
+        furnList[i].colliding=true;furnList[j].colliding=true;any=true;
+      }
+    }
+  }
+  const rw=parseFloat(document.getElementById('f-rw').value)||5;
+  const rl=parseFloat(document.getElementById('f-rl').value)||4;
+  furnList.forEach(f=>{
+    const b=getAABB(f);
+    if(b.min.x<-rw/2||b.max.x>rw/2||b.min.z<-rl/2||b.max.z>rl/2){f.colliding=true;any=true;}
+  });
+  furnList.forEach(f=>{
+    if(f.colliding){
+      f.mesh.material.color.set(0xff2222);
+      f.mesh.material.emissive=new THREE.Color(0x880000);
+      f.mesh.material.emissiveIntensity=0.65;
+    }else{
+      f.mesh.material.color.set(new THREE.Color(f.color));
+      f.mesh.material.emissive=new THREE.Color(selectedFurn===f.mesh?0x4f46e5:0x000000);
+      f.mesh.material.emissiveIntensity=selectedFurn===f.mesh?0.3:0;
+    }
+  });
+  const banner=document.getElementById('collision-banner');
+  banner.style.display=any?'block':'none';
+  const cnt=furnList.filter(f=>f.colliding).length;
+  document.getElementById('st-coll').innerHTML=
+    any?`<span style="color:#f87171">⚠️ ${cnt}개</span>`:'<span style="color:#34d399">✅ 없음</span>';
+  return any;
+}
+const PRESETS=[
+  {name:'더블침대',w:1.6,d:2.0,h:0.5,color:'#7c6fcd',emoji:'🛏'},
+  {name:'소파',    w:2.2,d:0.9,h:0.8,color:'#3b82f6',emoji:'🛋'},
+  {name:'책상',    w:1.2,d:0.6,h:0.75,color:'#10b981',emoji:'🖥'},
+  {name:'옷장',    w:1.8,d:0.6,h:2.0,color:'#f59e0b',emoji:'🚪'},
+  {name:'식탁',    w:1.5,d:0.9,h:0.75,color:'#ef4444',emoji:'🍽'},
+  {name:'책장',    w:1.0,d:0.3,h:1.8,color:'#8b5cf6',emoji:'📚'},
+  {name:'TV장',    w:1.6,d:0.4,h:0.5,color:'#06b6d4',emoji:'📺'},
+  {name:'의자',    w:0.5,d:0.5,h:0.9,color:'#f97316',emoji:'🪑'},
+];
+function buildPresetGrid(){document.getElementById('preset-grid').innerHTML=PRESETS.map((p,i)=>`<button class="preset-btn" onclick="applyPreset(${i})">${p.emoji}<br><span style="font-size:.68rem">${p.name}</span></button>`).join('')}
+function applyPreset(i){
+  const p=PRESETS[i];
+  document.getElementById('f-nm').value=p.name;
+  document.getElementById('f-fw').value=p.w;
+  document.getElementById('f-fd').value=p.d;
+  document.getElementById('f-fh').value=p.h;
+  document.getElementById('f-col').value=p.color;
+}
+function initThree(){
+  if(threeInited)return;threeInited=true;
+  const wrap=document.getElementById('canvas-wrap');
+  const canvas=document.getElementById('three-canvas');
+  const W=wrap.clientWidth||800;
+  const H=Math.max(460,Math.min(580,window.innerHeight*0.62));
+  canvas.style.height=H+'px';
+  renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(W,H);
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.setClearColor(0x0f172a,1);
+  scene=new THREE.Scene();
+  scene.fog=new THREE.FogExp2(0x0f172a,0.014);
+  camera=new THREE.PerspectiveCamera(55,W/H,0.1,200);
+  updateCamPos();
+  const amb=new THREE.AmbientLight(0xffffff,0.55);scene.add(amb);
+  const dir=new THREE.DirectionalLight(0xffffff,0.9);
+  dir.position.set(8,15,10);dir.castShadow=true;
+  dir.shadow.mapSize.set(2048,2048);
+  dir.shadow.camera.left=-20;dir.shadow.camera.right=20;
+  dir.shadow.camera.top=20;dir.shadow.camera.bottom=-20;
+  scene.add(dir);
+  const fill=new THREE.DirectionalLight(0x88aaff,0.3);fill.position.set(-5,5,-5);scene.add(fill);
+  raycaster=new THREE.Raycaster();mouse=new THREE.Vector2();
+  gridHelper=new THREE.GridHelper(40,40,0x1e3a5f,0x0f2a4a);
+  gridHelper.position.y=0.001;scene.add(gridHelper);
+  buildRoom();animate();setupMouseEvents();setupKeyEvents();
+  window.addEventListener('resize',()=>{
+    const W2=wrap.clientWidth;
+    renderer.setSize(W2,H);camera.aspect=W2/H;camera.updateProjectionMatrix();
+  });
+}
+function updateCamPos(){
+  camera.position.set(camTarget.x+camRadius*Math.sin(camPhi)*Math.sin(camTheta),camTarget.y+camRadius*Math.cos(camPhi),camTarget.z+camRadius*Math.sin(camPhi)*Math.cos(camTheta));
+  camera.lookAt(camTarget);
+}
+function buildRoom(){
+  roomMeshes.forEach(m=>{scene.remove(m);m.geometry&&m.geometry.dispose();m.material&&m.material.dispose()});
+  roomMeshes=[];
+  const rw=parseFloat(document.getElementById('f-rw').value)||5;
+  const rl=parseFloat(document.getElementById('f-rl').value)||4;
+  const rh=parseFloat(document.getElementById('f-rh').value)||2.4;
+  const fg=new THREE.PlaneGeometry(rw,rl);
+  const fm=new THREE.Mesh(fg,new THREE.MeshLambertMaterial({color:0x1e293b,side:THREE.DoubleSide}));
+  fm.rotation.x=-Math.PI/2;fm.receiveShadow=true;scene.add(fm);roomMeshes.push(fm);
+  const fe=new THREE.LineSegments(new THREE.EdgesGeometry(fg),new THREE.LineBasicMaterial({color:0x334155,transparent:true,opacity:.5}));
+  fe.rotation.x=-Math.PI/2;fe.position.y=0.002;scene.add(fe);roomMeshes.push(fe);
+  const wMat=new THREE.MeshLambertMaterial({color:0x1e2d4a,transparent:true,opacity:.48,side:THREE.DoubleSide});
+  const eMat=new THREE.LineBasicMaterial({color:0x6366f1,transparent:true,opacity:.7});
+  [{w:rw,h:rh,p:[0,rh/2,-rl/2],ry:0},{w:rw,h:rh,p:[0,rh/2,rl/2],ry:0},
+   {w:rl,h:rh,p:[-rw/2,rh/2,0],ry:Math.PI/2},{w:rl,h:rh,p:[rw/2,rh/2,0],ry:Math.PI/2}
+  ].forEach(({w,h,p,ry})=>{
+    const g=new THREE.PlaneGeometry(w,h);
+    const m=new THREE.Mesh(g,wMat);m.position.set(...p);m.rotation.y=ry;scene.add(m);roomMeshes.push(m);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),eMat);e.position.set(...p);e.rotation.y=ry;scene.add(e);roomMeshes.push(e);
+  });
+  const cg=new THREE.PlaneGeometry(rw,rl);
+  const ce=new THREE.LineSegments(new THREE.EdgesGeometry(cg),new THREE.LineBasicMaterial({color:0x6366f1,transparent:true,opacity:.3}));
+  ce.rotation.x=-Math.PI/2;ce.position.y=rh;scene.add(ce);roomMeshes.push(ce);
+  const pm=new THREE.MeshLambertMaterial({color:0x4f46e5});
+  [[rw/2,rl/2],[-rw/2,rl/2],[rw/2,-rl/2],[-rw/2,-rl/2]].forEach(([x,z])=>{
+    const g=new THREE.CylinderGeometry(.04,.04,rh,8);
+    const m=new THREE.Mesh(g,pm);m.position.set(x,rh/2,z);scene.add(m);roomMeshes.push(m);
+  });
+  camTarget.set(0,rh/2,0);camRadius=Math.max(rw,rl)*1.5+2.5;updateCamPos();updateStats();
+}
+function updateRoom(){buildRoom();checkCollisions();}
+function addFurniture(){
+  const name=document.getElementById('f-nm').value.trim()||'가구';
+  const fw=parseFloat(document.getElementById('f-fw').value);
+  const fd=parseFloat(document.getElementById('f-fd').value);
+  const fh=parseFloat(document.getElementById('f-fh').value);
+  const col=document.getElementById('f-col').value;
+  if([fw,fd,fh].some(v=>isNaN(v)||v<=0)){alert('⚠️ 가구 W·D·H를 모두 입력하세요.');return;}
+  const geo=new THREE.BoxGeometry(fw,fh,fd);
+  const mat=new THREE.MeshLambertMaterial({color:new THREE.Color(col)});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.castShadow=true;mesh.receiveShadow=true;
+  mesh.position.set(0,fh/2,0);
+  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.28})));
+  scene.add(mesh);
+  furnList.push({mesh,name,w:fw,d:fd,h:fh,color:col,id:++furnIdCounter,colliding:false});
+  selectFurn(mesh);checkCollisions();renderFurnList();updateStats();
+}
+function removeFurnById(id){
+  const idx=furnList.findIndex(f=>f.id===id);if(idx===-1)return;
+  const {mesh}=furnList[idx];
+  if(selectedFurn===mesh)selectedFurn=null;
+  scene.remove(mesh);mesh.geometry.dispose();mesh.material.dispose();
+  furnList.splice(idx,1);checkCollisions();renderFurnList();updateStats();
+}
+function clearAll(){
+  furnList.forEach(({mesh})=>{scene.remove(mesh);mesh.geometry.dispose();mesh.material.dispose()});
+  furnList=[];selectedFurn=null;
+  document.getElementById('collision-banner').style.display='none';
+  renderFurnList();updateStats();
+}
+function selectFurn(mesh){
+  furnList.forEach(f=>{if(!f.colliding){f.mesh.material.emissive=new THREE.Color(0);f.mesh.material.emissiveIntensity=0;}});
+  selectedFurn=mesh;
+  if(mesh){
+    const f=furnList.find(f=>f.mesh===mesh);
+    if(f&&!f.colliding){mesh.material.emissive=new THREE.Color(0x4f46e5);mesh.material.emissiveIntensity=0.3;}
+  }
+  renderFurnList();
+}
+function renderFurnList(){
+  const el=document.getElementById('furn-placed');
+  if(!furnList.length){
+    el.innerHTML='<p style="font-size:.81rem;color:var(--mu);text-align:center;padding:.4rem 0">배치된 가구 없음</p>';
+    document.getElementById('canvas-legend').innerHTML='';return;
+  }
+  el.innerHTML=furnList.map(f=>`
+    <div class="fi-item${f.mesh===selectedFurn?' selected':''}${f.colliding?' colliding':''}" onclick="selectFurnById(${f.id})">
+      <span class="fi-dot" style="background:${f.colliding?'#ef4444':f.color}"></span>
+      <span class="fi-name">${f.name}</span>
+      <span class="fi-sz">${f.w}×${f.d}m</span>
+      ${f.colliding?'<span class="fi-warn">⚠️</span>':''}
+      <button class="btn-del" onclick="event.stopPropagation();removeFurnById(${f.id})">✕</button>
+    </div>`).join('');
+  document.getElementById('canvas-legend').innerHTML=furnList.map(f=>`<div class="leg-item"><span class="leg-dot" style="background:${f.colliding?'#ef4444':f.color}"></span>${f.name}${f.colliding?' ⚠️':''}</div>`).join('');
+}
+function selectFurnById(id){const f=furnList.find(f=>f.id===id);if(f)selectFurn(f.mesh);}
+function updateStats(){
+  const rw=parseFloat(document.getElementById('f-rw').value)||5;
+  const rl=parseFloat(document.getElementById('f-rl').value)||4;
+  const roomArea=rw*rl,furnArea=furnList.reduce((s,f)=>s+f.w*f.d,0);
+  const freeArea=roomArea-furnArea,occ=roomArea>0?furnArea/roomArea*100:0;
+  document.getElementById('st-room').textContent=f2(roomArea)+' m²';
+  document.getElementById('st-furn').textContent=f2(furnArea)+' m²';
+  document.getElementById('st-free').textContent=f2(Math.max(0,freeArea))+' m²';
+  document.getElementById('st-occ').textContent=occ.toFixed(0)+'%';
+  document.getElementById('st-status').innerHTML=
+    freeArea<0?'<span style="color:#f87171">❌ 초과</span>':
+    occ>70?'<span style="color:#fbbf24">⚠️ 협소</span>':'<span style="color:#34d399">✅ 적합</span>';
+  showResult('res-furn',
+    rRow('방 면적',f2(roomArea),' m²')+rRow('가구 총 면적',f2(furnArea),' m²')+
+    rRow('여유 공간',f2(Math.max(0,freeArea)),' m²')+rRow('점유율',occ.toFixed(1),' %')+
+    `<div>${freeArea<0?'<span class="badge b-bad">❌ 공간 초과</span>':occ>70?'<span class="badge b-warn">⚠️ 다소 협소</span>':'<span class="badge b-ok">✅ 배치 적합</span>'}</div>`);
+}
+function setupMouseEvents(){
+  const cv=document.getElementById('three-canvas');
+  cv.addEventListener('mousedown',e=>{isDragging=true;isRightDrag=e.button===2;prevMouse={x:e.clientX,y:e.clientY}});
+  cv.addEventListener('contextmenu',e=>e.preventDefault());
+  window.addEventListener('mouseup',()=>isDragging=false);
+  window.addEventListener('mousemove',e=>{
+    if(!isDragging)return;
+    const dx=e.clientX-prevMouse.x,dy=e.clientY-prevMouse.y;
+    prevMouse={x:e.clientX,y:e.clientY};
+    if(isRightDrag){
+      const sp=0.005*camRadius,r=new THREE.Vector3(),up=new THREE.Vector3(0,1,0);
+      camera.getWorldDirection(r);r.cross(up).normalize();
+      camTarget.addScaledVector(r,-dx*sp);camTarget.addScaledVector(up,dy*sp);
+    }else{camTheta-=dx*0.008;camPhi=Math.max(0.07,Math.min(Math.PI/2-.04,camPhi+dy*0.008));}
+    updateCamPos();
+  });
+  cv.addEventListener('wheel',e=>{camRadius=Math.max(1.5,Math.min(40,camRadius+e.deltaY*0.012));updateCamPos();e.preventDefault();},{passive:false});
+  cv.addEventListener('click',e=>{
+    const rect=cv.getBoundingClientRect();
+    mouse.x=(e.clientX-rect.left)/rect.width*2-1;
+    mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+    raycaster.setFromCamera(mouse,camera);
+    const hits=raycaster.intersectObjects(furnList.map(f=>f.mesh),false);
+    selectFurn(hits.length?hits[0].object:null);renderFurnList();
+  });
+}
+function setupKeyEvents(){
+  window.addEventListener('keydown',e=>{
+    if(!selectedFurn)return;
+    const f=furnList.find(f=>f.mesh===selectedFurn);if(!f)return;
+    const rw=parseFloat(document.getElementById('f-rw').value)||5;
+    const rl=parseFloat(document.getElementById('f-rl').value)||4;
+    const s=0.1,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+    switch(e.key){
+      case'ArrowLeft':case'a':case'A':selectedFurn.position.x=clamp(selectedFurn.position.x-s,-rw/2,rw/2);break;
+      case'ArrowRight':case'd':case'D':selectedFurn.position.x=clamp(selectedFurn.position.x+s,-rw/2,rw/2);break;
+      case'ArrowUp':case'w':case'W':selectedFurn.position.z=clamp(selectedFurn.position.z-s,-rl/2,rl/2);break;
+      case'ArrowDown':case's':case'S':selectedFurn.position.z=clamp(selectedFurn.position.z+s,-rl/2,rl/2);break;
+      case'q':case'Q':selectedFurn.rotation.y+=Math.PI/8;break;
+      case'e':case'E':selectedFurn.rotation.y-=Math.PI/8;break;
+      case'Delete':case'Backspace':removeFurnById(f.id);return;
+      default:return;
+    }
+    e.preventDefault();checkCollisions();renderFurnList();updateStats();
+  });
+}
+function setView(v){
+  const rw=parseFloat(document.getElementById('f-rw').value)||5;
+  const rl=parseFloat(document.getElementById('f-rl').value)||4;
+  const r=Math.max(rw,rl)*1.5+2.5;
+  if(v==='top'){camPhi=0.06;camTheta=0;camRadius=r;}
+  if(v==='persp'){camPhi=Math.PI/3;camTheta=Math.PI/4;camRadius=r;}
+  if(v==='front'){camPhi=Math.PI/2-.05;camTheta=0;camRadius=r;}
+  updateCamPos();
+}
+function resetCamera(){setView('persp');}
+function toggleGrid(){showGrid=!showGrid;gridHelper.visible=showGrid;}
+function animate(){requestAnimationFrame(animate);renderer.render(scene,camera);}
+function onFurnVisible(){
+  setTimeout(()=>{
+    initThree();buildRoom();
+    const wrap=document.getElementById('canvas-wrap');
+    const H=Math.max(460,Math.min(580,window.innerHeight*0.62));
+    document.getElementById('three-canvas').style.height=H+'px';
+    renderer.setSize(wrap.clientWidth,H);
+    camera.aspect=wrap.clientWidth/H;camera.updateProjectionMatrix();
+  },50);
+}
+
+/* ④ BRAND */
+const BRANDS={
+  economy:{
+    tier:'Economy · 저가',label:'합리적 선택',css:'economy',color:'#16a34a',
+    desc:'가성비 중심의 국내 보급형 브랜드. 일반 거주 공간에 적합.',
+    paintPerL:6000,floorTileEach:1200,wallTileEach:900,laborPerM2:8000,miscRatio:.05
+  },
+  midrange:{
+    tier:'Mid-Range · 중가',label:'표준 시공',css:'midrange',color:'#2563eb',
+    desc:'품질과 가격의 균형. 국내외 중견 브랜드로 대부분의 주거에 권장.',
+    paintPerL:14000,floorTileEach:2800,wallTileEach:2200,laborPerM2:13000,miscRatio:.07
+  },
+  premium:{
+    tier:'Premium · 고급',label:'프리미엄 마감',css:'premium',color:'#7c3aed',
+    desc:'최고급 수입 브랜드. 호텔·하이엔드 주거에 적합한 최상급 자재.',
+    paintPerL:38000,floorTileEach:7500,wallTileEach:6000,laborPerM2:22000,miscRatio:.10
+  }
+};
+let selBrandKey=null;
+function syncBrandArea(){
+  const w=parseFloat(document.getElementById('br-w').value)||0;
+  const l=parseFloat(document.getElementById('br-l').value)||0;
+  if(w>0&&l>0)document.getElementById('br-area').value=(w*l).toFixed(2);
+}
+function calcBrand(key,fa,wa){
+  const b=BRANDS[key];
+  const liters=wa/10;
+  const paintCost=liters*b.paintPerL;
+  const floorCnt=Math.ceil(fa/0.36*1.05);
+  const floorCost=floorCnt*b.floorTileEach;
+  const wallCnt=Math.ceil(wa/0.18*1.05);
+  const wallCost=wallCnt*b.wallTileEach;
+  const laborCost=(fa+wa)*b.laborPerM2;
+  const sub=paintCost+floorCost+wallCost+laborCost;
+  const miscCost=sub*b.miscRatio;
+  return{paintCost,floorCost,wallCost,laborCost,miscCost,total:sub+miscCost};
+}
+function runBrandSim(){
+  const fa=parseFloat(document.getElementById('br-area').value);
+  const wa=parseFloat(document.getElementById('br-wall').value);
+  if(isNaN(fa)||fa<=0||isNaN(wa)||wa<=0){alert('⚠️ 바닥 면적과 벽 면적을 모두 입력하세요.');return;}
+  const R={};
+  Object.keys(BRANDS).forEach(k=>R[k]=calcBrand(k,fa,wa));
+  document.getElementById('brand-grid').innerHTML=
+    Object.entries(BRANDS).map(([k,b])=>{
+      const r=R[k],isSel=selBrandKey===k;
+      return `<div class="brand-card ${b.css}${isSel?' selected':''}" id="bc-${k}" onclick="selectBrand('${k}',${fa},${wa})">
+        <div>
+          <div class="brand-tier">${b.tier}</div>
+          <div class="brand-name" style="margin:.18rem 0">${b.label}</div>
+          <div class="brand-desc">${b.desc}</div>
+        </div>
+        <div class="brand-items">
+          <div class="brand-item"><span class="brand-item-name">🎨 페인트</span><span class="brand-item-price">₩ ${won(r.paintCost)}</span></div>
+          <div class="brand-item"><span class="brand-item-name">🟫 바닥타일</span><span class="brand-item-price">₩ ${won(r.floorCost)}</span></div>
+          <div class="brand-item"><span class="brand-item-name">🧱 벽타일</span><span class="brand-item-price">₩ ${won(r.wallCost)}</span></div>
+          <div class="brand-item"><span class="brand-item-name">👷 인건비</span><span class="brand-item-price">₩ ${won(r.laborCost)}</span></div>
+          <div class="brand-item"><span class="brand-item-name">📦 부자재</span><span class="brand-item-price">₩ ${won(r.miscCost)}</span></div>
+        </div>
+        <div class="brand-total-row">
+          <span class="brand-total-label">총 예상 비용</span>
+          <span class="brand-total-val" style="color:${b.color}">₩ ${won(r.total)}</span>
+        </div>
+        <button class="btn btn-sm" style="background:${b.color};color:#fff;width:100%;margin-top:.35rem"
+          onclick="event.stopPropagation();selectBrand('${k}',${fa},${wa})">
+          ${isSel?'✅ 선택됨 — 예산 반영 완료':'이 등급 선택 → ⑤ 예산 자동 반영'}
+        </button>
+      </div>`;
+    }).join('');
+  const e=R.economy,m=R.midrange,p=R.premium;
+  const tbl=(l,ek,mk,pk)=>`<tr><td>${l}</td><td class="tier-eco">₩ ${won(e[ek])}</td><td class="tier-mid">₩ ${won(m[mk])}</td><td class="tier-pre">₩ ${won(p[pk])}</td><td class="${m[mk]-e[ek]>0?'diff-pos':'diff-neg'}">${m[mk]-e[ek]>0?'+':''}₩ ${won(m[mk]-e[ek])}</td><td class="${p[pk]-m[mk]>0?'diff-pos':'diff-neg'}">${p[pk]-m[mk]>0?'+':''}₩ ${won(p[pk]-m[mk])}</td></tr>`;
+  document.getElementById('brand-compare-wrap').innerHTML=`
+    <section class="card card-brand" style="padding:1.2rem 1.4rem">
+      <div class="card-head"><span class="card-icon">📊</span><h2>등급별 비용 비교표</h2></div>
+      <div style="overflow-x:auto">
+      <table class="compare-table">
+        <thead><tr>
+          <th>항목</th><th class="tier-eco">💚 저가</th><th class="tier-mid">💙 중가</th>
+          <th class="tier-pre">💜 고급</th><th>저→중 차이</th><th>중→고 차이</th>
+        </tr></thead>
+        <tbody>
+          ${tbl('🎨 페인트','paintCost','paintCost','paintCost')}
+          ${tbl('🟫 바닥타일','floorCost','floorCost','floorCost')}
+          ${tbl('🧱 벽타일','wallCost','wallCost','wallCost')}
+          ${tbl('👷 인건비','laborCost','laborCost','laborCost')}
+          ${tbl('📦 부자재','miscCost','miscCost','miscCost')}
+          <tr style="font-weight:900;background:#f5f3ff">
+            <td><strong>💰 합계</strong></td>
+            <td class="tier-eco"><strong>₩ ${won(e.total)}</strong></td>
+            <td class="tier-mid"><strong>₩ ${won(m.total)}</strong></td>
+            <td class="tier-pre"><strong>₩ ${won(p.total)}</strong></td>
+            <td class="diff-pos"><strong>+₩ ${won(m.total-e.total)}</strong></td>
+            <td class="diff-pos"><strong>+₩ ${won(p.total-m.total)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+      <p style="font-size:.76rem;color:var(--mu);margin-top:.6rem">※ 바닥타일 600×600mm, 벽타일 300×600mm 기준. 실제 견적은 시공사에 따라 다를 수 있습니다.</p>
+    </section>`;
+}
+function selectBrand(key,fa,wa){
+  selBrandKey=key;
+  const r=calcBrand(key,fa,wa);
+  document.getElementById('b-paint').value=Math.ceil(r.paintCost);
+  document.getElementById('b-tile').value=Math.ceil(r.floorCost+r.wallCost);
+  document.getElementById('b-labor').value=Math.ceil(r.laborCost);
+  document.getElementById('b-misc').value=Math.ceil(r.miscCost);
+  runBrandSim();
+  const b=BRANDS[key];
+  alert(`✅ "${b.label}" 등급 선택 완료!\n총 예상 비용 ₩ ${won(r.total)}\n\n⑤ 예산 탭에 자동 반영되었습니다.`);
+}
+
+/* ⑤ BUDGET */
+function calcBudget(){
+  try{
+    const bPaint=parseFloat(document.getElementById('b-paint').value)||0;
+    const bTile=parseFloat(document.getElementById('b-tile').value)||0;
+    const bFurn=getNum('b-furn','가구 예산');
+    const bLabor=parseFloat(document.getElementById('b-labor').value)||0;
+    const bMisc=parseFloat(document.getElementById('b-misc').value)||0;
+    const limRaw=document.getElementById('b-lim').value;
+    const hasLim=limRaw!==''&&!isNaN(parseFloat(limRaw));
+    const lim=hasLim?parseFloat(limRaw):Infinity;
+    const total=bPaint+bTile+bFurn+bLabor+bMisc;
+    const pct=v=>total>0?Math.min(100,Math.round(v/total*100)):0;
+    let html=
+      rRow('🎨 페인트 비용','₩ '+won(bPaint))+prog('#f59e0b',pct(bPaint))+
+      rRow('🟫 타일 비용','₩ '+won(bTile))+prog('#10b981',pct(bTile))+
+      rRow('🛋️ 가구 구입','₩ '+won(bFurn))+prog('#8b5cf6',pct(bFurn))+
+      rRow('👷 인건비','₩ '+won(bLabor))+prog('#3b82f6',pct(bLabor))+
+      rRow('📦 기타','₩ '+won(bMisc))+prog('#64748b',pct(bMisc))+
+      rTot('💳 총 예상 비용','₩ '+won(total));
+    if(hasLim){
+      const diff=total-lim;
+      html+=diff>0
+        ?`<div><span class="badge b-bad">❌ ₩ ${won(diff)} 예산 초과</span></div>`
+        :`<div><span class="badge b-ok">✅ ₩ ${won(-diff)} 여유</span></div>`;
+    }
+    showResult('res-budget',html);
+  }catch(e){alert('⚠️ '+e.message)}
+}
+</script>
+</body>
+</html>

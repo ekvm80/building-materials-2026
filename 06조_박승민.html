@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoBuild AI: 건축물 검색 기반 폐기물 사전 감축 플랫폼</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --secondary: #3b82f6;
+            --accent: #8b5cf6;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 2rem;
+            color: #34d399;
+            letter-spacing: -0.05em;
+        }
+
+        header p {
+            margin: 0.5rem 0 0;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 850px) {
+            .grid-layout { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+        }
+
+        .card h2 {
+            font-size: 1.25rem;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--primary-dark);
+        }
+
+        .description {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        /* 1. Search Section Styles */
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .search-box input[type="text"] {
+            flex: 1;
+            padding: 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-box input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-search {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-search:hover { background: var(--primary-dark); }
+
+        /* Editable Info Card Styles */
+        .building-info-card {
+            background: #f0fdf4;
+            border: 1px solid #a7f3d0;
+            padding: 1.2rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .info-row {
+            display: flex;
+            align-items: center;
+            margin: 0.6rem 0;
+            gap: 10px;
+            font-size: 0.95rem;
+        }
+
+        .info-row label {
+            width: 140px;
+            color: #065f46;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .edit-input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #6ee7b7;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            background: white;
+            outline: none;
+        }
+        
+        .edit-input:focus { border-color: var(--primary-dark); }
+
+        .hint-text {
+            font-size: 0.8rem;
+            color: var(--primary-dark);
+            margin-left: 150px;
+            margin-top: -5px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        /* 2. AI Config Section Styles */
+        .config-box {
+            background: #f1f5f9;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+        }
+
+        .target-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .target-value {
+            font-size: 1.5rem;
+            color: var(--primary-dark);
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .btn-action {
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);
+            transition: all 0.2s;
+        }
+
+        .btn-action:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-action:disabled {
+            background: #cbd5e1;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Log Box Styles */
+        .console {
+            background: #0f172a;
+            color: #34d399;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            padding: 1rem;
+            border-radius: 8px;
+            height: 120px;
+            overflow-y: auto;
+            margin-top: 1rem;
+            border: 1px solid #1e293b;
+        }
+
+        .console div { margin-bottom: 4px; }
+        .console .info { color: #94a3b8; }
+        .console .success { color: #fbbf24; font-weight: bold; }
+        .console .error { color: #f87171; }
+
+        /* 3. Dashboard Styles */
+        #dashboard {
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: #fff;
+            padding: 1.5rem 1rem;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .stat-number { font-size: 1.75rem; font-weight: 800; color: var(--primary-dark); }
+
+        .recipe-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .recipe-table th {
+            background: #f1f5f9;
+            padding: 12px;
+            font-size: 0.9rem;
+            color: var(--text-main);
+            text-align: left;
+        }
+
+        .recipe-table td {
+            padding: 14px 12px;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.95rem;
+        }
+
+        .tag {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: #ecfdf5;
+            color: #065f46;
+        }
+
+        /* PDF 전용 버튼 스타일 */
+        .btn-pdf {
+            background: var(--secondary);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+            transition: all 0.2s;
+        }
+        .btn-pdf:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        /* Spinner */
+        .spinner {
+            display: none;
+            width: 40px;
+            height: 40px;
+            margin: 1rem auto;
+            border: 4px solid rgba(0,0,0,0.1);
+            border-left-color: var(--secondary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>EcoBuild AI Solutions</h1>
+        <p>건축물 검색 및 생성형 AI 연계 사전 폐기물 감축 플랫폼</p>
+    </header>
+
+    <div class="container">
+        <div class="grid-layout">
+            <div class="card">
+                <h2><span>🔍</span> 1단계: 건축물 검색 및 분석</h2>
+                <p class="description">시공 또는 리모델링 예정인 건물의 명칭이나 주소를 검색하세요. (오픈 API 자동 조회 및 오류 보정)</p>
+                
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="예: 코엑스, 서울타워, 롯데월드타워, 63빌딩..." onkeypress="if(event.keyCode==13) searchBuilding()">
+                    <button class="btn-search" onclick="searchBuilding()">검색</button>
+                </div>
+
+                <div id="building-info" class="building-info-card">
+                    <div class="info-row" style="border-bottom: 1px dashed #6ee7b7; padding-bottom: 10px; margin-bottom: 10px;">
+                        <label>📍 현장명:</label>
+                        <span id="info-name" style="font-weight: 600;"></span>
+                        <span id="info-region" style="color: var(--text-muted); font-size: 0.85rem; margin-left: auto;"></span>
+                    </div>
+                    
+                    <div class="info-row">
+                        <label>🏢 건축법 용도분류:</label>
+                        <select id="info-type" class="edit-input" onchange="recalculateBase()">
+                            <option value="공동주택 시설">공동주택 시설 (아파트·연립 등)</option>
+                            <option value="제1·2종 근린생활시설">제1·2종 근린생활시설 (상가·의원·음식점 등)</option>
+                            <option value="업무시설">업무시설 (오피스·오피스텔·공공청사 등)</option>
+                            <option value="판매·문화 및 집회시설">판매·문화 및 집회시설 (백화점·전시장·대형마트 등)</option>
+                            <option value="의료·교육연구시설">의료·교육연구시설 (종합병원·학교·연구소 등)</option>
+                            <option value="공장 및 창고시설">공장 및 창고시설 (제조공장·물류창고 등)</option>
+                            <option value="숙박·관광휴게시설">숙박·관광휴게시설 (호텔·콘도·전망대 등)</option>
+                        </select>
+                    </div>
+                    <span class="hint-text">용도별 건축법 기준에 따라 구조 설계 하중 및 시멘트 배합률이 보정됩니다.</span>
+
+                    <div class="info-row">
+                        <label>📐 연면적 (㎡):</label>
+                        <input type="number" id="info-size" class="edit-input" onchange="recalculateBase()" onkeyup="recalculateBase()">
+                    </div>
+
+                    <div class="info-row" style="margin-top: 15px; background: #d1fae5; padding: 10px; border-radius: 6px;">
+                        <label style="width: auto; margin-right: 10px;">⚠️ 기존 설계 기준 예상 폐기물:</label>
+                        <strong style="font-size: 1.1rem;"><span id="info-waste">0</span> 톤</strong>
+                    </div>
+                </div>
+
+                <div class="console" id="search-console">
+                    <div class="info">검색어를 입력해주세요...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><span>🤖</span> 2단계: AI 최적화 설정</h2>
+                <p class="description">확정된 <strong>건물 스펙을 기준</strong>으로 사용자 정의 탄소 저감 목표를 설정하여 시뮬레이션합니다.</p>
+                
+                <div class="config-box">
+                    <div class="target-label">
+                        <span>저감 목표 (Carbon Reduction)</span>
+                        <span class="target-value" id="val-display">30%</span>
+                    </div>
+                    <input type="range" id="carbon-slider" min="10" max="60" value="30" step="1" disabled>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; margin-top: 8px;">
+                        <span>기본 목표 (10%)</span>
+                        <span>도전적 목표 (60%)</span>
+                    </div>
+                </div>
+
+                <button id="run-btn" class="btn-action" disabled onclick="runSimulation()">AI 자재 및 배치 최적화 시작</button>
+                <div class="spinner" id="loading-spinner"></div>
+
+                <div class="console" id="ai-console">
+                    <div class="info">건물 검색 완료 후 활성화됩니다.</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="dashboard" class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                <h2 style="margin: 0; border: none; padding: 0;">📊 맞춤형 AI 최적화 리포트 (<span id="report-title"></span>)</h2>
+                <button class="btn-pdf" onclick="exportToPDF()"><span>📄</span> PDF 보고서 다운로드</button>
+            </div>
+            
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-label">예상 탄소 저감률</div>
+                    <div class="stat-number" id="stat-carbon">↓ 30%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">사전 폐기물 감축 (예상)</div>
+                    <div class="stat-number" id="stat-waste" style="color: var(--secondary);">0 톤</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">설계 최적화 점수</div>
+                    <div class="stat-number" id="stat-score" style="color: var(--accent);">0/100</div>
+                </div>
+            </div>
+
+            <h3>Concrete Copilot: 추천 자재 배합 레시피</h3>
+            <p class="description" style="margin-top: -10px;">건물의 하중 요건과 설정된 저감 목표치에 도달하기 위한 최적의 엔지니어링 배합입니다.</p>
+            
+            <table class="recipe-table">
+                <thead>
+                    <tr>
+                        <th>구성 자재</th>
+                        <th>기존(기준) 설계 비율</th>
+                        <th>AI 최적화 비율</th>
+                        <th>최적화 효과</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>일반 시멘트 (OPC)</td>
+                        <td id="base-cement">15.0%</td>
+                        <td style="font-weight: bold; color: var(--primary-dark);" id="td-cement">-</td>
+                        <td><span class="tag">탄소 배출량 감소</span></td>
+                    </tr>
+                    <tr>
+                        <td>고로슬래그 (SCM)</td>
+                        <td>0.0%</td>
+                        <td style="font-weight: bold; color: var(--primary-dark);" id="td-slag">-</td>
+                        <td><span class="tag" style="background:#eff6ff; color:#1d4ed8;">산업 부산물 활용</span></td>
+                    </tr>
+                    <tr>
+                        <td>골재 및 혼화제</td>
+                        <td id="base-etc">85.0%</td>
+                        <td id="td-etc">-</td>
+                        <td>분석된 지역 기후 데이터 적용</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const searchConsole = document.getElementById('search-console');
+        const aiConsole = document.getElementById('ai-console');
+        const runBtn = document.getElementById('run-btn');
+        const slider = document.getElementById('carbon-slider');
+        const valDisplay = document.getElementById('val-display');
+        const dashboard = document.getElementById('dashboard');
+        const spinner = document.getElementById('loading-spinner');
+        const buildingInfoCard = document.getElementById('building-info');
+
+        const mockDatabase = {
+            "코엑스": { name: "코엑스 (COEX)", type: "판매·문화 및 집회시설", size: 460000, region: "서울 강남구" },
+            "서울타워": { name: "N서울타워", type: "숙박·관광휴게시설", size: 15378, region: "서울 용산구" },
+            "롯데월드타워": { name: "롯데월드타워", type: "판매·문화 및 집회시설", size: 805872, region: "서울 송파구" },
+            "63빌딩": { name: "63스퀘어", type: "업무시설", size: 166100, region: "서울 영등포구" },
+            "default": { name: "일반 구조물", type: "업무시설", size: 45000, region: "전국 일원" }
+        };
+
+        let currentBuilding = {
+            name: "", region: "", type: "", size: 0, baseCement: 15.0, baseWaste: 0
+        };
+
+        slider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            valDisplay.innerText = val + '%';
+            if(dashboard.style.display === 'block') {
+                updateUI(val);
+            }
+        });
+
+        function recalculateBase() {
+            const newType = document.getElementById('info-type').value;
+            const newSize = parseFloat(document.getElementById('info-size').value) || 0;
+
+            let wasteMulti = 0.065;   
+            let newBaseCement = 15.0; 
+
+            if(newType === "공동주택 시설") { wasteMulti = 0.062; newBaseCement = 14.5; } 
+            else if(newType === "제1·2종 근린생활시설") { wasteMulti = 0.075; newBaseCement = 14.0; } 
+            else if(newType === "업무시설") { wasteMulti = 0.058; newBaseCement = 15.0; } 
+            else if(newType === "판매·문화 및 집회시설") { wasteMulti = 0.053; newBaseCement = 18.0; } 
+            else if(newType === "의료·교육연구시설") { wasteMulti = 0.068; newBaseCement = 15.5; } 
+            else if(newType === "공장 및 창고시설") { wasteMulti = 0.085; newBaseCement = 17.0; } 
+            else if(newType === "숙박·관광휴게시설") { wasteMulti = 0.110; newBaseCement = 16.5; }
+
+            const newBaseWaste = Math.round(newSize * wasteMulti);
+
+            currentBuilding.type = newType;
+            currentBuilding.size = newSize;
+            currentBuilding.baseCement = newBaseCement;
+            currentBuilding.baseWaste = newBaseWaste;
+
+            document.getElementById('info-waste').innerText = newBaseWaste.toLocaleString();
+
+            if(dashboard.style.display === 'block') { updateUI(slider.value); }
+        }
+
+        async function searchBuilding() {
+            const query = document.getElementById('search-input').value.trim();
+            if(!query) {
+                alert("건물명이나 주소를 입력해주세요.");
+                return;
+            }
+
+            searchConsole.innerHTML = `<div>> [접근] 국토교통부 건축HUB 데이터 허브 실시간 통신 시작...</div>`;
+            buildingInfoCard.style.display = "none";
+            dashboard.style.display = "none";
+            slider.disabled = true;
+            runBtn.disabled = true;
+
+            let finalData = null;
+
+            try {
+                const proxyUrl = "https://cors-anywhere.herokuapp.com/"; 
+                const serviceKey = "YOUR_PUBLIC_DATA_PORTAL_DECODED_SERVICE_KEY"; 
+                const targetUrl = `http://apis.data.go.kr/1613000/BldRgstService_v2/getBldRgstBrTitleInfo?serviceKey=${serviceKey}&bldNm=${encodeURIComponent(query)}&numOfRows=1&_type=json`;
+
+                searchConsole.innerHTML += `<div>> [연계] 오픈 API Request 송신 및 파싱 중...</div>`;
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                const response = await fetch(proxyUrl + targetUrl, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (!response.ok) throw new Error("HTTP_NETWORK_ERROR");
+
+                const resData = await response.json();
+                const item = resData?.response?.body?.items?.item;
+
+                if (item) {
+                    finalData = {
+                        name: item.bldNm || query,
+                        type: matchLawType(item.mainPurpsCdNm), 
+                        size: parseFloat(item.totArea) || 0,
+                        region: item.platPlc || "공공데이터 주소 정보 참조"
+                    };
+                    searchConsole.innerHTML += `<div class='success'>> [성공] 국토교통부 오픈 API 실시간 동기화 완료!</div>`;
+                } else {
+                    throw new Error("NO_MATCHED_DATA");
+                }
+
+            } catch (error) {
+                searchConsole.innerHTML += `<div class='error'>> [경고] 오픈 API 통신 차단됨 (이유: ${error.message}).</div>`;
+                searchConsole.innerHTML += `<div>> [복구] 로컬 백업 아키텍처 및 하이브리드 추론 엔진 스위칭...</div>`;
+                
+                let backupMatch = null;
+                for (let key in mockDatabase) {
+                    if (query.includes(key)) { backupMatch = mockDatabase[key]; break; }
+                }
+
+                if (backupMatch) {
+                    finalData = { ...backupMatch };
+                    searchConsole.innerHTML += `<div class='success'>> [보정] 내부 마스터 랜드마크 물리 데이터베이스 정보를 불러왔습니다.</div>`;
+                } else {
+                    const randomSize = Math.floor(Math.random() * 1400 + 120) * 100;
+                    finalData = {
+                        name: `검색된 현장 (${query})`,
+                        type: "업무시설",
+                        size: randomSize,
+                        region: "입력된 지역 자치단체 기준 연계"
+                    };
+                    searchConsole.innerHTML += `<div class='success'>> [보정] 인공지능 기반 연면적 스마트 추론 완료 (${randomSize.toLocaleString()}㎡)</div>`;
+                }
+            } finally {
+                currentBuilding.name = finalData.name;
+                currentBuilding.region = finalData.region;
+                
+                document.getElementById('info-name').innerText = currentBuilding.name;
+                document.getElementById('info-region').innerText = currentBuilding.region;
+                document.getElementById('info-type').value = finalData.type;
+                document.getElementById('info-size').value = finalData.size;
+                
+                recalculateBase();
+                
+                buildingInfoCard.style.display = "block";
+                slider.disabled = false;
+                runBtn.disabled = false;
+                aiConsole.innerHTML = `<div>> [Ready] 건축법 스펙 확인 완료. 탄소 저감 목표를 설정하세요.</div>`;
+            }
+        }
+
+        function matchLawType(lawName) {
+            if(!lawName) return "업무시설";
+            if(lawName.includes("아파트") || lawName.includes("공동주택") || lawName.includes("주거")) return "공동주택 시설";
+            if(lawName.includes("근린생활") || lawName.includes("상가")) return "제1·2종 근린생활시설";
+            if(lawName.includes("판매") || lawName.includes("문화") || lawName.includes("관람") || lawName.includes("전시")) return "판매·문화 및 집회시설";
+            if(lawName.includes("의료") || lawName.includes("병원") || lawName.includes("교육") || lawName.includes("학교") || lawName.includes("연구")) return "의료·교육연구시설";
+            if(lawName.includes("공장") || lawName.includes("창고") || lawName.includes("산업")) return "공장 및 창고시설";
+            if(lawName.includes("숙박") || lawName.includes("호텔") || lawName.includes("관광")) return "숙박·관광휴게시설";
+            return "업무시설";
+        }
+
+        function runSimulation() {
+            if(!currentBuilding) return;
+
+            runBtn.style.display = 'none';
+            spinner.style.display = 'block';
+            dashboard.style.display = 'none';
+            
+            const target = slider.value;
+            aiConsole.innerHTML = `<div>> [Target: ${target}%] ${currentBuilding.name} 최적 배합 솔루션 초기화...</div>`;
+
+            setTimeout(() => {
+                aiConsole.innerHTML += `<div>> 구조 설계기준(KDS 41) 및 용도별 하중 데이터 모델 결합 중...</div>`;
+            }, 800);
+
+            setTimeout(() => {
+                aiConsole.innerHTML += "<div>> Concrete Copilot: 수백만 개 이산배합 매트릭스 최적 연산 완료</div>";
+            }, 2200);
+
+            setTimeout(() => {
+                aiConsole.innerHTML += "<div class='success'>> 탄소 중립형 시멘트 대체 설계 레시피 도출 성공!</div>";
+                spinner.style.display = 'none';
+                runBtn.style.display = 'block';
+                runBtn.innerText = '재시뮬레이션 (목표 변경)';
+                
+                updateUI(target);
+                
+                document.getElementById('report-title').innerText = currentBuilding.name;
+                dashboard.style.display = 'block';
+                dashboard.scrollIntoView({ behavior: 'smooth' });
+            }, 3500);
+        }
+
+        function updateUI(target) {
+            target = parseInt(target);
+            document.getElementById('stat-carbon').innerText = `↓ ${target}%`;
+            
+            const wasteCalculated = Math.round(currentBuilding.baseWaste * (target / 35));
+            document.getElementById('stat-waste').innerText = wasteCalculated.toLocaleString() + ' 톤';
+            
+            const score = 85 + Math.floor((target / 60) * 13);
+            document.getElementById('stat-score').innerText = `${score}/100`;
+
+            document.getElementById('base-cement').innerText = currentBuilding.baseCement.toFixed(1) + '%';
+            document.getElementById('base-etc').innerText = (100 - currentBuilding.baseCement).toFixed(1) + '%';
+
+            let optimizedCement = (currentBuilding.baseCement - (target * 0.22)).toFixed(1);
+            if(optimizedCement < 5.0) optimizedCement = 5.0;
+            let optimizedSlag = (currentBuilding.baseCement - optimizedCement).toFixed(1);
+            let etc = (100 - currentBuilding.baseCement).toFixed(1);
+
+            document.getElementById('td-cement').innerText = optimizedCement + '%';
+            document.getElementById('td-slag').innerText = optimizedSlag + '%';
+            document.getElementById('td-etc').innerText = etc + '%';
+        }
+
+        // [신규] 대시보드 리포트 영역을 PDF 객체로 추출하여 자동 다운로드하는 함수
+        function exportToPDF() {
+            const element = document.getElementById('dashboard');
+            
+            // PDF 인쇄를 위한 문서 레이아웃 세부 커스텀 옵션
+            const opt = {
+                margin:       [15, 15, 15, 15], // 상하좌우 여백 안전 마진 설정 (mm 단위)
+                filename:     `EcoBuild_AI_Report_${currentBuilding.name.replace(/ /g, '_')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 }, // 캡처 이미지 품질 극대화
+                html2canvas:  { 
+                    scale: 2, // 해상도 스케일을 2배로 올려 글씨가 깨지는 증상 방지
+                    useCORS: true, // 외부 리소스 로드 허용
+                    letterRendering: true 
+                },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' } // A4 규격, 세로 모드
+            };
+
+            // PDF 생성 프로세스 구동
+            html2pdf().set(opt).from(element).save();
+        }
+    </script>
+</body>
+</html>

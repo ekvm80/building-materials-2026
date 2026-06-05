@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 예비 건축주 올인원 케어 시스템</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet.js (Map API) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { primary: '#2563eb', secondary: '#1e293b' } } }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap');
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .tab-content { display: none; animation: fadeIn 0.3s ease-out forwards; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .leaflet-container { z-index: 10 !important; }
+        body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; font-family: 'Noto Sans KR', sans-serif; }
+        
+        /* 스캐닝 애니메이션 효과 */
+        .scan-line {
+            position: absolute; width: 100%; height: 4px; background: rgba(56, 189, 248, 0.8);
+            box-shadow: 0 0 10px rgba(56, 189, 248, 1); top: 0; left: 0; z-index: 25;
+            animation: scan 2s linear infinite; display: none;
+        }
+        @keyframes scan { 0% { top: 0; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+    </style>
+</head>
+<body class="bg-slate-50 h-[100dvh] flex text-slate-800 overflow-hidden relative">
+
+    <div id="mobile-overlay" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden" onclick="toggleSidebar()"></div>
+
+    <aside id="sidebar" class="w-72 bg-secondary text-slate-300 flex flex-col shadow-xl z-50 fixed inset-y-0 left-0 transform -translate-x-full transition-transform duration-300 ease-in-out md:relative md:translate-x-0">
+        <div class="p-5 pb-6 border-b border-slate-700 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30 shrink-0">
+                    <i class="fa-solid fa-house-chimney text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-white font-bold text-lg leading-tight">BuildCare AI</h1>
+                    <p class="text-xs text-slate-400">예비 건축주 케어</p>
+                </div>
+            </div>
+            <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-white text-2xl px-2"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-2" id="sidebar-nav">
+            <button onclick="switchTab(1)" id="btn-tab-1" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl bg-primary/10 text-primary font-semibold transition-all">
+                <i class="fa-solid fa-map-location-dot w-5 text-center"></i><span class="text-sm">1. 대지 분석 & 예산</span>
+            </button>
+            <button onclick="switchTab(2)" id="btn-tab-2" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-users w-5 text-center"></i><span class="text-sm">2. 설계사무소 매칭</span>
+            </button>
+            <button onclick="switchTab(3)" id="btn-tab-3" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-pen-ruler w-5 text-center"></i><span class="text-sm">3. 도면 & 단열 검토</span>
+            </button>
+            <button onclick="switchTab(4)" id="btn-tab-4" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-calculator w-5 text-center"></i><span class="text-sm">4. AI 실시간 견적</span>
+            </button>
+            <button onclick="switchTab(5)" id="btn-tab-5" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-helmet-safety w-5 text-center"></i><span class="text-sm">5. 착공 & 현장 관리</span>
+            </button>
+            <button onclick="switchTab(6)" id="btn-tab-6" class="w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-slate-800 hover:text-white transition-all">
+                <i class="fa-solid fa-house-circle-check w-5 text-center"></i><span class="text-sm">6. 준공 & 입주</span>
+            </button>
+        </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-[100dvh] overflow-hidden relative w-full">
+        <header class="bg-white/80 backdrop-blur-md border-b border-slate-200 h-14 md:h-16 flex items-center px-4 md:px-8 z-10 sticky top-0 shrink-0 gap-3">
+            <button onclick="toggleSidebar()" class="md:hidden text-slate-700 text-xl p-1 rounded hover:bg-slate-100 transition"><i class="fa-solid fa-bars"></i></button>
+            <h2 id="header-title" class="text-base md:text-xl font-bold text-slate-800 truncate">1단계: 대지 분석 및 예산 기획</h2>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-4 md:p-8 w-full" id="main-scroll-area">
+            <div class="max-w-6xl mx-auto w-full">
+                
+                <!-- 1단계: 대지 분석 -->
+                <div id="tab-1" class="tab-content active space-y-4 md:space-y-6">
+                    <div class="bg-white rounded-2xl p-4 md:p-8 shadow-sm border border-slate-100">
+                        <div class="flex flex-col lg:flex-row gap-4 md:gap-6 mb-6 md:mb-8">
+                            <div class="w-full lg:w-1/2 h-48 md:h-64 bg-slate-200 rounded-xl overflow-hidden relative border border-slate-200" id="map-step1"></div>
+                            <div class="w-full lg:w-1/2 flex flex-col justify-center gap-3 md:gap-4">
+                                <div class="flex gap-2 w-full">
+                                    <div class="relative flex-1">
+                                        <i class="fa-solid fa-location-dot absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                        <input id="address-input" type="text" placeholder="현재 위치 탐색 중..." class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm md:text-base font-bold truncate" value="">
+                                    </div>
+                                    <button onclick="requestLocation()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-3 rounded-xl transition shrink-0" title="내 위치 찾기"><i class="fa-solid fa-crosshairs"></i></button>
+                                </div>
+                                <button onclick="window.showToast('AI가 대지 리포트를 업데이트했습니다.')" class="w-full bg-primary hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-medium transition shadow-md shadow-primary/20 text-sm md:text-base">AI 상세 리포트 업데이트</button>
+                            </div>
+                        </div>
+
+                        <div id="land-result" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
+                            <div class="bg-slate-50 p-4 md:p-5 rounded-xl border border-slate-100 relative overflow-hidden">
+                                <p class="text-xs md:text-sm text-slate-500 font-medium flex items-center gap-2">용도지역 <button onclick="openZoningModal()" class="w-6 h-6 rounded-full hover:bg-slate-200 text-slate-400 hover:text-primary transition flex items-center justify-center"><i class="fa-solid fa-circle-info"></i></button></p>
+                                <p id="zoning-type" class="text-lg md:text-xl font-bold text-slate-800 mt-1 relative z-10">제1종일반주거지역</p>
+                            </div>
+                            <div class="bg-slate-50 p-4 md:p-5 rounded-xl border border-slate-100 relative">
+                                <p class="text-xs md:text-sm text-slate-500 font-medium flex items-center gap-2">건폐율/용적률 <button onclick="openStatsModal()" class="w-6 h-6 rounded-full hover:bg-slate-200 text-slate-400 hover:text-primary transition flex items-center justify-center"><i class="fa-solid fa-circle-info"></i></button></p>
+                                <p id="zoning-stats" class="text-base md:text-lg font-bold text-slate-800 mt-1">60% 이하 / 200% 이하</p>
+                            </div>
+                            <div class="bg-slate-50 p-4 md:p-5 rounded-xl border border-slate-100 relative sm:col-span-2 md:col-span-1">
+                                <p class="text-xs md:text-sm text-slate-500 font-medium flex items-center gap-2">건축 가능 규모 <button onclick="openBuildingModal()" class="w-6 h-6 rounded-full hover:bg-slate-200 text-slate-400 hover:text-primary transition flex items-center justify-center"><i class="fa-solid fa-circle-info"></i></button></p>
+                                <p id="zoning-height" class="text-base md:text-lg font-bold text-slate-800 mt-1">지상 4층 이하</p>
+                                <p id="zoning-underground" class="text-xs md:text-sm text-slate-500 mt-1">지하: 제한 없음</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-4 md:p-8 shadow-sm border border-slate-100 flex flex-col lg:flex-row gap-6 md:gap-8">
+                        <div class="w-full lg:w-1/3 flex flex-col justify-between">
+                            <div>
+                                <h3 class="text-base md:text-lg font-bold flex items-center gap-2 mb-4"><i class="fa-solid fa-chart-pie text-primary"></i> 초기 예산 시뮬레이터</h3>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-xs md:text-sm font-medium text-slate-700 mb-1">희망 연면적 (평)</label>
+                                        <input id="budget-area" type="number" value="45" min="1" oninput="handleBudgetInput()" class="w-full p-2.5 md:p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3 md:gap-4">
+                                        <div>
+                                            <label class="flex justify-between items-center text-xs md:text-sm font-medium text-slate-700 mb-1"><span>지상 층수</span><span id="ground-limit-display" class="text-[10px] text-primary font-bold">(제한: 4층)</span></label>
+                                            <input type="number" id="budget-ground-floors" value="2" min="1" max="4" oninput="handleBudgetInput()" class="w-full p-2.5 md:p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                        </div>
+                                        <div>
+                                            <label class="flex justify-between items-center text-xs md:text-sm font-medium text-slate-700 mb-1"><span>지하 층수</span><span id="underground-limit-display" class="text-[10px] text-primary font-bold">(제한: 없음)</span></label>
+                                            <input type="number" id="budget-underground-floors" value="0" min="0" oninput="handleBudgetInput()" class="w-full p-2.5 md:p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs md:text-sm font-medium text-slate-700 mb-2">추가 공사 선택지</label>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                            <label class="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition">
+                                                <input type="checkbox" id="opt-premium" class="w-4 h-4 rounded text-primary border-slate-300 focus:ring-primary" onchange="calculateBudget()">
+                                                <span class="font-medium text-slate-700 leading-tight">최고급 자재<br><span id="opt-premium-price" class="text-[10px] text-blue-500 font-bold"></span></span>
+                                            </label>
+                                            <label class="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition">
+                                                <input type="checkbox" id="opt-elevator" class="w-4 h-4 rounded text-primary border-slate-300 focus:ring-primary" onchange="calculateBudget()">
+                                                <span class="font-medium text-slate-700 leading-tight">내부 승강기<br><span id="opt-elevator-price" class="text-[10px] text-blue-500 font-bold"></span></span>
+                                            </label>
+                                            <label class="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 transition sm:col-span-2">
+                                                <input type="checkbox" id="opt-solar" class="w-4 h-4 rounded text-primary border-slate-300 focus:ring-primary" onchange="calculateBudget()">
+                                                <span class="font-medium text-slate-700 leading-tight">태양광 설비<br><span id="opt-solar-price" class="text-[10px] text-blue-500 font-bold"></span></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="budget-result-box" class="mt-4 bg-blue-50 rounded-xl p-4 text-center border border-blue-100">
+                                <p class="text-xs text-blue-600 font-bold tracking-wider">예상 총 필요 자금</p>
+                                <p class="text-xl md:text-2xl font-black text-primary mt-1 break-words" id="budget-total-price">0원</p>
+                            </div>
+                        </div>
+                        <div class="w-full lg:w-1/2 flex items-center justify-center bg-slate-50 rounded-xl p-4 border border-slate-100 min-h-[250px]"><canvas id="budgetChart"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- 2단계: 지도 매칭 -->
+                <div id="tab-2" class="tab-content h-[calc(100vh-140px)]">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 h-full flex flex-col lg:flex-row overflow-hidden">
+                        <div class="w-full lg:w-2/3 h-64 lg:h-full relative shrink-0 border-b lg:border-b-0 lg:border-r border-slate-100" id="map-step2">
+                            <div class="absolute top-4 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur px-4 py-2 rounded-full shadow-lg text-xs md:text-sm font-bold text-slate-800 z-[999] flex items-center gap-2 whitespace-nowrap">
+                                <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> 전남대 인근 건축사사무소 매칭
+                            </div>
+                        </div>
+                        <div class="w-full lg:w-1/3 flex flex-col bg-white z-20 h-full relative">
+                            <div class="p-4 md:p-5 border-b border-slate-100 bg-slate-50 shrink-0">
+                                <div class="flex justify-between items-center mb-1">
+                                    <h3 class="font-bold text-sm md:text-base text-slate-800"><i class="fa-brands fa-google text-[#4285f4]"></i> 지식 정보 패널 연동</h3>
+                                    <button onclick="openArchitectChecklist()" class="text-[10px] md:text-xs bg-slate-800 text-white px-2 py-1 rounded shadow-sm hover:bg-slate-700 transition flex items-center gap-1"><i class="fa-solid fa-clipboard-check"></i> 상담 체크리스트</button>
+                                </div>
+                                <p class="text-[10px] md:text-[11px] text-slate-500 leading-tight">리스트를 누르면 주요 업무 및 실적 패널이 표시됩니다.</p>
+                            </div>
+                            <div id="architect-list-container" class="flex-1 overflow-y-auto p-4 md:p-5 space-y-3 md:space-y-4 pb-20 lg:pb-5"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3단계: 도면 & 단열 검토 (업로드 도면 인식 및 영역 애니메이션) -->
+                <div id="tab-3" class="tab-content space-y-4 md:space-y-6">
+                    <div class="bg-white rounded-2xl p-4 md:p-8 shadow-sm border border-slate-100 flex flex-col lg:flex-row gap-6 md:gap-8">
+                        <div class="w-full lg:w-2/3 flex flex-col">
+                            <h3 class="text-base md:text-lg font-bold flex items-center gap-2 mb-2"><i class="fa-solid fa-wand-magic-sparkles text-primary"></i> AI 도면 인식 & 재설계 시뮬레이터</h3>
+                            <p class="text-[11px] md:text-xs text-slate-500 mb-4 leading-relaxed">
+
+                                사용자가 업로드한 <b>실제 도면을 배경으로 깔고</b>, AI가 인식한 각 공간(거실, 마스터룸, 주방 등)의 영역을 표시합니다.<br>
+                                프롬프트를 입력하면 원본 도면의 뼈대는 유지한 채 <b>내부 인식 영역(Zone)이 실제로 확장/축소되는 애니메이션</b>을 시연합니다.
+                            </p>
+                            
+                            <div class="mb-4">
+                                <input type="file" accept="image/*" class="block w-full text-xs md:text-sm text-slate-500 file:mr-3 md:file:mr-4 file:py-2 md:file:py-2.5 file:px-3 md:file:px-4 file:rounded-xl file:border-0 file:font-semibold file:bg-blue-50 file:text-primary hover:file:bg-blue-100 cursor-pointer" onchange="handleBlueprintUpload(event)">
+                            </div>
+                            
+                            <!-- AI 캔버스 뷰어 영역 -->
+                            <div class="flex-1 bg-[#0f172a] border-2 border-slate-700 rounded-xl min-h-[350px] md:min-h-[450px] flex items-center justify-center relative overflow-hidden shadow-2xl" id="blueprint-viewer">
+                                <div id="blueprint-placeholder" class="text-center text-slate-500 p-4 z-20 transition-opacity duration-500">
+                                    <i class="fa-solid fa-cloud-arrow-up text-3xl md:text-4xl mb-3 block"></i>
+                                    <p class="text-xs md:text-sm">터치하여 도면 이미지를 업로드해 주세요.</p>
+                                </div>
+                                
+                                <!-- 스캐닝 애니메이션 효과 라인 -->
+                                <div id="scan-line" class="scan-line"></div>
+
+                                <!-- 인터랙티브 캔버스 (도면 구조가 렌더링될 곳) -->
+                                <canvas id="blueprint-canvas" class="w-full h-full absolute inset-0 z-0 hidden opacity-0 transition-opacity duration-500"></canvas>
+
+                                <!-- AI 분석/로딩 오버레이 -->
+                                <div id="ai-loading-overlay" class="absolute inset-0 bg-slate-900/90 backdrop-blur-sm hidden flex-col items-center justify-center z-30 transition-opacity duration-300">
+                                    <i class="fa-solid fa-magnifying-glass-chart text-4xl text-blue-400 animate-bounce mb-4"></i>
+                                    <p class="text-white font-bold text-sm text-center px-4 leading-relaxed" id="ai-loading-text">도면 구조 파악 및 형식화 진행 중...</p>
+                                </div>
+                            </div>
+
+                            <!-- AI 재설계 프롬프트 -->
+                            <div class="mt-4 bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-inner">
+                                <h4 class="text-white text-sm font-bold mb-3 flex items-center gap-2">
+                                    <i class="fa-solid fa-pen-nib text-blue-400"></i> 내부 구조 재설계 요청 <span class="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded font-normal">BETA</span>
+                                </h4>
+                                <div class="flex gap-2">
+                                    <input type="text" id="ai-redraw-input" placeholder="명령어 입력 (예: 거실 넓게 / 마스터룸 키워줘)" class="flex-1 p-2.5 md:p-3 rounded-lg text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 font-medium disabled:opacity-50" disabled>
+                                    <button id="ai-redraw-btn" onclick="requestAIRedraw()" class="bg-slate-600 text-white px-4 md:px-6 rounded-lg text-xs md:text-sm font-bold transition whitespace-nowrap shadow-md" disabled>실행</button>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-2"><i class="fa-solid fa-circle-info"></i> 먼저 도면을 업로드하여 캔버스 형식화가 완료되어야 합니다.</p>
+                            </div>
+                        </div>
+
+                        <!-- 실시간 단열 검토 영역 -->
+                        <div class="w-full lg:w-1/3 flex flex-col lg:border-l border-t lg:border-t-0 border-slate-100 lg:pl-8 pt-6 lg:pt-0">
+                            <h3 class="text-base md:text-lg font-bold flex items-center gap-2 mb-4"><i class="fa-solid fa-temperature-half text-primary"></i> 실시간 열관류율(단열) 검토</h3>
+                            
+                            <div class="flex justify-between items-center bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 shadow-sm">
+                                <span class="text-xs md:text-sm text-slate-600 font-bold"><i class="fa-solid fa-map-location-dot text-primary"></i> 해당 지역: <span id="insulation-region-display" class="text-primary">남부지역</span></span>
+                                <span class="text-xs md:text-sm text-slate-600 font-bold">법정 기준: <span id="insulation-req-display" class="text-red-500">0.320</span> 이하</span>
+                            </div>
+
+                            <div id="insulation-status" class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3 mb-5 transition-colors duration-300">
+                                <i id="status-icon" class="fa-solid fa-circle-check text-emerald-500 text-lg md:text-xl mt-0.5"></i>
+                                <div>
+                                    <h4 id="status-title" class="font-bold text-emerald-800 text-sm md:text-base">법정 단열 기준 충족</h4>
+                                    <p id="status-desc" class="text-xs md:text-sm text-emerald-600 mt-1">남부지역 외벽 기준 만족</p>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-xs md:text-sm font-medium text-slate-700 mb-1">단열재 종류 선택 (열전도율 연동)</label>
+                                    <select id="material-select" onchange="checkInsulation()" class="w-full p-2.5 md:p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm focus:outline-none focus:border-primary">
+                                        <option value="0.031" selected>비드법 2종 1호 (일반 단열재)</option>
+                                        <option value="0.027">압출법 특호 (아이소핑크/지하용)</option>
+                                        <option value="0.020">경질우레탄폼 2종 2호 (최고효율)</option>
+                                        <option value="0.034">그라스울 24K (목조/불연재)</option>
+                                        <option value="0.040">일반 스티로폼 1종 3호 (저성능)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs md:text-sm font-medium text-slate-700 mb-1">단열재 두께 (mm)</label>
+                                    <input type="number" id="insulation-thickness" value="120" min="1" oninput="checkInsulation()" class="w-full p-2.5 md:p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm focus:outline-none focus:border-primary">
+                                </div>
+                                
+                                <div class="bg-slate-50 p-3 md:p-4 rounded-xl border border-slate-200 mt-4">
+                                    <div class="flex justify-between text-xs md:text-sm mb-2">
+                                        <span class="text-slate-500 font-bold">계산된 열관류율</span>
+                                        <span id="u-value" class="font-black text-primary">0.258 W/㎡K</span>
+                                    </div>
+                                    <div class="w-full bg-slate-200 rounded-full h-2 mb-3">
+                                        <div id="u-value-bar" class="bg-emerald-500 h-2 rounded-full transition-all duration-300" style="width: 70%"></div>
+                                    </div>
+                                    <p id="insulation-recommend" class="text-[10px] md:text-xs text-slate-600 leading-relaxed bg-white p-2 rounded border border-slate-100 shadow-sm"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4단계: 실시간 견적 -->
+                <div id="tab-4" class="tab-content space-y-4 md:space-y-6">
+                    <div class="bg-white rounded-2xl p-4 md:p-8 shadow-sm border border-slate-100">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b border-slate-100 pb-4 gap-3 md:gap-0">
+                            <div>
+                                <h3 class="text-lg md:text-xl font-bold flex items-center gap-2 text-slate-800"><i class="fa-solid fa-calculator text-primary"></i> 스펙 연동형 공사비</h3>
+                                <p class="text-xs md:text-sm text-slate-500 mt-1">기입한 면적, 층수 옵션을 토대로 품목별 단가를 연산합니다.</p>
+                            </div>
+                            <div class="text-left md:text-right w-full md:w-auto flex justify-between md:block items-center">
+                                <span class="bg-blue-50 text-primary px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold border border-blue-100 inline-block md:mb-1 animate-pulse">Live</span>
+                                <p class="text-[10px] md:text-xs font-medium text-slate-600" id="today-date-display"></p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col lg:flex-row gap-6 md:gap-8">
+                            <div class="w-full lg:w-1/2 overflow-x-auto">
+                                <h4 class="font-bold text-sm text-slate-500 mb-3 flex items-center gap-1"><i class="fa-solid fa-receipt"></i> 직접공사비 상세</h4>
+                                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm min-w-[320px]">
+                                    <table class="w-full text-xs md:text-sm text-left">
+                                        <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                                            <tr><th class="px-2 md:px-4 py-2 md:py-3 font-bold">공종</th><th class="px-2 md:px-4 py-2 md:py-3 font-bold text-right">자재비</th><th class="px-2 md:px-4 py-2 md:py-3 font-bold text-right">노무비</th><th class="px-2 md:px-4 py-2 md:py-3 font-bold text-right">소계</th></tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
+                                            <tr><td class="px-2 md:px-4 py-2.5 md:py-3 bg-slate-50/50">가설/토공사</td><td id="val-mat-civil" class="px-2 md:px-4 py-2.5 md:py-3 text-right">0원</td><td id="val-lab-civil" class="px-2 md:px-4 py-2.5 md:py-3 text-right">0원</td><td id="val-sub-civil" class="px-2 md:px-4 py-2.5 md:py-3 text-right font-bold text-slate-900">0원</td></tr>
+                                            <tr><td class="px-2 md:px-4 py-2.5 md:py-3 bg-slate-50/50">철근콘크리트</td><td id="val-mat-struct" class="px-2 md:px-4 py-2.5 md:py-3 text-right">0원</td><td id="val-lab-struct" class="px-2 md:px-4 py-2.5 md:py-3 text-right">0원</td><td id="val-sub-struct" class="px-2 md:px-4 py-2.5 md:py-3 text-right font-bold text-slate-900">0원</td></tr>
+                                            <tr><td class="px-2 md:px-4 py-2.5 md:py-3 bg-slate-50/50">단열/방수</td><td id="val-mat-insul" class="px-2 md:px-4 py-2.5 md:py-3 text-right">0원</td><td id="val-lab-insul" class="px-2 md:px-4 py-2.5 md:py-3 text-right">0원</td><td id="val-sub-insul" class="px-2 md:px-4 py-2.5 md:py-3 text-right font-bold text-slate-900">0원</td></tr>
+                                            <tr><td class="px-2 md:px-4 py-2.5 md:py-3 bg-slate-50/50">마감/설비</td><td id="val-mat-finish" class="px-2 md:px-4 py-2.5 md:py-3 text-right">0원</td><td id="val-lab-finish" class="px-2 md:px-4 py-2.5 md:py-3 text-right">0원</td><td id="val-sub-finish" class="px-2 md:px-4 py-2.5 md:py-3 text-right font-bold text-slate-900">0원</td></tr>
+                                            <tr class="bg-slate-50"><td colspan="3" class="px-2 md:px-4 py-2.5 md:py-3 text-slate-500 font-bold text-right text-[10px] md:text-xs">간접비 (제경비 8.2%)</td><td id="val-indirect-total" class="px-2 md:px-4 py-2.5 md:py-3 text-right font-bold text-slate-800">0원</td></tr>
+                                            <tr class="bg-blue-50/80"><td colspan="3" class="px-2 md:px-4 py-3 font-black text-blue-900 text-right text-xs md:text-sm">최종 견적</td><td id="val-project-grand" class="px-2 md:px-4 py-3 text-right font-black text-blue-700 text-base md:text-xl">0원</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="w-full lg:w-1/2 flex flex-col justify-center bg-slate-50 p-4 rounded-xl border relative w-full h-[250px] md:h-auto overflow-hidden"><canvas id="costChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5단계: 현장 관리 (댓글 시스템 추가) -->
+                <div id="tab-5" class="tab-content space-y-4 md:space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                        <div class="bg-white rounded-2xl p-4 md:p-8 shadow-sm border border-slate-100 flex flex-col">
+                            <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-4 md:mb-6 gap-3 sm:gap-0">
+                                <h3 class="text-base md:text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-list-check text-primary"></i> 맞춤 체크리스트</h3>
+                                <select id="step5-process-select" onchange="updateStep5Checklist()" class="w-full sm:w-auto p-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-lg font-bold text-primary focus:outline-none">
+                                    <option value="골조">골조 (뼈대공사)</option>
+                                    <option value="단열">단열/창호 공사</option>
+                                    <option value="방수">방수/마감 공사</option>
+                                </select>
+                            </div>
+                            <div class="mb-4 bg-slate-50 p-3 md:p-4 rounded-xl border border-slate-100">
+                                <div class="flex justify-between text-xs md:text-sm mb-2"><span class="font-bold text-slate-700">오늘 확인 필수 내역</span><span id="step5-progress-text" class="text-primary font-bold">0%</span></div>
+                                <div class="w-full bg-slate-200 rounded-full h-2"><div id="step5-progress-bar" class="bg-primary h-2 rounded-full transition-all duration-300" style="width: 0%"></div></div>
+                            </div>
+                            <div class="space-y-2 md:space-y-3 flex-1 overflow-y-auto max-h-[300px] md:max-h-full pr-2" id="step5-checklist-container"></div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl p-4 md:p-8 shadow-sm border border-slate-100 flex flex-col h-auto md:h-[500px]">
+                            <h3 class="text-base md:text-lg font-bold flex items-center gap-2 mb-4"><i class="fa-solid fa-camera-retro text-primary"></i> 현장 일지 및 조치</h3>
+                            <div class="bg-slate-50 p-3 md:p-4 rounded-xl border border-slate-200 mb-4 space-y-3">
+                                <div class="flex gap-2">
+                                    <label class="cursor-pointer bg-white border border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs md:text-sm hover:bg-slate-100 transition flex items-center gap-2 shrink-0">
+                                        <i class="fa-solid fa-image"></i> 사진
+                                        <input type="file" id="step5-photo-input" accept="image/*" class="hidden" onchange="handleStep5PhotoSelected()">
+                                    </label>
+                                    <span id="step5-photo-name" class="text-[10px] md:text-xs text-slate-400 flex items-center truncate">선택 없음</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <input type="text" id="step5-log-input" placeholder="특이사항 기록 (모바일 호환)" class="flex-1 p-2.5 md:p-3 border border-slate-200 rounded-lg text-xs md:text-sm focus:outline-none focus:border-primary">
+                                    <button onclick="addStep5Log()" class="bg-slate-800 text-white px-4 md:px-5 py-2.5 md:py-3 rounded-lg text-xs md:text-sm font-bold hover:bg-slate-900 transition shrink-0">업로드</button>
+                                </div>
+                            </div>
+                            <div class="flex-1 overflow-y-auto space-y-4 pr-1 h-[250px] md:h-auto" id="step5-log-list">
+                                <div id="log-item-0" class="border-l-2 border-primary ml-2 md:ml-4 pl-3 md:pl-4 relative">
+                                    <div class="absolute -left-[9px] top-0 w-4 h-4 bg-primary rounded-full ring-4 ring-white"></div>
+                                    <div class="bg-white p-3 md:p-4 rounded-xl border border-slate-100 shadow-sm ml-1 md:ml-2">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <span class="text-[10px] md:text-xs font-bold text-slate-500">어제 등록 내역</span>
+                                            <button id="status-btn-log-item-0" onclick="toggleLogStatus('log-item-0')" class="text-[10px] md:text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold hover:bg-emerald-200 transition">해결됨</button>
+                                        </div>
+                                        <p class="text-xs md:text-sm font-medium text-slate-800 mb-2">기둥 수직도 및 철근 피복 두께 확인 부탁드립니다.</p>
+                                        
+                                        <!-- 댓글 영역 -->
+                                        <div class="mt-3 border-t border-slate-100 pt-3">
+                                            <div id="comments-log-item-0" class="space-y-2 mb-2">
+                                                <div class="flex gap-2 text-[10px] md:text-xs bg-slate-50 p-2 rounded">
+                                                    <span class="font-bold text-primary shrink-0">감리 소장</span><span class="text-slate-700">도면 치수와 일치하게 배근된 것 확인했습니다.</span>
+                                                </div>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <input type="text" id="comment-input-log-item-0" placeholder="댓글 및 조치사항 작성..." class="flex-1 p-2 border border-slate-200 rounded text-[10px] md:text-xs focus:outline-none focus:border-primary">
+                                                <button onclick="addComment('log-item-0')" class="bg-slate-200 text-slate-700 px-3 py-1.5 rounded text-[10px] md:text-xs font-bold hover:bg-slate-300 transition shrink-0">작성</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6단계: 준공 검사 -->
+                <div id="tab-6" class="tab-content space-y-4 md:space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                        
+                        <div class="bg-white rounded-2xl p-4 md:p-8 shadow-sm border border-slate-100 flex flex-col h-auto min-h-[450px] md:h-[550px]">
+                            <h3 class="text-base md:text-lg font-bold flex items-center gap-2 mb-4"><i class="fa-solid fa-magnifying-glass-plus text-primary"></i> 공간별 셀프 하자 점검</h3>
+                            <div class="flex gap-1 md:gap-2 mb-4 border-b border-slate-100 pb-2 overflow-x-auto whitespace-nowrap" id="step6-tabs">
+                                <button onclick="switchStep6Tab('living', event)" class="step6-tab-btn px-3 md:px-4 py-2 text-xs md:text-sm font-bold border-b-2 border-primary text-primary transition shrink-0">거실/방</button>
+                                <button onclick="switchStep6Tab('bath', event)" class="step6-tab-btn px-3 md:px-4 py-2 text-xs md:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition shrink-0">화장실/주방</button>
+                                <button onclick="switchStep6Tab('outer', event)" class="step6-tab-btn px-3 md:px-4 py-2 text-xs md:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition shrink-0">외부/현관</button>
+                            </div>
+
+                            <div class="bg-blue-50 border border-blue-100 p-3 md:p-4 rounded-xl mb-4">
+                                <p class="text-[11px] md:text-xs font-bold text-blue-800 mb-2"><i class="fa-solid fa-lightbulb text-yellow-500"></i> 꼭 확인해야 할 주요 하자 포인트 <span class="text-[10px] text-blue-600 font-normal">(클릭 시 입력)</span></p>
+                                <div id="step6-recommend-tags" class="flex flex-wrap gap-1.5 md:gap-2"></div>
+                            </div>
+
+                            <div class="flex gap-2 mb-4 bg-slate-50 p-2 md:p-3 rounded-xl border border-slate-100">
+                                <label class="cursor-pointer bg-white border border-slate-200 text-slate-500 w-10 md:w-12 h-10 md:h-12 rounded-lg flex items-center justify-center hover:bg-slate-100 transition shrink-0"><i class="fa-solid fa-camera"></i><input type="file" id="step6-defect-img" accept="image/*" class="hidden"></label>
+                                <input type="text" id="step6-defect-input" placeholder="발견된 하자 기입" class="flex-1 px-3 border border-slate-200 rounded-lg text-xs md:text-sm focus:outline-none focus:border-primary">
+                                <button onclick="addStep6Defect()" class="bg-primary text-white px-3 md:px-4 rounded-lg text-xs md:text-sm font-bold hover:bg-blue-700 transition shrink-0">추가</button>
+                            </div>
+                            <ul id="step6-defect-list" class="flex-1 space-y-2 md:space-y-3 mb-2 overflow-y-auto max-h-[250px] md:max-h-full">
+                                <div class="text-center text-xs md:text-sm text-slate-400 mt-6"><i class="fa-regular fa-face-smile-wink text-2xl md:text-3xl mb-2 block"></i>등록된 하자가 없습니다.</div>
+                            </ul>
+                        </div>
+
+                        <div class="bg-white rounded-2xl p-4 md:p-8 shadow-sm border border-slate-100 flex flex-col h-auto min-h-[450px] md:h-[550px]">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-base md:text-lg font-bold flex items-center gap-2"><i class="fa-regular fa-calendar-check text-primary"></i> 입주 필수 행정/세무 캘린더</h3>
+                                <span class="text-[10px] md:text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded font-bold">타임라인</span>
+                            </div>
+
+                            <div class="flex items-center justify-between mb-6 relative px-2 md:px-4">
+                                <div class="absolute top-1/2 left-4 right-4 h-1 bg-slate-100 -z-10 -translate-y-1/2"></div>
+                                <div class="absolute top-1/2 left-4 w-1/2 h-1 bg-primary -z-10 -translate-y-1/2 transition-all duration-300" id="step6-progress-line" style="width: 0%;"></div>
+
+                                <div class="flex flex-col items-center cursor-pointer group" onclick="showCalendarDetail(1)">
+                                    <div id="cal-icon-1" class="w-10 h-10 md:w-12 md:h-12 bg-blue-100 text-primary border-2 border-primary rounded-full flex items-center justify-center font-bold text-xs md:text-sm transition-transform group-hover:scale-110 bg-white shadow-md">D-Day</div>
+                                    <p class="text-[10px] md:text-xs font-bold mt-2 text-slate-800">사용승인</p>
+                                    <p class="text-[9px] md:text-[10px] text-primary">완료 (최근)</p>
+                                </div>
+                                <div class="flex flex-col items-center cursor-pointer group" onclick="showCalendarDetail(2)">
+                                    <div id="cal-icon-2" class="w-10 h-10 md:w-12 md:h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center font-bold text-xs md:text-sm transition-transform group-hover:scale-110">D+60</div>
+                                    <p class="text-[10px] md:text-xs font-bold mt-2 text-slate-800">취득세 납부</p>
+                                    <p class="text-[9px] md:text-[10px] text-red-500">기한 주의</p>
+                                </div>
+                                <div class="flex flex-col items-center cursor-pointer group" onclick="showCalendarDetail(3)">
+                                    <div id="cal-icon-3" class="w-10 h-10 md:w-12 md:h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center font-bold text-xs md:text-sm transition-transform group-hover:scale-110">D+60</div>
+                                    <p class="text-[10px] md:text-xs font-bold mt-2 text-slate-800">보존등기</p>
+                                    <p class="text-[9px] md:text-[10px] text-slate-500">대기</p>
+                                </div>
+                            </div>
+
+                            <div class="flex-1 relative">
+                                <div id="cal-detail-1" class="cal-detail-card bg-slate-50 p-4 md:p-5 rounded-xl border border-slate-200 h-full animate-[fadeIn_0.3s_ease-out]">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <h4 class="font-bold text-slate-800 text-sm md:text-base"><i class="fa-solid fa-building-circle-check text-primary"></i> 건축물 사용승인 (준공)</h4>
+                                        <span class="bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded text-[10px] font-bold">승인 완료</span>
+                                    </div>
+                                    <p class="text-xs text-slate-600 mb-4 leading-relaxed">건축물 사용을 위해 관할 구청에 허가를 받는 단계입니다. 감리자가 준공 검사를 마친 후 서류를 취합해 제출합니다.</p>
+                                    <div class="bg-white p-3 rounded-lg border border-slate-100">
+                                        <p class="text-xs font-bold text-slate-700 mb-2">필수 구비 서류</p>
+                                        <ul class="list-disc pl-4 space-y-1 text-[11px] text-slate-600"><li>공사감리 완료보고서 및 현장조사서</li><li>각종 필증 (소방, 통신, 정화조, 가스 등)</li><li>건설폐기물 처리 확인서 (영수증)</li></ul>
+                                    </div>
+                                </div>
+                                <div id="cal-detail-2" class="cal-detail-card bg-blue-50/50 p-4 md:p-5 rounded-xl border border-blue-100 h-full hidden animate-[fadeIn_0.3s_ease-out]">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <h4 class="font-bold text-blue-800 text-sm md:text-base"><i class="fa-solid fa-file-invoice-dollar text-blue-600"></i> 취득세 신고 및 납부</h4>
+                                        <span class="bg-red-100 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold">D-44 기한</span>
+                                    </div>
+                                    <p class="text-xs text-slate-600 mb-4 leading-relaxed">사용승인일로부터 <strong class="text-red-500">60일 이내</strong>에 세무과에 신고해야 합니다. 기한 초과 시 가산세 20%가 부과됩니다.</p>
+                                    <div class="bg-white p-3 rounded-lg border border-slate-100 mb-3 flex justify-between items-center shadow-sm">
+                                        <span class="text-[11px] md:text-xs font-bold text-slate-700">예상 취득세 (공사비의 3.16%)</span>
+                                        <span id="cal-tax-amount" class="text-sm md:text-base font-black text-blue-700">계산 중...</span>
+                                    </div>
+                                </div>
+                                <div id="cal-detail-3" class="cal-detail-card bg-slate-50 p-4 md:p-5 rounded-xl border border-slate-200 h-full hidden animate-[fadeIn_0.3s_ease-out]">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <h4 class="font-bold text-slate-800 text-sm md:text-base"><i class="fa-solid fa-stamp text-slate-600"></i> 소유권 보존등기 신청</h4>
+                                        <span class="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">대기중</span>
+                                    </div>
+                                    <p class="text-xs text-slate-600 mb-4 leading-relaxed">취득세 납부 후, 관할 등기소에 방문하여 새 건물을 법적으로 본인 소유로 등록하는 마지막 절차입니다.</p>
+                                    <div class="bg-white p-3 rounded-lg border border-slate-100 mb-3 flex justify-between items-center shadow-sm">
+                                        <span class="text-[11px] md:text-xs font-bold text-slate-700">등기 수수료 (법무사 대행 포함)</span><span class="text-sm md:text-base font-black text-slate-700">약 80만 원</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- 2단계용 상담 체크리스트 모달 -->
+    <div id="architect-checklist-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[9999] opacity-0 transition-opacity duration-300 px-4 py-8" onclick="closeArchitectChecklist()">
+        <div class="bg-white rounded-xl w-full max-w-lg shadow-2xl p-6 md:p-8 transform scale-95 transition-transform duration-300 relative flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-start mb-2 shrink-0 border-b border-slate-100 pb-4">
+                <h3 class="text-lg md:text-xl font-bold text-slate-800 leading-tight"><i class="fa-solid fa-clipboard-question text-primary"></i> 설계사무소 상담 체크리스트</h3>
+                <button onclick="closeArchitectChecklist()" class="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <p class="text-xs text-slate-500 mb-4 shrink-0">건축 지식이 없더라도 미팅 시 이 항목들만은 꼭 확인해 보세요.</p>
+            <div class="space-y-3 mt-2 text-sm text-slate-700 overflow-y-auto flex-1 pr-2">
+                <label class="flex items-start gap-3 p-3 md:p-4 bg-slate-50 rounded-lg border border-slate-200 cursor-pointer hover:bg-blue-50 transition shadow-sm">
+                    <input type="checkbox" class="mt-1 w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary">
+                    <div><p class="font-bold text-slate-800">예산 맞춤 설계 가능 여부</p><p class="text-xs text-slate-500 mt-1.5 leading-relaxed">"제가 가진 전체 예산(공사비) 안에서 실현 가능한 설계안을 제안해 주실 수 있나요?"</p></div>
+                </label>
+                <label class="flex items-start gap-3 p-3 md:p-4 bg-slate-50 rounded-lg border border-slate-200 cursor-pointer hover:bg-blue-50 transition shadow-sm">
+                    <input type="checkbox" class="mt-1 w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary">
+                    <div><p class="font-bold text-slate-800">유사 프로젝트 경험</p><p class="text-xs text-slate-500 mt-1.5 leading-relaxed">"제가 지으려는 건물과 비슷한 규모나 스타일의 건물을 설계해 보신 포트폴리오가 있나요?"</p></div>
+                </label>
+                <label class="flex items-start gap-3 p-3 md:p-4 bg-slate-50 rounded-lg border border-slate-200 cursor-pointer hover:bg-blue-50 transition shadow-sm">
+                    <input type="checkbox" class="mt-1 w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary">
+                    <div><p class="font-bold text-slate-800">설계 변경 시 추가 비용</p><p class="text-xs text-slate-500 mt-1.5 leading-relaxed">"계약 후 설계 진행 과정에서 도면을 수정하게 되면 몇 번까지 추가 비용 없이 가능한가요?"</p></div>
+                </label>
+                <label class="flex items-start gap-3 p-3 md:p-4 bg-slate-50 rounded-lg border border-slate-200 cursor-pointer hover:bg-blue-50 transition shadow-sm">
+                    <input type="checkbox" class="mt-1 w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary">
+                    <div><p class="font-bold text-slate-800">현장 감리 직접 수행 여부</p><p class="text-xs text-slate-500 mt-1.5 leading-relaxed">"공사가 시작되면 시공사가 도면대로 제대로 짓고 있는지 현장 감리도 직접 수행해 주시나요?"</p></div>
+                </label>
+            </div>
+            <button onclick="closeArchitectChecklist()" class="mt-6 w-full py-3.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-sm md:text-base transition shrink-0">확인했습니다</button>
+        </div>
+    </div>
+
+    <!-- 구글 지식 패널 스타일 모달 -->
+    <div id="firm-info-modal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[9999] opacity-0 transition-opacity duration-300 px-4 py-8" onclick="closeFirmModal()">
+        <div id="firm-info-box" class="bg-white rounded-xl w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[90vh] transform scale-95 transition-transform duration-300 relative flex flex-col" onclick="event.stopPropagation()">
+            <div class="sticky top-0 bg-white/95 backdrop-blur-sm z-10 px-6 py-5 flex justify-between items-start pt-6 border-b border-[#ebebeb]">
+                <div><h2 id="modal-ai-title" class="text-xl md:text-2xl font-medium text-[#202124] leading-tight font-sans tracking-tight"></h2><p id="modal-ai-subtitle" class="text-[13px] text-[#70757a] mt-1 font-sans">건축사사무소 · 광주광역시</p></div>
+                <button onclick="closeFirmModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-[#70757a] transition shrink-0"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="px-6 pb-6 pt-5">
+                <div class="flex gap-4 sm:gap-6 mb-6 justify-start border-b border-[#ebebeb] pb-6">
+                    <button id="modal-firm-link" class="flex flex-col items-center gap-1.5 hover:underline transition group"><div class="w-12 h-12 rounded-full border border-[#dfe1e5] flex items-center justify-center group-hover:bg-[#f8f9fa] transition text-[#1a0dab]"><i class="fa-solid fa-globe text-lg"></i></div><span class="text-[12px] font-medium text-[#1a0dab]">웹사이트</span></button>
+                    <button id="modal-firm-map-link" class="flex flex-col items-center gap-1.5 hover:underline transition group"><div class="w-12 h-12 rounded-full border border-[#dfe1e5] flex items-center justify-center group-hover:bg-[#f8f9fa] transition text-[#1a0dab]"><i class="fa-solid fa-diamond-turn-right text-lg"></i></div><span class="text-[12px] font-medium text-[#1a0dab]">경로 탐색</span></button>
+                </div>
+                <div class="bg-[#f0f4f9] rounded-2xl p-5 md:p-6 mb-6 font-sans relative overflow-hidden border border-[#e8eaed]">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#4285f4] via-[#ea4335] to-[#fbbc04]"></div>
+                    <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-sparkles text-[#1a73e8] text-lg"></i><span class="text-[#202124] font-medium text-[16px] tracking-tight">AI 개요</span></div>
+                    <div id="modal-ai-intro" class="text-[14px] text-[#202124] leading-relaxed mb-4"></div>
+                    <h4 class="font-bold text-[14px] text-[#202124] mb-3 border-t border-[#dadce0] pt-4">주요 특징 및 핵심 역량</h4>
+                    <ul id="modal-ai-bullets" class="space-y-3 text-[14px] text-[#202124] leading-relaxed mb-4"></ul>
+                </div>
+                <div class="space-y-3 text-[14px] text-[#202124] font-sans pb-2">
+                    <div class="flex items-start gap-4 border-b border-[#ebebeb] pb-3"><i class="fa-solid fa-location-dot mt-1 w-5 text-center text-[#70757a] text-lg"></i><div class="flex flex-col"><span class="text-[#70757a] text-[12px] font-medium mb-0.5">위치</span><span id="modal-ai-addr" class="hover:text-[#1a0dab] hover:underline cursor-pointer"></span></div></div>
+                    <div class="flex items-start gap-4 border-b border-[#ebebeb] pb-3"><i class="fa-solid fa-phone mt-1 w-5 text-center text-[#70757a] text-base"></i><div class="flex flex-col"><span class="text-[#70757a] text-[12px] font-medium mb-0.5">대표 전화</span><span id="modal-ai-phone" class="text-[#1a0dab] cursor-pointer hover:underline font-medium"></span></div></div>
+                    <div class="flex items-start gap-4 border-b border-[#ebebeb] pb-3"><i class="fa-solid fa-user-tie mt-1 w-5 text-center text-[#70757a] text-base"></i><div class="flex flex-col"><span class="text-[#70757a] text-[12px] font-medium mb-0.5">대표자 / 전문분야</span><span class="font-medium"><span id="modal-ai-rep" class="text-[#1a0dab] cursor-pointer hover:underline"></span><span class="text-[#70757a] font-normal mx-1">|</span><span id="modal-ai-spec"></span></span></div></div>
+                    <div class="flex items-start gap-4 border-b border-[#ebebeb] pb-3"><i class="fa-solid fa-briefcase mt-1 w-5 text-center text-[#70757a] text-base"></i><div class="flex flex-col"><span class="text-[#70757a] text-[12px] font-medium mb-0.5">주요 업무</span><span id="modal-ai-biz" class="leading-relaxed"></span></div></div>
+                    <div class="flex items-start gap-4 pb-2"><i class="fa-solid fa-trophy mt-1 w-5 text-center text-[#70757a] text-base"></i><div class="flex flex-col"><span class="text-[#70757a] text-[12px] font-medium mb-0.5">주요 실적</span><span id="modal-ai-portfolio" class="leading-relaxed"></span></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 법규 모달들 -->
+    <div id="zoning-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-[9999] opacity-0 transition-opacity duration-300 px-4" onclick="closeZoningModal()">
+        <div class="bg-white p-6 md:p-8 rounded-2xl w-full max-w-lg shadow-2xl" onclick="event.stopPropagation()"><h3 class="text-lg md:text-xl font-bold mb-3 md:mb-4">용도지역 상세 가이드</h3><div class="space-y-3 text-sm text-slate-700"><p id="modal-zoning-name" class="font-bold text-primary"></p><p id="modal-zoning-desc" class="bg-slate-50 p-3 rounded-lg border border-slate-200"></p></div><button onclick="closeZoningModal()" class="mt-5 w-full py-3 bg-primary text-white rounded-xl font-bold text-sm">확인했습니다</button></div>
+    </div>
+    <div id="building-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-[9999] opacity-0 transition-opacity duration-300 px-4" onclick="closeBuildingModal()">
+        <div class="bg-white p-6 md:p-8 rounded-2xl w-full max-w-lg shadow-2xl" onclick="event.stopPropagation()">
+            <h3 class="text-lg md:text-xl font-bold mb-3 md:mb-4">건축 가능 규모 상세 가이드</h3>
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 text-sm">
+                <div class="flex justify-between border-b pb-2"><span class="text-slate-500">최고 높이</span><span id="modal-building-height-m" class="font-bold"></span></div>
+                <div class="flex justify-between mt-2 border-b pb-2"><span class="text-slate-500">지상 층수</span><span id="modal-building-height" class="font-bold"></span></div>
+                <div class="flex justify-between mt-2"><span class="text-slate-500">지하 층수</span><span id="modal-building-underground" class="font-bold"></span></div>
+            </div>
+            <button onclick="closeBuildingModal()" class="mt-5 w-full py-3 bg-slate-800 text-white rounded-xl font-bold text-sm">닫기</button>
+        </div>
+    </div>
+    <div id="stats-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-[9999] opacity-0 transition-opacity duration-300 px-4" onclick="closeStatsModal()">
+        <div class="bg-white p-6 md:p-8 rounded-2xl w-full max-w-lg shadow-2xl" onclick="event.stopPropagation()"><h3 class="text-lg md:text-xl font-bold mb-3 md:mb-4">건폐율과 용적률이란?</h3><div class="space-y-3 text-sm"><div class="bg-blue-50 p-3 rounded-lg"><p class="font-bold text-blue-800">건폐율</p><p class="text-slate-600">대지면적 대비 1층 바닥면적 비율</p></div><div class="bg-emerald-50 p-3 rounded-lg"><p class="font-bold text-emerald-800">용적률</p><p class="text-slate-600">대지면적 대비 지상층 연면적 비율</p></div></div><button onclick="closeStatsModal()" class="mt-5 w-full py-3 bg-slate-800 text-white rounded-xl font-bold text-sm">이해했습니다</button></div>
+    </div>
+
+    <script>
+        let budgetChartInstance = null, costChartInstance = null;
+        let map1 = null, map2 = null, isPinFixed = false;
+        let isSidebarOpen = false;
+        let currentZoningData = { name: "제1종일반주거지역", desc: "저층주택 중심의 편리한 주거환경 조성 지역", height: "지상 4층 이하", heightMeters: "16m 이하", underground: "제한 없음" };
+        
+        let bpCanvas, bpCtx, animId = null;
+        let uploadedImg = null;
+        
+        // 업로드된 도면 구조에 맞춘 7개 구역 설정
+        let rooms = [
+            { name: '마스터 룸', x: 0.26, y: 0.13, w: 0.15, h: 0.32, color: 'rgba(248, 113, 113, 0.45)' }, // 빨강
+            { name: '욕실/메이크업', x: 0.16, y: 0.25, w: 0.1, h: 0.25, color: 'rgba(148, 163, 184, 0.45)' }, // 회색
+            { name: '드레스룸', x: 0.16, y: 0.50, w: 0.2, h: 0.35, color: 'rgba(192, 132, 252, 0.45)' }, // 보라
+            { name: '다용도/주방', x: 0.41, y: 0.13, w: 0.22, h: 0.32, color: 'rgba(250, 204, 21, 0.45)' }, // 노랑
+            { name: '거실', x: 0.36, y: 0.45, w: 0.27, h: 0.40, color: 'rgba(56, 189, 248, 0.45)' }, // 파랑
+            { name: '현관/욕실', x: 0.63, y: 0.13, w: 0.15, h: 0.32, color: 'rgba(251, 146, 60, 0.45)' }, // 주황
+            { name: '피트니스 룸', x: 0.63, y: 0.45, w: 0.26, h: 0.40, color: 'rgba(74, 222, 128, 0.45)' } // 초록
+        ];
+        let targetRooms = JSON.parse(JSON.stringify(rooms)); // 애니메이션 타겟 복사
+
+        function toggleSidebar() {
+            isSidebarOpen = !isSidebarOpen;
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            if(isSidebarOpen) { sidebar.classList.remove('-translate-x-full'); overlay.classList.remove('hidden'); }
+            else { sidebar.classList.add('-translate-x-full'); overlay.classList.add('hidden'); }
+            setTimeout(() => { 
+                if(map1) map1.invalidateSize(); 
+                if(map2) map2.invalidateSize(); 
+                if(costChartInstance) costChartInstance.resize();
+                if(document.getElementById('tab-3').classList.contains('active')) initBlueprint();
+            }, 300);
+        }
+
+        window.addEventListener('resize', () => {
+            if(map1) map1.invalidateSize();
+            if(map2) map2.invalidateSize();
+            if(costChartInstance) costChartInstance.resize();
+            if(budgetChartInstance) budgetChartInstance.resize();
+            if(document.getElementById('tab-3').classList.contains('active')) initBlueprint();
+        });
+
+        window.showToast = function(msg, isErr = false) {
+            const t = document.createElement('div');
+            t.className = `fixed top-[5%] md:top-6 left-1/2 -translate-x-1/2 px-4 md:px-6 py-2.5 md:py-3 rounded-full shadow-lg text-xs md:text-sm font-bold z-[9999] transition-all duration-500 opacity-0 whitespace-nowrap ${isErr ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-800 text-white'}`;
+            t.innerHTML = isErr ? `<i class="fa-solid fa-triangle-exclamation"></i> ${msg}` : `<i class="fa-solid fa-circle-check text-green-400"></i> ${msg}`;
+            document.body.appendChild(t);
+            setTimeout(() => { t.style.opacity = '1'; t.style.transform = 'translate(-50%, 10px)'; }, 10);
+            setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 500); }, 3000);
+        };
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            document.querySelectorAll('#sidebar-nav button').forEach(btn => {
+                btn.className = 'w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 hover:bg-slate-800 hover:text-white text-slate-300';
+            });
+            document.getElementById('btn-tab-' + tabId).className = 'w-full flex items-center gap-4 px-4 py-3 rounded-xl bg-primary/10 text-primary font-semibold transition-all';
+            
+            const titles = ["1단계: 대지 및 예산", "2단계: AI 설계사무소 매칭", "3단계: 도면 및 단열", "4단계: AI 견적", "5단계: 현장 관리", "6단계: 준공 검사"];
+            document.getElementById('header-title').innerText = titles[tabId - 1];
+
+            if(window.innerWidth < 768 && isSidebarOpen) toggleSidebar();
+            document.getElementById('main-scroll-area').scrollTop = 0;
+
+            if (tabId === 1 && map1) setTimeout(() => map1.invalidateSize(), 150);
+            if (tabId === 2 && map2) setTimeout(() => map2.invalidateSize(), 150);
+            if ((tabId === 1 || tabId === 4) && !budgetChartInstance) setTimeout(initCharts, 150);
+            if (tabId === 3) setTimeout(initBlueprint, 150);
+            if (tabId === 4) { setTodayDate(); updateStep4Estimate(); setTimeout(() => { if(costChartInstance) costChartInstance.resize(); }, 150); }
+            if (tabId === 5 && !document.getElementById('step5-checklist-container').innerHTML.trim()) updateStep5Checklist();
+            if (tabId === 6) { showCalendarDetail(1); renderStep6Guides(); }
+        }
+
+        // ======================= 1단계/2단계 지도 =======================
+        function initMaps() {
+            const defLat = 35.1770, defLng = 126.9047; 
+            map1 = L.map('map-step1').setView([defLat, defLng], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map1);
+            window.map1Marker = L.marker([defLat, defLng]).addTo(map1);
+
+            map2 = L.map('map-step2').setView([defLat, defLng], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map2);
+
+            map1.on('click', (e) => {
+                isPinFixed = true; window.map1Marker.setLatLng(e.latlng);
+                fetchAddress(e.latlng.lat, e.latlng.lng); if(map2) map2.setView(e.latlng, 15);
+                updateZoning(e.latlng.lat, e.latlng.lng); // 위치 변경 시 용도지역 업데이트
+            });
+            window.map1Marker.on('click', () => { isPinFixed = false; window.showToast("드래그 모드 전환"); });
+            map1.on('move', () => { if (!isPinFixed) window.map1Marker.setLatLng(map1.getCenter()); });
+            map1.on('moveend', () => { 
+                if (!isPinFixed) {
+                    const center = map1.getCenter();
+                    fetchAddress(center.lat, center.lng);
+                    updateZoning(center.lat, center.lng); // 드래그 종료 시 용도지역 업데이트
+                }
+            });
+            
+            renderRealArchitects();
+            requestLocation(true); // 페이지 로딩 시 자동으로 내 위치 탐색 실행
+        }
+
+        function fetchAddress(lat, lng) {
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=ko`)
+                .then(r => {
+                    if (!r.ok) throw new Error('Network error');
+                    return r.json();
+                })
+                .then(d => { 
+                    if(d.address) {
+                        const a = d.address;
+                        let parts = [];
+                        
+                        // 1. 시/도
+                        if (a.state) parts.push(a.state);
+                        else if (a.province) parts.push(a.province);
+                        else if (a.city) parts.push(a.city);
+                        
+                        // 2. 시/군/구
+                        if (a.city && !parts.includes(a.city)) parts.push(a.city);
+                        if (a.city_district) parts.push(a.city_district);
+                        else if (a.borough) parts.push(a.borough);
+                        else if (a.county) parts.push(a.county);
+                        
+                        // 3. 읍/면/동
+                        if (a.suburb) parts.push(a.suburb);
+                        else if (a.town) parts.push(a.town);
+                        else if (a.village) parts.push(a.village);
+                        
+                        // 4. 도로명 (가장 중요)
+                        if (a.road) {
+                            parts.push(a.road);
+                            if (a.house_number) parts.push(a.house_number);
+                        } else if (a.pedestrian) {
+                            parts.push(a.pedestrian);
+                        }
+                        
+                        let formattedAddress = [...new Set(parts)].join(' ');
+                        
+                        // 조합된 주소가 비어있을 경우, display_name을 활용해 한국식으로 재조립
+                        if (!formattedAddress.trim()) {
+                            formattedAddress = d.display_name.split(',').reverse().join(' ').replace('대한민국 ', '').trim();
+                        }
+                        
+                        document.getElementById('address-input').value = formattedAddress;
+                    } else if (d.display_name) {
+                        // address 객체가 없을 경우의 대비책
+                        document.getElementById('address-input').value = d.display_name.split(',').reverse().join(' ').replace('대한민국 ', '').trim();
+                    } else {
+                        document.getElementById('address-input').value = `좌표: ${lat.toFixed(4)}, ${lng.toFixed(4)}`; 
+                    }
+                })
+                .catch(() => { 
+                    // API 요청 차단(Rate Limit) 등에 대비한 백업 무료 API
+                    fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=ko`)
+                        .then(r => r.json())
+                        .then(d => {
+                            let fallbackAddress = [d.principalSubdivision, d.city, d.locality].filter(Boolean).join(' ');
+                            document.getElementById('address-input').value = fallbackAddress || `좌표: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                        })
+                        .catch(() => {
+                            document.getElementById('address-input').value = `좌표: ${lat.toFixed(4)}, ${lng.toFixed(4)}`; 
+                        });
+                });
+        }
+
+        function requestLocation(isAutoLoad = false) {
+            const input = document.getElementById('address-input'); 
+            input.value = "현재 위치 탐색 중...";
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (p) => { 
+                        isPinFixed = false;
+                        map1.setView([p.coords.latitude, p.coords.longitude], 16);
+                        window.map1Marker.setLatLng([p.coords.latitude, p.coords.longitude]);
+                        fetchAddress(p.coords.latitude, p.coords.longitude);
+                        updateZoning(p.coords.latitude, p.coords.longitude);
+                        if (!isAutoLoad) window.showToast("현재 내 위치로 동기화했습니다."); 
+                    },
+                    (e) => { 
+                        fetchAddress(35.1770, 126.9047); 
+                        updateZoning(35.1770, 126.9047); 
+                        if (!isAutoLoad) window.showToast("위치 권한이 거부되어 기본 주소로 표시됩니다.", true); 
+                    }, 
+                    { timeout: 5000 }
+                );
+            } else {
+                if (!isAutoLoad) window.showToast("위치 정보를 지원하지 않는 브라우저입니다.", true);
+                fetchAddress(35.1770, 126.9047); 
+                updateZoning(35.1770, 126.9047); 
+            }
+        }
+
+        function openArchitectChecklist() {
+            const modal = document.getElementById('architect-checklist-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.remove('opacity-0'); modal.children[0].classList.remove('scale-95'); }, 10);
+        }
+        function closeArchitectChecklist() {
+            const modal = document.getElementById('architect-checklist-modal');
+            modal.classList.add('opacity-0'); modal.children[0].classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+
+        function renderRealArchitects() {
+            const realFirms = [
+                { 
+                    name: "비에이치티엔지니어링건축사사무소(주)", lat: 35.1755, lng: 126.9035, address: "광주광역시 북구 용봉동 300 (전남대)", tags: ["산학협력", "친환경", "패시브디자인"],
+                    rep: "이효원", specialty: "친환경 탄소건축 및 에너지 절약형 패시브 건축", phone: "062-530-1644",
+                    biz: "건축 설계, 학술 연구용역, 신재생 에너지 설계 적용", portfolio: "국토해양부 에너지성능향상 외피디자인, 공공임대주택 환경 개선 기술 개발 등",
+                    aiIntro: "<b>비에이치티엔지니어링건축사사무소(주)</b>는 전남대학교 건축학부 이효원 교수의 친환경 건축 기술을 바탕으로 설립된 <b>기술집약적 산학협력 기업(자회사)</b>입니다.",
+                    aiBullets: ["<b>친환경 탄소건축</b>: 고에너지 효율을 갖는 건축 시스템 및 패시브 디자인 기술을 보유하고 있습니다.", "<b>정부 과제 선정</b>: 2012년 국토해양부의 '에너지성능향상 외피디자인' 등 다수의 국책 연구 과제를 수행했습니다.", "<b>사업 영역</b>: 친환경 주택사업 활성화에 맞춘 건축 설계부터 시스템 적용까지 다방면으로 활동합니다."]
+                },
+                { 
+                    name: "제희건축사사무소", lat: 35.1685, lng: 126.9030, address: "광주광역시 북구 신안동 120-1", tags: ["단독주택", "상가주택", "모던 트렌드"],
+                    rep: "박제희", specialty: "모던 단독주택 및 상가주택 파사드 설계", phone: "062-525-8855",
+                    biz: "단독주택, 다가구 상가주택 설계 및 인허가 대관업무", portfolio: "북구 및 광산구 일대 다수 주택/상가 신축 공사 설계",
+                    aiIntro: "<b>제희건축사사무소</b>는 건축주의 라이프스타일을 반영한 감각적인 디자인을 바탕으로 다양한 주거 및 상업용 프로젝트를 수행합니다.",
+                    aiBullets: ["<b>맞춤형 설계</b>: 건축주의 일상을 분석하여 최적화된 모던 단독주택과 상가주택 설계에 특화되어 있습니다.", "<b>트렌디한 외관</b>: 상업적 가치를 높여주는 세련된 파사드 디자인을 제안합니다."],
+                    link: "https://jootek.com/folio/1025891"
+                },
+                { 
+                    name: "시티건축사사무소", lat: 35.1670, lng: 126.8970, address: "광주광역시 북구 서암대로 291, 중도다이아빌 413호 (신안동 491-1)", tags: ["상업공간", "건축컨설팅", "효율성"],
+                    rep: "최창호", specialty: "상업용 건축 기획 및 부동산 가치 상승 컨설팅", phone: "062-511-4311",
+                    biz: "단독·공동주택 설계, 근린생활시설, 업무시설, 공장 및 창고시설 설계 등", portfolio: "다수의 단독주택 및 근린생활시설 신축, 야영장시설 인허가 등",
+                    aiIntro: "<b>시티건축사사무소</b>는 광주 북구 신안동 무등로에 위치하며, 건축설계, 건축컨설팅 및 건축디자인 전반을 아우르는 전문 서비스를 제공합니다.",
+                    aiBullets: ["<b>종합 컨설팅</b>: 초기 기획부터 인허가, 준공까지 건축 전 과정에 대한 컨설팅을 지원하여 건축주의 부담을 덜어줍니다.", "<b>디자인 혁신</b>: 지역 특성에 맞는 창의적인 상업용 및 주거용 건축 디자인을 선보이며 기능성을 극대화합니다."],
+                    link: "https://jootek.com/folio/1015326"
+                },
+                { 
+                    name: "명인건축사사무소", lat: 35.1655, lng: 126.9015, address: "광주광역시 북구 신안동 140", tags: ["전원주택", "친환경 건축", "실용주의"],
+                    rep: "임정빈", specialty: "단독/전원주택 설계, 공간 효율화 및 감리", phone: "062-514-0010",
+                    biz: "전원주택, 패시브 하우스 전문 설계 및 책임 감리", portfolio: "전남 외곽 지역 다수 전원주택단지 마스터플랜 및 개별 주택 설계",
+                    aiIntro: "<b>명인건축사사무소</b>는 거품 없는 실용성과 구조적 안전성을 최우선으로 하는 맞춤형 건축 솔루션을 제공합니다.",
+                    aiBullets: ["<b>친환경 패시브 건축</b>: 고효율 단열재와 자연 채광을 고려한 설계 기법을 적극 도입합니다.", "<b>실용주의 공간 최적화</b>: 데드 스페이스를 최소화하고, 거주자 라이프스타일에 맞춘 레이아웃을 기획합니다."]
+                },
+                { 
+                    name: "디엠건축사사무소", lat: 35.1700, lng: 126.9150, address: "광주광역시 북구 우치로", tags: ["미니멀리즘", "인테리어", "조명 설계"],
+                    rep: "김동민", specialty: "미니멀리즘 테마 건축 및 내외부 일체형 디자인", phone: "062-522-7711",
+                    biz: "고급 주택 설계, 카페 및 쇼룸 건축, 실내 인테리어 연계 디자인", portfolio: "광주 시내 유명 베이커리 카페 다수 및 갤러리형 단독주택",
+                    aiIntro: "<b>디엠(DM)건축사사무소</b>는 건축 설계부터 조명, 마감재 등 실내 공간까지 일체형으로 통합 기획하여 감각적 공간을 창조합니다.",
+                    aiBullets: ["<b>내외부 통합 디자인</b>: 건축 외관과 실내 공간의 톤앤매너를 일치시켜 건축물의 브랜딩 가치를 높입니다.", "<b>정교한 공간 연출</b>: 빛의 각도를 계산한 조명 설계와 세밀한 마감재 지정 작업을 제공합니다."]
+                }
+            ];
+
+            window.currentFirms = realFirms;
+            const listContainer = document.getElementById('architect-list-container');
+            listContainer.innerHTML = '';
+            
+            const redIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: '<div class="w-7 h-7 bg-[#ea4335] rounded-full border border-white shadow-lg flex items-center justify-center text-white text-xs hover:scale-110 transition"><i class="fa-solid fa-building"></i></div>',
+                iconSize: [28, 28], iconAnchor: [14, 14]
+            });
+
+            realFirms.forEach((f, index) => {
+                let m = L.marker([f.lat, f.lng], {icon: redIcon}).addTo(map2);
+                m.on('click', () => { map2.setView([f.lat, f.lng], 16); openFirmModal(index); });
+
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition cursor-pointer hover:border-[#4285f4] flex flex-col group';
+                let tagsHtml = f.tags.map(t => `<span class="text-[10px] text-[#5f6368] bg-[#f1f3f4] px-1.5 py-0.5 rounded border border-[#dadce0] group-hover:bg-[#e8f0fe] group-hover:text-[#1a73e8] transition">#${t}</span>`).join('');
+                
+                card.innerHTML = `<div class="flex justify-between items-start mb-2"><h4 class="font-bold text-[#202124] text-sm group-hover:text-[#1a73e8] transition">${f.name}</h4></div><div class="flex flex-wrap gap-1 mb-3">${tagsHtml}</div><button onclick="openFirmModal(${index}); event.stopPropagation();" class="w-full text-xs bg-slate-50 border border-slate-200 group-hover:bg-[#1a73e8] group-hover:text-white group-hover:border-[#1a73e8] text-slate-700 py-2.5 rounded-lg transition font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-sparkles text-[#1a73e8] group-hover:text-white"></i> AI 정보 패널 열기</button>`;
+                card.onclick = (e) => { if (e.target.tagName !== 'BUTTON') { map2.setView([f.lat, f.lng], 16); openFirmModal(index); } };
+                listContainer.appendChild(card);
+            });
+        }
+
+        function openFirmModal(index) {
+            const firm = window.currentFirms[index];
+            if(!firm) return;
+            
+            document.getElementById('modal-ai-title').innerText = firm.name;
+            document.getElementById('modal-ai-addr').innerText = firm.address;
+            document.getElementById('modal-ai-phone').innerText = firm.phone;
+            document.getElementById('modal-ai-rep').innerText = firm.rep;
+            document.getElementById('modal-ai-spec').innerText = firm.specialty;
+            document.getElementById('modal-ai-biz').innerText = firm.biz;
+            document.getElementById('modal-ai-portfolio').innerText = firm.portfolio;
+            document.getElementById('modal-ai-intro').innerHTML = firm.aiIntro;
+            document.getElementById('modal-ai-bullets').innerHTML = firm.aiBullets.map(bullet => `<li class="flex items-start gap-3"><span class="text-[#1a73e8] mt-1.5"><i class="fa-solid fa-circle text-[6px]"></i></span><span class="flex-1">${bullet}</span></li>`).join('');
+
+            document.getElementById('modal-firm-link').onclick = () => { 
+                if(firm.link) {
+                    window.open(firm.link, '_blank');
+                } else {
+                    window.open('https://www.google.com/search?q=' + encodeURIComponent('광주 ' + firm.name), '_blank'); 
+                }
+            };
+            document.getElementById('modal-firm-map-link').onclick = () => { window.open('https://www.google.com/maps/search/' + encodeURIComponent('광주 ' + firm.name), '_blank'); };
+
+            const modal = document.getElementById('firm-info-modal');
+            const box = document.getElementById('firm-info-box');
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.remove('opacity-0'); box.classList.remove('scale-95'); box.classList.add('scale-100'); }, 10);
+        }
+
+        function closeFirmModal() {
+            const modal = document.getElementById('firm-info-modal'); const box = document.getElementById('firm-info-box');
+            modal.classList.add('opacity-0'); box.classList.remove('scale-100'); box.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+
+        // 위치별 용도지역 데이터 시뮬레이션
+        const zoningLaws = [
+            { lat: 35.1770, lng: 126.9047, type: "제2종일반주거지역", coverage: "60% 이하", far: "250% 이하", height: "지상 15층 이하", heightMeters: "60m 이하", underground: "제한 없음", desc: "중층주택을 중심으로 편리한 주거환경을 조성하기 위해 지정된 지역입니다." }, 
+            { lat: 35.1755, lng: 126.9035, type: "일반상업지역", coverage: "80% 이하", far: "1300% 이하", height: "제한 없음", heightMeters: "도로사선/가로구역별 높이 제한 적용", underground: "제한 없음", desc: "상업 및 기타 업무의 편의를 증진하기 위해 지정된 지역으로, 고밀도 개발이 가능합니다." }, 
+            { lat: 35.1685, lng: 126.9030, type: "제1종일반주거지역", coverage: "60% 이하", far: "200% 이하", height: "지상 4층 이하", heightMeters: "16m 이하", underground: "제한 없음", desc: "저층주택을 중심으로 편리한 주거환경을 조성하기 위해 지정된 지역입니다. (다가구, 다세대 중심)" }, 
+            { lat: 35.1670, lng: 126.8970, type: "준주거지역", coverage: "70% 이하", far: "500% 이하", height: "지상 7층 이하", heightMeters: "28m 이하", underground: "제한 없음", desc: "주거기능을 위주로 이를 지원하는 일부 상업기능 및 업무기능을 보완하기 위해 지정된 지역입니다." }, 
+            { lat: 35.1800, lng: 126.9100, type: "자연녹지지역", coverage: "20% 이하", far: "100% 이하", height: "지상 4층 이하", heightMeters: "16m 이하", underground: "제한됨", desc: "도시의 녹지공간 확보, 도시확산 방지, 장래 도시용지의 공급 등을 위해 보전할 필요가 있는 지역입니다." } 
+        ];
+
+        let currentRegion = "남부지역";
+        let currentUReq = 0.320;
+
+        function updateRegion(lat) {
+            if(lat >= 37.5) { currentRegion = "중부 1지역"; currentUReq = 0.150; }
+            else if(lat >= 36.0) { currentRegion = "중부 2지역"; currentUReq = 0.240; }
+            else if(lat >= 33.5) { currentRegion = "남부지역"; currentUReq = 0.320; }
+            else { currentRegion = "제주도"; currentUReq = 0.430; }
+
+            const regionEl = document.getElementById('insulation-region-display');
+            const reqEl = document.getElementById('insulation-req-display');
+            if(regionEl) regionEl.innerText = currentRegion;
+            if(reqEl) reqEl.innerText = currentUReq.toFixed(3);
+            
+            checkInsulation();
+        }
+
+        function updateZoning(lat, lng) {
+            let closestZoning = zoningLaws[0];
+            let minDistance = Number.MAX_VALUE;
+
+            zoningLaws.forEach(z => {
+                const dist = Math.sqrt(Math.pow(z.lat - lat, 2) + Math.pow(z.lng - lng, 2));
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closestZoning = z;
+                }
+            });
+            
+            const z = closestZoning;
+            document.getElementById('zoning-type').innerText = z.type;
+            document.getElementById('zoning-stats').innerText = `${z.coverage} / ${z.far}`;
+            document.getElementById('zoning-height').innerText = z.height;
+            document.getElementById('zoning-underground').innerText = "지하: " + z.underground;
+            currentZoningData = { name: z.type, desc: z.desc, height: z.height, heightMeters: z.heightMeters, underground: z.underground };
+
+            let groundLimitStr = z.height.includes("제한 없음") ? "없음" : z.height.replace("지상 ", "").replace(" 이하", "");
+            document.getElementById('ground-limit-display').innerText = `(제한: ${groundLimitStr})`;
+            
+            let groundInput = document.getElementById('budget-ground-floors');
+            if (groundLimitStr !== "없음") {
+                let maxVal = parseInt(groundLimitStr);
+                groundInput.max = maxVal;
+                if (!isNaN(maxVal) && parseInt(groundInput.value) > maxVal) {
+                    groundInput.value = maxVal;
+                    window.showToast("해당 지역 제한에 맞춰 지상 층수가 자동 조정되었습니다.", true);
+                }
+            } else { groundInput.removeAttribute('max'); }
+            handleBudgetInput();
+            updateRegion(lat);
+        }
+
+        function openZoningModal() { 
+            document.getElementById('modal-zoning-name').innerText = currentZoningData.name; 
+            document.getElementById('modal-zoning-desc').innerText = currentZoningData.desc; 
+            document.getElementById('zoning-modal').classList.remove('hidden'); 
+            setTimeout(() => document.getElementById('zoning-modal').classList.remove('opacity-0'), 10); 
+        }
+        function closeZoningModal() { 
+            document.getElementById('zoning-modal').classList.add('opacity-0'); 
+            setTimeout(() => document.getElementById('zoning-modal').classList.add('hidden'), 300); 
+        }
+        function openBuildingModal() { 
+            document.getElementById('modal-building-height').innerText = currentZoningData.height; 
+            document.getElementById('modal-building-height-m').innerText = currentZoningData.heightMeters; 
+            document.getElementById('modal-building-underground').innerText = currentZoningData.underground; 
+            document.getElementById('building-modal').classList.remove('hidden'); 
+            setTimeout(() => document.getElementById('building-modal').classList.remove('opacity-0'), 10); 
+        }
+        function closeBuildingModal() { 
+            document.getElementById('building-modal').classList.add('opacity-0'); 
+            setTimeout(() => document.getElementById('building-modal').classList.add('hidden'), 300); 
+        }
+        function openStatsModal() { 
+            document.getElementById('stats-modal').classList.remove('hidden'); 
+            setTimeout(() => document.getElementById('stats-modal').classList.remove('opacity-0'), 10); 
+        }
+        function closeStatsModal() { 
+            document.getElementById('stats-modal').classList.add('opacity-0'); 
+            setTimeout(() => document.getElementById('stats-modal').classList.add('hidden'), 300); 
+        }
+
+        // ======================= 1/4단계 예산 =======================
+        function formatMoney(amount) {
+            const eok = Math.floor(amount / 100000000);
+            const man = Math.floor((amount % 100000000) / 10000);
+            let res = "";
+            if(eok > 0) res += eok + '억 ';
+            if(man > 0) res += man.toLocaleString() + '만';
+            return res.trim() + " 원";
+        }
+
+        function handleBudgetInput() {
+            let groundInput = document.getElementById('budget-ground-floors');
+            let ground = parseInt(groundInput.value);
+            if (!isNaN(ground)) {
+                let groundMax = groundInput.getAttribute('max');
+                if (groundMax && ground > parseInt(groundMax)) {
+                    groundInput.value = groundMax;
+                    window.showToast("최고 층수 " + groundMax + "층 자동 교정", true);
+                }
+            }
+            updateOptionCosts();
+            calculateBudget();
+        }
+
+        function updateOptionCosts() {
+            const area = parseFloat(document.getElementById('budget-area').value) || 0;
+            const ground = parseInt(document.getElementById('budget-ground-floors').value) || 1;
+            
+            document.getElementById('opt-premium-price').innerText = '+' + formatMoney(area * 1800000);
+            document.getElementById('opt-elevator-price').innerText = '+' + formatMoney(30000000 + (ground * 4000000));
+            let solar = area * 180000; if(ground >= 3) solar *= 1.1;
+            document.getElementById('opt-solar-price').innerText = '+' + formatMoney(solar);
+        }
+
+        function calculateBudget() {
+            const area = parseFloat(document.getElementById('budget-area').value) || 0;
+            const ground = parseInt(document.getElementById('budget-ground-floors').value) || 1;
+            const under = parseInt(document.getElementById('budget-underground-floors').value) || 0;
+            
+            let baseDirectCost = area * 5800000; 
+            if(ground >= 3) baseDirectCost *= 1.06;
+            let underAdd = under * 45000000; 
+            
+            let premiumAdd = document.getElementById('opt-premium').checked ? (area * 1800000) : 0;
+            let elevatorAdd = document.getElementById('opt-elevator').checked ? (30000000 + (ground * 4000000)) : 0;
+            let solarAdd = document.getElementById('opt-solar').checked ? (area * 180000 * (ground >= 3 ? 1.1 : 1)) : 0;
+            
+            let civilVal = (baseDirectCost * 0.12) + underAdd;
+            let structVal = (baseDirectCost * 0.42) + (premiumAdd * 0.3);
+            let insulVal = (baseDirectCost * 0.16) + solarAdd;
+            let finishVal = (baseDirectCost * 0.30) + (premiumAdd * 0.7) + elevatorAdd;
+            
+            let directSum = civilVal + structVal + insulVal + finishVal;
+            let indirectSum = directSum * 0.082; 
+            let grandTotal = directSum + indirectSum;
+            
+            document.getElementById('budget-total-price').innerText = formatMoney(grandTotal);
+            
+            const taxEl = document.getElementById('cal-tax-amount');
+            if(taxEl) taxEl.innerText = formatMoney(grandTotal * 0.0316);
+            
+            if(budgetChartInstance) {
+                budgetChartInstance.data.datasets[0].data = [directSum * 0.05, directSum * 0.8, directSum * 0.05, indirectSum];
+                budgetChartInstance.update();
+            }
+            
+            window.cachedEstimate = { civil: civilVal, struct: structVal, insul: insulVal, finish: finishVal, indirect: indirectSum, grand: grandTotal };
+            if(document.getElementById('tab-4').classList.contains('active')) updateStep4Estimate();
+        }
+
+        function updateStep4Estimate() {
+            if(!window.cachedEstimate) return;
+            const data = window.cachedEstimate;
+            
+            document.getElementById('val-mat-civil').innerText = Math.round(data.civil * 0.45 / 10000).toLocaleString() + "만";
+            document.getElementById('val-lab-civil').innerText = Math.round(data.civil * 0.55 / 10000).toLocaleString() + "만";
+            document.getElementById('val-sub-civil').innerText = formatMoney(data.civil);
+            
+            document.getElementById('val-mat-struct').innerText = Math.round(data.struct * 0.5 / 10000).toLocaleString() + "만";
+            document.getElementById('val-lab-struct').innerText = Math.round(data.struct * 0.5 / 10000).toLocaleString() + "만";
+            document.getElementById('val-sub-struct').innerText = formatMoney(data.struct);
+            
+            document.getElementById('val-mat-insul').innerText = Math.round(data.insul * 0.6 / 10000).toLocaleString() + "만";
+            document.getElementById('val-lab-insul').innerText = Math.round(data.insul * 0.4 / 10000).toLocaleString() + "만";
+            document.getElementById('val-sub-insul').innerText = formatMoney(data.insul);
+            
+            document.getElementById('val-mat-finish').innerText = Math.round(data.finish * 0.4 / 10000).toLocaleString() + "만";
+            document.getElementById('val-lab-finish').innerText = Math.round(data.finish * 0.6 / 10000).toLocaleString() + "만";
+            document.getElementById('val-sub-finish').innerText = formatMoney(data.finish);
+            
+            document.getElementById('val-indirect-total').innerText = formatMoney(data.indirect);
+            document.getElementById('val-project-grand').innerText = formatMoney(data.grand);
+            
+            if(costChartInstance) {
+                costChartInstance.data.datasets[0].data = [data.civil/10000000, data.struct/10000000, data.insul/10000000, data.finish/10000000];
+                costChartInstance.update();
+            }
+        }
+
+        function initCharts() {
+            if(budgetChartInstance) budgetChartInstance.destroy();
+            budgetChartInstance = new Chart(document.getElementById('budgetChart').getContext('2d'), {
+                type: 'doughnut', data: { labels: ['설계비', '직접시공', '인허가', '제경비'], datasets: [{ data: [5,80,5,10], backgroundColor: ['#94a3b8','#2563eb','#38bdf8','#cbd5e1'], borderWidth: 0 }] },
+                options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+            });
+            if(costChartInstance) costChartInstance.destroy();
+            costChartInstance = new Chart(document.getElementById('costChart').getContext('2d'), {
+                type: 'bar', data: { labels: ['토공사','골조구조','단열창호','수사마감'], datasets: [{ label: '단가 (천만원)', data: [0,0,0,0], backgroundColor: '#2563eb', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } } }, plugins: { legend: { display: false } } }
+            });
+            handleBudgetInput();
+        }
+
+        // ================= 3단계: AI 캔버스 도면 재생성 시스템 =================
+        
+        function handleBlueprintUpload(e) {
+            const f = e.target.files[0]; if(!f) return;
+            const r = new FileReader();
+            
+            r.onload = ev => {
+                uploadedImg = new Image();
+                uploadedImg.onload = () => {
+                    const uploadView = document.getElementById('initial-upload-view');
+                    const placeholder = document.getElementById('blueprint-placeholder');
+                    if (uploadView) uploadView.classList.add('opacity-0');
+                    if (placeholder) placeholder.classList.add('opacity-0');
+                    
+                    setTimeout(() => {
+                        if (uploadView) uploadView.classList.add('hidden');
+                        if (placeholder) placeholder.classList.add('hidden');
+                        
+                        const canvas = document.getElementById('blueprint-canvas');
+                        if (canvas) {
+                            canvas.classList.remove('hidden');
+                            canvas.classList.remove('opacity-0');
+                        }
+                        
+                        const aiInput = document.getElementById('ai-redraw-input');
+                        const aiBtn = document.getElementById('ai-redraw-btn');
+                        if (aiInput && aiBtn) {
+                            aiInput.disabled = false;
+                            aiInput.classList.remove('disabled:opacity-50');
+                            aiBtn.disabled = false;
+                            aiBtn.className = "bg-blue-600 hover:bg-blue-500 text-white px-4 md:px-6 rounded-lg text-xs md:text-sm font-bold transition whitespace-nowrap shadow-md";
+                        }
+                        
+                        initBlueprint();
+                        simulateScanning();
+                        window.showToast("도면 인식 완료! AI가 분석한 파티션을 재배치해보세요.");
+                    }, 500);
+                };
+                uploadedImg.src = ev.target.result;
+            };
+            r.readAsDataURL(f);
+        }
+
+        function simulateScanning() {
+            const scanLine = document.getElementById('scan-line');
+            if (scanLine) {
+                scanLine.style.display = 'block';
+                setTimeout(() => { scanLine.style.display = 'none'; }, 2000);
+            }
+        }
+
+        function initBlueprint() {
+            bpCanvas = document.getElementById('blueprint-canvas');
+            if(!bpCanvas || !uploadedImg) return;
+            bpCtx = bpCanvas.getContext('2d');
+            const container = bpCanvas.parentElement;
+            bpCanvas.width = container.clientWidth;
+            bpCanvas.height = container.clientHeight || 400;
+            
+            drawBlueprint();
+        }
+
+        function drawBlueprint() {
+            if(!bpCtx || !uploadedImg) return;
+            const w = bpCanvas.width;
+            const h = bpCanvas.height;
+
+            bpCtx.clearRect(0, 0, w, h);
+            
+            const scale = Math.min(w / uploadedImg.width, h / uploadedImg.height) * 0.95;
+            const imgW = uploadedImg.width * scale;
+            const imgH = uploadedImg.height * scale;
+            const imgX = (w - imgW) / 2;
+            const imgY = (h - imgH) / 2;
+
+            bpCtx.globalAlpha = 0.85; 
+            bpCtx.drawImage(uploadedImg, imgX, imgY, imgW, imgH);
+            bpCtx.globalAlpha = 1.0;
+
+            rooms.forEach(r => {
+                const rx = imgX + (r.x * imgW);
+                const ry = imgY + (r.y * imgH);
+                const rw = r.w * imgW;
+                const rh = r.h * imgH;
+
+                bpCtx.fillStyle = r.color;
+                bpCtx.fillRect(rx, ry, rw, rh);
+                
+                bpCtx.strokeStyle = '#ffffff';
+                bpCtx.lineWidth = 2.5;
+                bpCtx.setLineDash([5, 5]); 
+                bpCtx.strokeRect(rx, ry, rw, rh);
+                bpCtx.setLineDash([]); 
+
+                bpCtx.fillStyle = '#ffffff';
+                bpCtx.font = 'bold 12px "Noto Sans KR", sans-serif';
+                bpCtx.textAlign = 'center';
+                bpCtx.textBaseline = 'middle';
+                
+                const textW = bpCtx.measureText(r.name).width;
+                bpCtx.fillStyle = 'rgba(0,0,0,0.6)';
+                bpCtx.fillRect(rx + rw/2 - textW/2 - 8, ry + rh/2 - 12, textW + 16, 24);
+                
+                bpCtx.fillStyle = '#ffffff';
+                bpCtx.fillText(r.name, rx + rw/2, ry + rh/2);
+            });
+        }
+
+        function animateBlueprint() {
+            let isMoving = false;
+            for(let i=0; i<rooms.length; i++) {
+                ['x', 'y', 'w', 'h'].forEach(prop => {
+                    if(Math.abs(targetRooms[i][prop] - rooms[i][prop]) > 0.002) {
+                        rooms[i][prop] += (targetRooms[i][prop] - rooms[i][prop]) * 0.06; 
+                        isMoving = true;
+                    } else {
+                        rooms[i][prop] = targetRooms[i][prop];
+                    }
+                });
+            }
+            
+            drawBlueprint();
+            
+            if(isMoving) {
+                animId = requestAnimationFrame(animateBlueprint);
+            } else {
+                cancelAnimationFrame(animId);
+            }
+        }
+
+        function requestAIRedraw() {
+            const input = document.getElementById('ai-redraw-input').value;
+            const overlay = document.getElementById('ai-loading-overlay');
+            const loadingText = document.getElementById('ai-loading-text');
+
+            if(!input) { window.showToast("변경하고 싶은 내용을 입력해주세요. (예: 거실 넓혀줘)", true); return; }
+
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            overlay.classList.remove('opacity-0');
+            document.getElementById('ai-redraw-input').value = ""; 
+
+            setTimeout(() => { loadingText.innerText = "업로드된 도면 구조 분석 및 Canny Edge 추출 중..."; }, 1000);
+            setTimeout(() => { loadingText.innerText = "프롬프트 내용 반영하여 공간 레이아웃 재배치 연산 중..."; }, 2000);
+
+            setTimeout(() => {
+                overlay.classList.add('opacity-0');
+                setTimeout(() => { overlay.classList.add('hidden'); overlay.classList.remove('flex'); }, 300);
+                
+                loadingText.innerText = "AI가 도면을 분석 중입니다..."; 
+                
+                if(input.includes("거실") && (input.includes("넓") || input.includes("크") || input.includes("늘") || input.includes("키워"))) {
+                    targetRooms[4].x = 0.30;
+                    targetRooms[4].w = 0.40;
+                    targetRooms[2].w = 0.14;
+                    targetRooms[6].x = 0.70;
+                    targetRooms[6].w = 0.19;
+                    window.showToast("원본 도면의 외곽선을 유지한 채 거실 영역이 확장되었습니다!");
+                } else if((input.includes("침실") || input.includes("마스터") || input.includes("마스터룸") || input.includes("방")) && (input.includes("넓") || input.includes("크") || input.includes("늘") || input.includes("키워"))) {
+                    targetRooms[0].w = 0.28; 
+                    targetRooms[3].x = 0.54;
+                    targetRooms[3].w = 0.09;
+                    window.showToast("원본 도면의 외곽선을 유지한 채 마스터 룸 영역이 크게 확장되었습니다!");
+                } else {
+                    targetRooms[4].w = 0.27 + (Math.random() * 0.05);
+                    window.showToast("요청하신 내용에 맞게 도면 영역이 재구성되었습니다.");
+                }
+
+                if(animId) cancelAnimationFrame(animId);
+                animateBlueprint();
+
+            }, 3500);
+        }
+
+        function checkInsulation() {
+            const lambda = parseFloat(document.getElementById('material-select').value);
+            const thickness = parseFloat(document.getElementById('insulation-thickness').value);
+            const uReq = currentUReq;
+
+            if(!thickness || thickness <= 0) return;
+
+            const uValue = lambda / (thickness / 1000);
+            const uValueEl = document.getElementById('u-value');
+            if(uValueEl) uValueEl.innerText = uValue.toFixed(3) + " W/㎡K";
+
+            const isPass = uValue <= uReq;
+            const recThickness = Math.ceil((lambda / uReq) * 1000);
+
+            const box = document.getElementById('insulation-status'); 
+            const icon = document.getElementById('status-icon');
+            const title = document.getElementById('status-title');
+            const desc = document.getElementById('status-desc');
+            const bar = document.getElementById('u-value-bar');
+            const recText = document.getElementById('insulation-recommend');
+
+            let pct = Math.min(100, (uReq / uValue) * 50); 
+            bar.style.width = Math.max(10, pct) + "%";
+
+            if(!isPass) { 
+                box.className = 'bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 mb-5 transition-colors duration-300'; 
+                icon.className = 'fa-solid fa-circle-xmark text-red-500 text-lg md:text-xl mt-0.5'; 
+                title.className = 'font-bold text-red-800 text-sm md:text-base'; 
+                title.innerText = '법정 단열 기준 미달';
+                desc.className = 'text-xs md:text-sm text-red-600 mt-1'; 
+                desc.innerText = `${currentRegion} 기준(${uReq.toFixed(3)}) 초과. 허가 불가`;
+                bar.className = 'bg-red-500 h-2 rounded-full transition-all duration-300'; 
+                if(recText) recText.innerHTML = `<span class="text-red-600 font-bold">🚨 경고:</span> 이 단열재로 허가를 받으려면 두께를 최소 <b>${recThickness}mm</b> 이상으로 늘려야 합니다!`;
+            } else { 
+                box.className = 'bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3 mb-5 transition-colors duration-300'; 
+                icon.className = 'fa-solid fa-circle-check text-blue-500 text-lg md:text-xl mt-0.5'; 
+                title.className = 'font-bold text-blue-800 text-sm md:text-base'; 
+                title.innerText = '법정 단열 기준 충족';
+                desc.className = 'text-xs md:text-sm text-blue-600 mt-1'; 
+                desc.innerText = `${currentRegion} 기준(${uReq.toFixed(3)}) 만족`;
+                bar.className = 'bg-blue-500 h-2 rounded-full transition-all duration-300'; 
+                if(recText) recText.innerHTML = `<span class="text-blue-600 font-bold">💡 추천:</span> ${currentRegion} 기준을 통과하기 위한 최소 두께는 <b>${recThickness}mm</b> 입니다. (현재 ${thickness}mm로 안전)`;
+            }
+        }
+
+        // ================= 5단계 & 6단계 =================
+        function setTodayDate() { 
+            const t = new Date(); 
+            const display = document.getElementById('today-date-display');
+            if(display) display.innerText = '동기화: ' + (t.getMonth()+1) + '/' + t.getDate() + ' 실시간'; 
+        }
+
+        const checklists = {
+            "골조": [
+                { title: "콘크리트 굳는 시간(양생) 확보", desc: "레미콘 타설 후 최소 3~4일은 굳히는지 기록 (다음날 바로 윗층 짓기 금지)" },
+                { title: "현장 정리정돈 상태", desc: "위험한 못이나 철근이 방치되지 않고 현장이 깨끗한지 확인" },
+                { title: "도면과 실제 크기 비교", desc: "방이나 거실 크기가 도면과 대략적으로 비슷한지 줄자로 측정" },
+                { title: "자재 비맞음 방지", desc: "철근이나 시멘트 포대가 비에 젖지 않게 천막으로 덮여있는지 체크" },
+                { title: "기둥/벽체 수직 상태", desc: "스마트폰 수평계 앱을 벽에 대보고 눈에 띄게 기울어지지 않았는지 확인" },
+                { title: "레미콘 타설 전 내부 청소", desc: "거푸집 안에 나뭇조각 등 이물질이 없는지 확인" }
+            ],
+            "단열": [
+                { title: "창틀 주변 폼 충진 확인", desc: "창문 틀과 벽 사이에 빈틈이 없도록 우레탄폼이 꽉 채워졌는지 꼼꼼히 보기" },
+                { title: "단열재 파손/들뜸 여부", desc: "벽에 붙이는 스티로폼이 깨지거나 심하게 젖어/들떠있지 않은지 육안으로 확인" },
+                { title: "모든 창문 직접 열어보기", desc: "창문이 뻑뻑하거나 닫았을 때 덜컹거리는 느낌이 없는지 전체 다 만져보기" },
+                { title: "단열재 등급/두께 스티커 확인", desc: "현장에 들어온 단열재 겉면에 계약서와 똑같은 등급이 찍혀있는지 보기" },
+                { title: "단열재 이음매 확인", desc: "단열재 판과 판 사이에 빈 공간이 벌어져 있지 않은지 체크" },
+                { title: "결로 취약부 점검", desc: "외벽과 만나는 방 모서리에 빈틈없이 단열재가 꼼꼼히 붙어있는지 확인" }
+            ],
+            "방수": [
+                { title: "화장실 바닥 물 채워보기", desc: "방수액 바르고 마른 뒤 물을 얕게 채워놓고 다음날 밑에 층에서 물이 안 새는지 보기" },
+                { title: "화장실/베란다 물구배 확인", desc: "바닥에 물을 뿌렸을 때 고이지 않고 배수구 쪽으로 자연스럽게 흘러가는지 테스트" },
+                { title: "모서리 곰팡이/얼룩", desc: "비가 온 다음 날 천장이나 벽 구석에 물 얼룩이 생기지 않는지 확인" },
+                { title: "외부 창틀 실리콘", desc: "창문 밖으로 실리콘이 끊어지지 않고 두툼하고 매끄럽게 발려있는지 확인" },
+                { title: "방수 바탕면 건조 상태", desc: "물기가 없는 완전히 마른 상태에서 방수액을 칠하고 있는지 점검" },
+                { title: "콘센트/스위치 위치 최종 점검", desc: "벽지 바르기 전에 내가 원하는 위치에 콘센트 구멍이 제대로 뚫려있는지 체크" }
+            ]
+        };
+
+        function updateStep5Checklist() {
+            const process = document.getElementById('step5-process-select').value;
+            const container = document.getElementById('step5-checklist-container'); container.innerHTML = '';
+            checklists[process].forEach((item) => {
+                container.innerHTML += `<label class="flex items-start gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-blue-50 transition"><input type="checkbox" class="mt-1 w-4 h-4 text-primary rounded border-gray-300" onchange="calcStep5Progress()"><div><p class="font-bold text-xs text-slate-800">${item.title}</p><p class="text-[10px] text-slate-500 mt-0.5">${item.desc}</p></div></label>`;
+            });
+            calcStep5Progress();
+        }
+
+        function calcStep5Progress() {
+            const cbs = document.querySelectorAll('#step5-checklist-container input[type="checkbox"]');
+            let chk = Array.from(cbs).filter(cb => cb.checked).length;
+            const pct = cbs.length === 0 ? 0 : Math.round((chk / cbs.length) * 100);
+            document.getElementById('step5-progress-bar').style.width = pct + "%";
+            document.getElementById('step5-progress-text').innerText = pct + "%";
+        }
+
+        let tempStep5Img = null;
+        function handleStep5PhotoSelected() {
+            const f = document.getElementById('step5-photo-input').files[0];
+            if(f) { document.getElementById('step5-photo-name').innerText = f.name; const r = new FileReader(); r.onload = e => tempStep5Img = e.target.result; r.readAsDataURL(f); }
+        }
+
+        let logIdCounter = 0;
+        function addStep5Log() {
+            const input = document.getElementById('step5-log-input'); const text = input.value.trim();
+            if(!text) { window.showToast("내용을 입력하세요.", true); return; }
+            const list = document.getElementById('step5-log-list'); const d = new Date();
+            const timeStr = `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${d.getMinutes()}`;
+            let imgHtml = tempStep5Img ? `<img src="${tempStep5Img}" class="w-full h-32 object-cover rounded-lg mt-2 border border-slate-200 mb-2">` : '';
+            
+            logIdCounter++;
+            const id = `log-item-${logIdCounter}`;
+
+            const item = document.createElement('div');
+            item.className = "border-l-2 border-emerald-500 ml-2 md:ml-4 pl-3 md:pl-4 relative animate-[fadeIn_0.3s_ease-out]";
+            item.innerHTML = `
+                <div class="absolute -left-[9px] top-0 w-4 h-4 bg-emerald-500 rounded-full ring-4 ring-white"></div>
+                <div id="${id}" class="bg-white p-3 md:p-4 rounded-xl border border-slate-100 shadow-sm ml-1 md:ml-2">
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] md:text-xs font-bold text-slate-500">${timeStr}</span>
+                            <span class="text-[10px] md:text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">건축주</span>
+                        </div>
+                        <button id="status-btn-${id}" onclick="toggleLogStatus('${id}')" class="text-[10px] md:text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold hover:bg-red-200 transition">미해결</button>
+                    </div>
+                    <p class="text-xs md:text-sm font-medium text-slate-800 mb-2">${text}</p>
+                    ${imgHtml}
+                    <!-- 댓글 및 조치 기능 -->
+                    <div class="mt-3 border-t border-slate-100 pt-3">
+                        <div id="comments-${id}" class="space-y-2 mb-2"></div>
+                        <div class="flex gap-2">
+                            <input type="text" id="comment-input-${id}" placeholder="댓글 및 조치사항 작성..." class="flex-1 p-2 border border-slate-200 rounded text-[10px] md:text-xs focus:outline-none focus:border-primary">
+                            <button onclick="addComment('${id}')" class="bg-slate-200 text-slate-700 px-3 py-1.5 rounded text-[10px] md:text-xs font-bold hover:bg-slate-300 transition shrink-0">작성</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            list.prepend(item); input.value = ''; tempStep5Img = null; document.getElementById('step5-photo-name').innerText = "선택 없음";
+            window.showToast("현장 일지가 등록되었습니다.");
+        }
+
+        function toggleLogStatus(id) {
+            const btn = document.getElementById(`status-btn-${id}`);
+            if(btn.innerText === "미해결") {
+                btn.innerText = "해결됨";
+                btn.className = "text-[10px] md:text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold hover:bg-emerald-200 transition";
+                window.showToast("해당 이슈가 해결 처리되었습니다.");
+            } else {
+                btn.innerText = "미해결";
+                btn.className = "text-[10px] md:text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold hover:bg-red-200 transition";
+            }
+        }
+
+        function addComment(id) {
+            const input = document.getElementById(`comment-input-${id}`);
+            const text = input.value.trim();
+            if(!text) return;
+            const commentsDiv = document.getElementById(`comments-${id}`);
+            const c = document.createElement('div');
+            c.className = "flex gap-2 text-[10px] md:text-xs bg-slate-50 p-2 rounded animate-[fadeIn_0.3s_ease-out]";
+            c.innerHTML = `<span class="font-bold text-primary shrink-0">관계자</span><span class="text-slate-700">${text}</span>`;
+            commentsDiv.appendChild(c);
+            input.value = '';
+        }
+
+        // ======================= 6단계 캘린더 & 하자 점검 =======================
+        let currentStep6Space = 'living'; let step6Defects = { 'living': [], 'bath': [], 'outer': [] };
+        
+        const defectGuides = {
+            'living': ["창틀 주변 벽지 누수/얼룩", "바닥 마루 들뜸이나 걸레받이 틈새", "방문 저절로 열림 (수직 불량)", "콘센트/스위치 작동 불량"],
+            'bath': ["바닥 물 고임 (구배 불량)", "타일 모서리 깨짐/줄눈 누락", "세면대/변기 하단 배관 누수", "환풍기 흡입 불량/소음", "실리콘 마감 누락"],
+            'outer': ["외벽 마감재 균열/크랙", "창틀 외부 실리콘 탈락", "현관문 도어락 작동/부드러움", "현관 타일 단차"]
+        };
+
+        function renderStep6Guides() {
+            const container = document.getElementById('step6-recommend-tags');
+            if(!container) return;
+            container.innerHTML = '';
+            const guides = defectGuides[currentStep6Space];
+            guides.forEach(g => {
+                const btn = document.createElement('button');
+                btn.className = "text-[10px] md:text-xs bg-white border border-blue-200 text-blue-700 px-2.5 py-1.5 rounded-full hover:bg-blue-100 hover:border-blue-300 transition shadow-sm whitespace-nowrap";
+                btn.innerHTML = `<i class="fa-solid fa-plus text-[8px]"></i> ${g}`;
+                btn.onclick = () => { document.getElementById('step6-defect-input').value = g; };
+                container.appendChild(btn);
+            });
+        }
+        
+        function showCalendarDetail(step) {
+            document.getElementById('cal-detail-1').classList.add('hidden');
+            document.getElementById('cal-detail-2').classList.add('hidden');
+            document.getElementById('cal-detail-3').classList.add('hidden');
+            document.getElementById('cal-detail-' + step).classList.remove('hidden');
+
+            const icons = [document.getElementById('cal-icon-1'), document.getElementById('cal-icon-2'), document.getElementById('cal-icon-3')];
+            const line = document.getElementById('step6-progress-line');
+
+            icons.forEach((icon, idx) => {
+                if (idx + 1 < step) {
+                    icon.className = "w-10 h-10 md:w-12 md:h-12 bg-primary text-white rounded-full flex items-center justify-center font-bold text-xs md:text-sm shadow-lg shadow-primary/30 transition-transform group-hover:scale-110";
+                } else if (idx + 1 === step) {
+                    icon.className = "w-10 h-10 md:w-12 md:h-12 bg-blue-100 text-primary border-2 border-primary rounded-full flex items-center justify-center font-bold text-xs md:text-sm transition-transform group-hover:scale-110 bg-white shadow-md";
+                } else {
+                    icon.className = "w-10 h-10 md:w-12 md:h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center font-bold text-xs md:text-sm transition-transform group-hover:scale-110";
+                }
+            });
+
+            if(step === 1) line.style.width = '0%';
+            if(step === 2) line.style.width = '50%';
+            if(step === 3) line.style.width = '100%';
+        }
+
+        function switchStep6Tab(space, e) {
+            currentStep6Space = space;
+            document.querySelectorAll('.step6-tab-btn').forEach(btn => btn.className = 'step6-tab-btn px-3 md:px-4 py-2 text-xs md:text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition shrink-0');
+            e.target.className = 'step6-tab-btn px-3 md:px-4 py-2 text-xs md:text-sm font-bold border-b-2 border-primary text-primary transition shrink-0';
+            renderStep6Defects();
+            renderStep6Guides();
+        }
+
+        function addStep6Defect() {
+            const input = document.getElementById('step6-defect-input'); const fileInput = document.getElementById('step6-defect-img');
+            if(!input.value.trim()) { window.showToast("내용 입력 필수", true); return; }
+            const defectObj = { text: input.value.trim(), img: null };
+            if(fileInput.files && fileInput.files[0]) {
+                const r = new FileReader(); r.onload = e => { defectObj.img = e.target.result; step6Defects[currentStep6Space].push(defectObj); renderStep6Defects(); }; r.readAsDataURL(fileInput.files[0]);
+            } else { step6Defects[currentStep6Space].push(defectObj); renderStep6Defects(); }
+            input.value = ''; fileInput.value = ''; window.showToast("추가됨");
+        }
+
+        function renderStep6Defects() {
+            const list = document.getElementById('step6-defect-list'); list.innerHTML = ''; const defects = step6Defects[currentStep6Space];
+            if(defects.length === 0) { list.innerHTML = `<div class="text-center text-xs md:text-sm text-slate-400 mt-10"><i class="fa-regular fa-face-smile-wink text-2xl md:text-3xl mb-2 block"></i>등록된 하자가 없습니다.</div>`; return; }
+            defects.forEach((d, i) => {
+                const li = document.createElement('li'); li.className = "bg-white p-2 md:p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-2 md:gap-3 animate-[fadeIn_0.3s_ease-out]";
+                let imgIcon = d.img ? `<img src="${d.img}" class="w-8 md:w-10 h-8 md:h-10 object-cover rounded border border-slate-200">` : `<div class="w-8 md:w-10 h-8 md:h-10 bg-slate-100 rounded border flex items-center justify-center text-slate-400 text-[10px] md:text-xs"><i class="fa-solid fa-image"></i></div>`;
+                li.innerHTML = `${imgIcon}<div class="flex-1 text-xs md:text-sm text-slate-800 pt-1 font-medium">${d.text}</div><button onclick="removeStep6Defect(${i})" class="text-slate-400 hover:text-red-500 transition px-2 py-1"><i class="fa-solid fa-trash-can"></i></button>`;
+                list.appendChild(li);
+            });
+        }
+
+        function removeStep6Defect(i) { step6Defects[currentStep6Space].splice(i, 1); renderStep6Defects(); }
+
+        // 초기 시작
+        switchTab(1); 
+        setTimeout(() => { initMaps(); showCalendarDetail(1); renderStep6Guides(); }, 200);
+    </script>
+</body>
+</html>

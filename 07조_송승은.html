@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThermoAI 2.0 — 건물 단열 에너지 예측 시스템</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f5f6fa; --surface:#fff; --surface2:#f0f2f8; --surface3:#e4e8f5;
+  --accent:#1a7f6e; --accent-l:#e6f7f4; --accent2:#1565c0; --accent2-l:#e3eefa;
+  --accent3:#d84315; --accent3-l:#fbe9e7; --accent4:#6a1b9a; --accent4-l:#f3e5f5;
+  --yellow:#e65100; --yellow-l:#fff3e0; --green:#2e7d32; --green-l:#e8f5e9;
+  --text:#1a2033; --text2:#4a5568; --text3:#8896ab;
+  --border:#dde3f0; --border-a:#b2dfdb;
+  --sh:0 2px 12px rgba(26,32,51,.08); --sh-lg:0 8px 32px rgba(26,32,51,.12);
+  --r:14px; --rs:8px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;min-height:100vh;overflow-x:hidden;}
+
+/* LOADING */
+#loadingOverlay{position:fixed;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.4s;}
+.loader-ring{width:60px;height:60px;border:4px solid var(--surface3);border-top-color:var(--accent);border-radius:50%;animation:spin 0.9s linear infinite;margin-bottom:18px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* HEADER */
+header{background:#fff;border-bottom:1px solid var(--border);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:60px;box-shadow:0 1px 4px rgba(0,0,0,.06);position:sticky;top:0;z-index:200;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.logo-text{font-family:'Space Mono',monospace;font-size:16px;font-weight:700;color:var(--accent);}
+.logo-ver{font-size:9px;background:var(--accent2);color:#fff;border-radius:4px;padding:1px 5px;font-weight:700;}
+.hdr-badge{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;background:var(--accent-l);color:var(--accent);border:1px solid var(--border-a);}
+
+/* NAV */
+.nav-wrap{background:#fff;border-bottom:1px solid var(--border);position:sticky;top:60px;z-index:190;}
+.nav-tabs{display:flex;overflow-x:auto;padding:0 32px;scrollbar-width:none;}
+.nav-tabs::-webkit-scrollbar{display:none;}
+.nav-tab{padding:14px 18px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text3);border-bottom:2.5px solid transparent;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:6px;}
+.nav-tab:hover{color:var(--text2);}
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700;}
+
+/* MAIN */
+.main{max-width:1360px;margin:0 auto;padding:24px 32px;}
+.page{display:none;}
+.page.active{display:block;animation:fadeIn .3s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* SECTION */
+.sec-head{margin-bottom:22px;}
+.sec-title{font-size:20px;font-weight:800;display:flex;align-items:center;gap:9px;margin-bottom:4px;}
+.sec-desc{font-size:13px;color:var(--text3);}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:13px;}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--sh);transition:box-shadow .2s;}
+.card:hover{box-shadow:var(--sh-lg);}
+.card-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px;display:flex;align-items:center;gap:6px;}
+
+/* FORM */
+.fg{margin-bottom:14px;}
+.fl{font-size:11px;color:var(--text3);font-weight:600;margin-bottom:6px;display:block;text-transform:uppercase;letter-spacing:.7px;}
+.fsel,.finp{width:100%;padding:10px 14px;border-radius:var(--rs);background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;transition:all .2s;appearance:none;}
+.fsel:focus,.finp:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(26,127,110,.1);}
+.sel-w{position:relative;}
+.sel-w::after{content:'▾';position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;font-size:12px;}
+.sl-w{display:flex;align-items:center;gap:10px;}
+.fsl{flex:1;-webkit-appearance:none;height:5px;border-radius:3px;background:var(--surface3);outline:none;cursor:pointer;}
+.fsl::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));cursor:pointer;box-shadow:0 2px 6px rgba(26,127,110,.35);}
+.sl-val{min-width:68px;text-align:right;font-family:'Space Mono',monospace;font-size:12px;color:var(--accent);font-weight:700;}
+
+/* BUTTON */
+.btn{padding:10px 20px;border-radius:var(--rs);border:none;cursor:pointer;font-family:'Noto Sans KR',sans-serif;font-size:13px;font-weight:700;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+.btn-pri{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 14px rgba(26,127,110,.28);}
+.btn-pri:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(26,127,110,.35);}
+.btn-sec{background:var(--surface2);color:var(--text2);border:1px solid var(--border);}
+.btn-sec:hover{border-color:var(--accent);color:var(--accent);background:#fff;}
+.btn-full{width:100%;justify-content:center;padding:14px;font-size:14px;}
+.btn-run{background:linear-gradient(135deg,#1a7f6e,#1565c0);color:#fff;width:100%;justify-content:center;padding:16px;font-size:15px;font-weight:800;border-radius:12px;box-shadow:0 6px 20px rgba(26,127,110,.35);letter-spacing:.5px;}
+.btn-run:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(26,127,110,.4);}
+.btn-run:active{transform:translateY(0);}
+
+/* STAT */
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);}
+.stat-num{font-family:'Space Mono',monospace;font-size:24px;font-weight:700;margin-bottom:2px;}
+.stat-label{font-size:11px;color:var(--text3);font-weight:500;}
+
+/* PROGRESS */
+.prog-wrap{margin-top:10px;}
+.prog-label{display:flex;justify-content:space-between;font-size:12px;color:var(--text3);margin-bottom:5px;font-weight:500;}
+.prog-bar{height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .8s ease;}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,#e8f5f1 0%,#e3eefa 60%,#f3e5f5 100%);border-radius:20px;padding:44px 38px;margin-bottom:26px;border:1px solid var(--border);}
+.hero-title{font-size:34px;font-weight:900;line-height:1.2;margin-bottom:11px;}
+.hero-title span{background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.hero-desc{font-size:14px;color:var(--text2);max-width:560px;line-height:1.75;margin-bottom:22px;}
+.hero-stats{display:flex;gap:36px;flex-wrap:wrap;}
+.hero-stat-num{font-family:'Space Mono',monospace;font-size:26px;font-weight:700;color:var(--accent);}
+.hero-stat-label{font-size:10px;color:var(--text3);margin-top:2px;}
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;}
+.feat-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--r);padding:20px;cursor:pointer;transition:all .25s;}
+.feat-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:var(--sh-lg);}
+.feat-icon{font-size:24px;margin-bottom:9px;}
+.feat-title{font-size:14px;font-weight:700;margin-bottom:5px;}
+.feat-desc{font-size:12px;color:var(--text3);line-height:1.6;}
+
+/* MAP */
+#mapContainer{border-radius:var(--r);overflow:hidden;border:1px solid var(--border);position:relative;}
+.map-search-bar{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:10;background:#fff;border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,.18);display:flex;align-items:center;gap:8px;padding:8px 16px;width:380px;}
+.map-search-bar input{border:none;outline:none;font-size:13px;font-family:'Noto Sans KR',sans-serif;flex:1;color:var(--text);}
+.map-search-bar button{background:var(--accent);color:#fff;border:none;border-radius:16px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:600;}
+.map-pin-info{position:absolute;bottom:12px;left:12px;background:#fff;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.18);padding:12px 16px;font-size:12px;min-width:200px;z-index:10;}
+.map-pin-info .pin-name{font-weight:700;font-size:13px;margin-bottom:4px;}
+.map-pin-info .pin-coords{color:var(--text3);font-family:'Space Mono',monospace;font-size:11px;}
+.map-pin-info .pin-zone{margin-top:6px;display:inline-block;background:var(--accent-l);color:var(--accent);border-radius:8px;padding:2px 10px;font-size:11px;font-weight:700;}
+
+/* RESULT SECTION */
+.result-section{margin-top:20px;animation:fadeIn .4s ease;}
+.result-hero{background:linear-gradient(135deg,var(--accent-l),var(--accent2-l));border:2px solid var(--accent);border-radius:16px;padding:20px 24px;margin-bottom:18px;display:flex;align-items:center;gap:20px;}
+.result-grade-circle{width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;color:#fff;}
+.rgc-grade{font-size:24px;font-weight:900;}
+.rgc-label{font-size:9px;opacity:.85;letter-spacing:.5px;}
+.result-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:18px;}
+.rkpi{background:var(--surface2);border-radius:11px;padding:13px;text-align:center;border:1px solid var(--border);}
+.rkpi-val{font-family:'Space Mono',monospace;font-size:19px;font-weight:700;}
+.rkpi-unit{font-size:9px;color:var(--text3);margin-top:1px;}
+.rkpi-lbl{font-size:11px;color:var(--text2);margin-top:4px;font-weight:500;}
+
+/* SEASON TABS */
+.season-tabs{display:flex;gap:7px;margin-bottom:18px;flex-wrap:wrap;}
+.s-btn{padding:8px 18px;border-radius:22px;border:1.5px solid var(--border);background:var(--surface);color:var(--text3);cursor:pointer;font-size:12px;font-weight:600;transition:all .2s;}
+.s-btn:hover{border-color:var(--accent);color:var(--accent);}
+.s-btn.active.all{background:var(--accent-l);border-color:var(--accent);color:var(--accent);}
+.s-btn.active.spring{background:#fff8f0;border-color:#f59e0b;color:#92400e;}
+.s-btn.active.summer{background:#fef2f2;border-color:#ef4444;color:#991b1b;}
+.s-btn.active.fall{background:#fff7ed;border-color:#f97316;color:#9a3412;}
+.s-btn.active.winter{background:#eff6ff;border-color:#3b82f6;color:#1e40af;}
+
+/* CERT */
+.cert-item{padding:13px 15px;border-radius:var(--rs);display:flex;align-items:center;gap:11px;border:1.5px solid transparent;margin-bottom:7px;}
+.cert-item.pass{background:var(--green-l);border-color:#a5d6a7;}
+.cert-item.fail{background:#fef2f2;border-color:#fca5a5;}
+.cert-icon{font-size:19px;}
+.cert-name{font-size:13px;font-weight:700;}
+.cert-status{font-size:11px;margin-top:2px;}
+.cert-item.pass .cert-status{color:var(--green);font-weight:600;}
+.cert-item.fail .cert-status{color:var(--accent3);font-weight:600;}
+
+/* GRADE BADGE */
+.gb{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.gb-1{background:var(--accent-l);color:var(--accent);}
+.gb-2{background:var(--accent2-l);color:var(--accent2);}
+.gb-3{background:var(--yellow-l);color:var(--yellow);}
+.gb-4{background:var(--accent3-l);color:var(--accent3);}
+
+/* TAG */
+.tag{display:inline-block;padding:2px 9px;border-radius:11px;font-size:10px;font-weight:700;}
+.tag-g{background:var(--green-l);color:var(--green);}
+.tag-b{background:var(--accent2-l);color:var(--accent2);}
+.tag-o{background:var(--yellow-l);color:var(--yellow);}
+
+/* DB TABLE */
+.dbt{width:100%;border-collapse:collapse;}
+.dbt th{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);padding:9px 11px;text-align:left;border-bottom:2px solid var(--border);font-weight:700;background:var(--surface2);}
+.dbt td{padding:10px 11px;font-size:12px;border-bottom:1px solid var(--border);}
+.dbt tr:hover td{background:var(--accent-l);}
+
+/* CHAT */
+.chat-wrap{display:flex;flex-direction:column;height:520px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh);}
+.chat-msgs{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:13px;background:var(--bg);}
+.msg{display:flex;gap:9px;animation:fadeIn .3s ease;}
+.msg.user{flex-direction:row-reverse;}
+.msg-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.msg.ai .msg-av{background:linear-gradient(135deg,var(--accent),var(--accent2));}
+.msg.user .msg-av{background:linear-gradient(135deg,var(--accent4),var(--accent2));}
+.msg-bub{max-width:78%;padding:11px 15px;border-radius:13px;font-size:13px;line-height:1.65;}
+.msg.ai .msg-bub{background:#fff;border:1px solid var(--border);border-radius:4px 13px 13px 13px;}
+.msg.user .msg-bub{background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:13px 4px 13px 13px;color:#fff;}
+.chat-inp-wrap{padding:13px 16px;border-top:1px solid var(--border);display:flex;gap:9px;background:#fff;}
+.chat-inp{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;resize:none;min-height:42px;max-height:88px;}
+.chat-inp:focus{border-color:var(--accent);background:#fff;}
+.chat-send{width:42px;height:42px;border-radius:10px;border:none;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;}
+.api-bar{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;gap:9px;background:#fafbfe;}
+.api-inp{flex:1;background:#fff;border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-size:11px;font-family:'Space Mono',monospace;outline:none;}
+.api-btn{padding:8px 14px;border-radius:7px;border:1px solid #ce93d8;cursor:pointer;background:var(--accent4-l);color:var(--accent4);font-size:12px;font-weight:700;}
+.typing{display:flex;gap:4px;align-items:center;padding:12px 15px;}
+.td{width:7px;height:7px;border-radius:50%;background:var(--text3);animation:tdp 1.2s infinite;}
+.td:nth-child(2){animation-delay:.2s;}.td:nth-child(3){animation-delay:.4s;}
+@keyframes tdp{0%,60%,100%{opacity:.3;transform:scale(.8)}30%{opacity:1;transform:scale(1)}}
+
+/* SCENARIO EXPLORER */
+.scenario-wrap{display:flex;flex-direction:column;gap:0;}
+.scenario-header{background:linear-gradient(135deg,var(--accent2-l),var(--accent4-l));border:1.5px solid var(--accent2);border-radius:14px;padding:18px 22px;margin-bottom:18px;}
+.scenario-title{font-size:15px;font-weight:800;color:var(--accent2);margin-bottom:4px;}
+.scenario-desc{font-size:12px;color:var(--text3);}
+.preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;}
+.preset-card{background:#fff;border:2px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;text-align:center;}
+.preset-card:hover,.preset-card.active{border-color:var(--accent2);background:var(--accent2-l);transform:translateY(-2px);}
+.preset-icon{font-size:26px;margin-bottom:6px;}
+.preset-name{font-size:12px;font-weight:700;color:var(--text);}
+.preset-desc{font-size:11px;color:var(--text3);margin-top:3px;}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:16px 0;}
+
+/* TOOLTIP */
+[data-tip]{position:relative;cursor:help;}
+[data-tip]::after{content:attr(data-tip);position:absolute;bottom:calc(100%+6px);left:50%;transform:translateX(-50%);background:#1a2033;color:#fff;font-size:11px;padding:5px 10px;border-radius:7px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s;z-index:999;}
+[data-tip]:hover::after{opacity:1;}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  .g2,.g3,.g4{grid-template-columns:1fr;}
+  .feat-grid{grid-template-columns:1fr 1fr;}
+  .result-kpis{grid-template-columns:1fr 1fr;}
+  .map-search-bar{width:90%;}
+}
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="loader-ring"></div>
+  <div style="font-size:14px;color:var(--text3);font-weight:600;">ThermoAI 2.0 초기화 중...</div>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🏗️</div>
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="logo-text">ThermoAI</span>
+        <span class="logo-ver">v2.0</span>
+      </div>
+      <div style="font-size:9px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;">건물 단열 에너지 예측 시스템</div>
+    </div>
+  </div>
+  <span class="hdr-badge">🇰🇷 대한민국 전국 지원</span>
+</header>
+
+<div class="nav-wrap">
+  <div class="nav-tabs" id="navTabs">
+    <div class="nav-tab active" onclick="showPage(0)" data-page="0">🏠 홈</div>
+    <div class="nav-tab" onclick="showPage(1)" data-page="1">🔬 단열 시뮬레이터</div>
+    <div class="nav-tab" onclick="showPage(2)" data-page="2">🌿 시나리오 탐색기</div>
+    <div class="nav-tab" onclick="showPage(3)" data-page="3">🗂️ 단열재 데이터베이스</div>
+    <div class="nav-tab" onclick="showPage(4)" data-page="4">🤖 AI 전문가 상담</div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ══ PAGE 0: HOME ══ -->
+<div class="page active" id="page-0">
+  <div class="hero">
+    <div class="hero-title">🏗️ <span>AI 단열 설계 시스템</span><br>대한민국 전국 어디서나</div>
+    <div class="hero-desc">전국 주요 도시·지역을 드롭다운으로 선택하면 기후구역과 HDD가 자동 반영됩니다. 건물 정보·단열 부위를 한번에 설정하면 버튼 클릭 하나로 계절별 성능·경제성·탄소절감·친환경 인증까지 모든 분석이 한 번에 나옵니다.</div>
+    <div class="hero-stats">
+      <div><div class="hero-stat-num">30+</div><div class="hero-stat-label">단열재 데이터베이스</div></div>
+      <div><div class="hero-stat-num">6가지</div><div class="hero-stat-label">친환경 인증 자동 체크</div></div>
+      <div><div class="hero-stat-num">AI</div><div class="hero-stat-label">Gemini 전문가 상담</div></div>
+      <div><div class="hero-stat-num">전국</div><div class="hero-stat-label">주요 위치 선택</div></div>
+    </div>
+  </div>
+  <div class="feat-grid">
+    <div class="feat-card" onclick="showPage(1)">
+      <div class="feat-icon">🔬</div>
+      <div class="feat-title">단열 시뮬레이터</div>
+      <div class="feat-desc">건물 정보 입력 → 버튼 하나로 계절별 성능, 경제성, 탄소절감, 인증 모두 분석</div>
+    </div>
+    <div class="feat-card" onclick="showPage(2)">
+      <div class="feat-icon">🎮</div>
+      <div class="feat-title">시나리오 탐색기</div>
+      <div class="feat-desc">다양한 건물 유형·단열재 조합을 눌러보며 에너지 성능 변화를 인터랙티브하게 탐색</div>
+    </div>
+    <div class="feat-card" onclick="showPage(3)">
+      <div class="feat-icon">🗂️</div>
+      <div class="feat-title">단열재 데이터베이스</div>
+      <div class="feat-desc">국내 유통 단열재 30종의 열전도율·등급·가격·적용부위 정보 검색</div>
+    </div>
+    <div class="feat-card" onclick="showPage(4)">
+      <div class="feat-icon">🤖</div>
+      <div class="feat-title">AI 전문가 상담</div>
+      <div class="feat-desc">Gemini AI에게 단열재 선택, 열교, 패시브하우스, 인증 전략 등 전문 질문</div>
+    </div>
+    <div class="feat-card" onclick="showPage(1)">
+      <div class="feat-icon">📍</div>
+      <div class="feat-title">전국 위치 선택</div>
+      <div class="feat-desc">서울·부산·제주 등 대한민국 주요 도시를 선택하면 기후구역·HDD가 자동 반영됩니다</div>
+    </div>
+    <div class="feat-card" onclick="showPage(2)">
+      <div class="feat-icon">📊</div>
+      <div class="feat-title">에너지·탄소 계산기</div>
+      <div class="feat-desc">두께·면적·에너지 단가를 조절하며 CO₂ 절감량과 ROI를 실시간으로 계산</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE 1: SIMULATOR ══ -->
+<div class="page" id="page-1">
+  <div class="sec-head">
+    <div class="sec-title">🔬 단열 시뮬레이터</div>
+    <div class="sec-desc">건물 정보와 단열 부위를 설정하고 <strong>「결과 분석 실행」</strong> 버튼 하나만 클릭하세요. 계절별 성능·경제성·탄소·인증이 한꺼번에 도출됩니다.</div>
+  </div>
+
+  <div class="g2" style="align-items:start;gap:20px;">
+    <!-- LEFT: INPUT -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- 건물 기본 정보 -->
+      <div class="card">
+        <div class="card-title">🏢 1단계 · 건물 기본 정보</div>
+        <div class="fg" style="margin-bottom:14px;">
+          <label class="fl">📍 건물 위치 (단열 지역 자동 적용)</label>
+          <div class="sel-w"><select class="fsel" id="locationSelect" onchange="onLocationChange()">
+            <optgroup label="서울특별시">
+              <option value="central|서울특별시 (중부2)" selected>서울특별시</option>
+            </optgroup>
+            <optgroup label="경기도 / 인천">
+              <option value="central|인천광역시 (중부2)">인천광역시</option>
+              <option value="central|수원시 (중부2)">수원시 (경기남부)</option>
+              <option value="central|성남시 (중부2)">성남시·분당</option>
+              <option value="central|고양시 (중부2)">고양시·일산</option>
+              <option value="central|용인시 (중부2)">용인시</option>
+              <option value="north|의정부시 (중부1)">의정부시 (경기북부)</option>
+              <option value="north|동두천시 (중부1)">동두천시 (경기북부)</option>
+            </optgroup>
+            <optgroup label="강원도">
+              <option value="north|춘천시 (중부1)">춘천시</option>
+              <option value="north|원주시 (중부1)">원주시</option>
+              <option value="north|강릉시 (중부2-해안)">강릉시 (해안)</option>
+              <option value="north|속초시 (중부1)">속초시</option>
+            </optgroup>
+            <optgroup label="충청도">
+              <option value="central|대전광역시 (중부2)">대전광역시</option>
+              <option value="central|세종특별자치시 (중부2)">세종특별자치시</option>
+              <option value="central|청주시 (중부2)">청주시 (충북)</option>
+              <option value="central|천안시 (중부2)">천안시 (충남)</option>
+            </optgroup>
+            <optgroup label="경상도">
+              <option value="south|부산광역시 (남부)">부산광역시</option>
+              <option value="south|대구광역시 (남부)">대구광역시</option>
+              <option value="south|울산광역시 (남부)">울산광역시</option>
+              <option value="south|창원시 (남부)">창원시 (경남)</option>
+              <option value="south|포항시 (남부)">포항시 (경북)</option>
+            </optgroup>
+            <optgroup label="전라도">
+              <option value="south|광주광역시 (남부)">광주광역시</option>
+              <option value="south|전주시 (남부)">전주시 (전북)</option>
+              <option value="south|목포시 (남부)">목포시 (전남)</option>
+              <option value="south|여수시 (남부)">여수시 (전남)</option>
+            </optgroup>
+            <optgroup label="제주특별자치도">
+              <option value="jeju|제주시 (제주)">제주시</option>
+              <option value="jeju|서귀포시 (제주)">서귀포시</option>
+            </optgroup>
+          </select></div>
+          <div id="locationInfo" style="margin-top:8px;padding:8px 12px;background:var(--accent-l);border-radius:var(--rs);font-size:12px;display:flex;gap:16px;border:1px solid var(--border-a);">
+            <span>📍 위치: <strong id="locName" style="color:var(--text);">서울특별시</strong></span>
+            <span>단열지역: <strong id="locZone" style="color:var(--accent);">중부2</strong></span>
+            <span>HDD: <strong id="locHDD" style="font-family:'Space Mono',monospace;color:var(--accent2);">2800</strong></span>
+          </div>
+        </div>
+        <div class="g2">
+          <div class="fg">
+            <label class="fl">건물 용도</label>
+            <div class="sel-w"><select class="fsel" id="bldUse">
+              <option value="apartment">공동주택 (아파트·연립)</option>
+              <option value="residential">단독주택</option>
+              <option value="office">업무시설 (오피스)</option>
+              <option value="commercial">판매시설 (쇼핑몰·상가)</option>
+              <option value="school">교육시설 (학교·학원)</option>
+              <option value="hospital">의료시설 (병원·의원)</option>
+              <option value="hotel">숙박시설 (호텔·모텔)</option>
+              <option value="factory">공장·창고</option>
+            </select></div>
+          </div>
+          <div class="fg">
+            <label class="fl">건축 연도</label>
+            <div class="sel-w"><select class="fsel" id="bldYear">
+              <option value="2023">2023년 이후 (최신 기준)</option>
+              <option value="2020">2020~2022년</option>
+              <option value="2015">2015~2019년</option>
+              <option value="2010">2010~2014년</option>
+              <option value="2000">2000~2009년</option>
+              <option value="old">2000년 이전</option>
+            </select></div>
+          </div>
+          <div class="fg">
+            <label class="fl">연면적 (m²)</label>
+            <div class="sl-w">
+              <input type="range" class="fsl" id="bldArea" min="50" max="5000" value="300" step="50" oninput="sv('bldArea','bldAreaV','m²')">
+              <div class="sl-val" id="bldAreaV">300 m²</div>
+            </div>
+          </div>
+          <div class="fg">
+            <label class="fl">지상 층수</label>
+            <div class="sel-w"><select class="fsel" id="bldFloors">
+              <option value="1">1층 (단층)</option>
+              <option value="3" selected>3층 이하</option>
+              <option value="5">4~5층</option>
+              <option value="10">6~10층</option>
+              <option value="20">11~20층</option>
+              <option value="30">21층 이상</option>
+            </select></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 단열 부위 설정 -->
+      <div class="card">
+        <div class="card-title">🧱 2단계 · 단열 부위 설정</div>
+
+        <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;">외벽</div>
+        <div class="g2">
+          <div class="fg">
+            <label class="fl">단열재 종류</label>
+            <div class="sel-w"><select class="fsel" id="wallMat">
+              <option value="eps">EPS 비드법 1종 (λ=0.031)</option>
+              <option value="xps">XPS 압출법 (λ=0.028)</option>
+              <option value="pu">경질우레탄폼 (λ=0.024)</option>
+              <option value="glass">유리면 (λ=0.036)</option>
+              <option value="rock">암면 (λ=0.036)</option>
+              <option value="aero">에어로젤 (λ=0.015)</option>
+              <option value="phenol">페놀폼 (λ=0.020)</option>
+            </select></div>
+          </div>
+          <div class="fg">
+            <label class="fl">두께 (mm)</label>
+            <div class="sl-w">
+              <input type="range" class="fsl" id="wallThick" min="30" max="300" value="120" step="10" oninput="sv('wallThick','wallThickV','mm')">
+              <div class="sl-val" id="wallThickV">120 mm</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.8px;margin:10px 0;">지붕 / 최상층 바닥</div>
+        <div class="g2">
+          <div class="fg">
+            <label class="fl">단열재 종류</label>
+            <div class="sel-w"><select class="fsel" id="roofMat">
+              <option value="pu">경질우레탄폼 (λ=0.024)</option>
+              <option value="eps">EPS 비드법 1종 (λ=0.031)</option>
+              <option value="xps">XPS 압출법 (λ=0.028)</option>
+              <option value="rock">암면 (λ=0.036)</option>
+              <option value="aero">에어로젤 (λ=0.015)</option>
+            </select></div>
+          </div>
+          <div class="fg">
+            <label class="fl">두께 (mm)</label>
+            <div class="sl-w">
+              <input type="range" class="fsl" id="roofThick" min="50" max="400" value="200" step="10" oninput="sv('roofThick','roofThickV','mm')">
+              <div class="sl-val" id="roofThickV">200 mm</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;font-weight:700;color:var(--accent3);text-transform:uppercase;letter-spacing:.8px;margin:10px 0;">최하층 바닥</div>
+        <div class="g2">
+          <div class="fg">
+            <label class="fl">단열재 종류</label>
+            <div class="sel-w"><select class="fsel" id="floorMat">
+              <option value="xps">XPS 압출법 (λ=0.028)</option>
+              <option value="eps">EPS 비드법 1종 (λ=0.031)</option>
+              <option value="pu">경질우레탄폼 (λ=0.024)</option>
+            </select></div>
+          </div>
+          <div class="fg">
+            <label class="fl">두께 (mm)</label>
+            <div class="sl-w">
+              <input type="range" class="fsl" id="floorThick" min="30" max="200" value="80" step="10" oninput="sv('floorThick','floorThickV','mm')">
+              <div class="sl-val" id="floorThickV">80 mm</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;font-weight:700;color:var(--accent4);text-transform:uppercase;letter-spacing:.8px;margin:10px 0;">창호</div>
+        <div class="fg">
+          <div class="sel-w"><select class="fsel" id="windowType">
+            <option value="triple">삼중 로이유리 (U=0.8 W/m²K)</option>
+            <option value="double_low">이중 로이유리 (U=1.4 W/m²K)</option>
+            <option value="double" selected>이중유리 (U=2.1 W/m²K)</option>
+            <option value="single">단창 (U=5.8 W/m²K)</option>
+          </select></div>
+        </div>
+
+        <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.8px;margin:10px 0;">경제성 분석 기준</div>
+        <div class="g2">
+          <div class="fg">
+            <label class="fl">현재 연간 에너지 비용 (만원)</label>
+            <div class="sl-w">
+              <input type="range" class="fsl" id="enrgCost" min="50" max="5000" value="500" step="50" oninput="sv('enrgCost','enrgCostV','만원')">
+              <div class="sl-val" id="enrgCostV">500 만원</div>
+            </div>
+          </div>
+          <div class="fg">
+            <label class="fl">에너지 물가 상승률 (%/년)</label>
+            <div class="sl-w">
+              <input type="range" class="fsl" id="inflation" min="1" max="8" value="3" step="0.5" oninput="sv('inflation','inflationV','%')">
+              <div class="sl-val" id="inflationV">3.0 %</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RUN BUTTON -->
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn btn-run" onclick="runFullAnalysis()">
+          🚀 결과 분석 실행 — 계절별 성능 · 경제성 · 탄소절감 · 인증 한번에 도출
+        </button>
+        <button class="btn btn-sec btn-full" id="pdfBtn" onclick="exportPDF()" style="display:none;">
+          📄 결과 PDF로 저장
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT: RESULTS -->
+    <div id="simResults">
+      <div style="text-align:center;padding:80px 20px;background:var(--surface);border-radius:var(--r);border:2px dashed var(--border);">
+        <div style="font-size:64px;margin-bottom:16px;">📊</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text2);margin-bottom:6px;">분석 대기 중</div>
+        <div style="font-size:13px;color:var(--text3);">왼쪽에서 건물 정보와 단열 조건을 설정한 후<br>「결과 분석 실행」 버튼을 클릭하세요</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE 2: SCENARIO EXPLORER ══ -->
+<div class="page" id="page-2">
+  <div class="sec-head">
+    <div class="sec-title">🎮 시나리오 탐색기</div>
+    <div class="sec-desc">건물 유형, 단열재, 조건 프리셋을 눌러보며 에너지 성능 변화를 실시간으로 탐색하세요. 비교·학습·아이디어 발굴에 최적화된 인터랙티브 도구입니다.</div>
+  </div>
+
+  <div class="scenario-header">
+    <div class="scenario-title">💡 사용 방법</div>
+    <div class="scenario-desc">아래 프리셋 중 하나를 선택하거나, 슬라이더와 드롭다운을 직접 조작해 조건을 바꿔보세요. 변경할 때마다 차트와 지표가 실시간으로 갱신됩니다.</div>
+  </div>
+
+  <!-- 프리셋 -->
+  <div class="preset-grid" id="presetGrid">
+    <div class="preset-card active" onclick="applyPreset('passive')" id="preset-passive">
+      <div class="preset-icon">🏡</div>
+      <div class="preset-name">패시브하우스 수준</div>
+      <div class="preset-desc">최고 성능·최두꺼운 단열</div>
+    </div>
+    <div class="preset-card" onclick="applyPreset('standard')" id="preset-standard">
+      <div class="preset-icon">🏢</div>
+      <div class="preset-name">현행 법적 기준</div>
+      <div class="preset-desc">2023년 에너지절약 기준</div>
+    </div>
+    <div class="preset-card" onclick="applyPreset('old')" id="preset-old">
+      <div class="preset-icon">🏚️</div>
+      <div class="preset-name">구형 건물 (2000년 이전)</div>
+      <div class="preset-desc">단열 취약 · 에너지 낭비</div>
+    </div>
+    <div class="preset-card" onclick="applyPreset('hospital')" id="preset-hospital">
+      <div class="preset-icon">🏥</div>
+      <div class="preset-name">의료시설 최적화</div>
+      <div class="preset-desc">24시간 운영·높은 에너지 절감</div>
+    </div>
+    <div class="preset-card" onclick="applyPreset('school')" id="preset-school">
+      <div class="preset-icon">🏫</div>
+      <div class="preset-name">교육시설 표준</div>
+      <div class="preset-desc">학교·학원 권장 사양</div>
+    </div>
+    <div class="preset-card" onclick="applyPreset('zero')" id="preset-zero">
+      <div class="preset-icon">⚡</div>
+      <div class="preset-name">제로에너지건축</div>
+      <div class="preset-desc">에어로젤·삼중유리·태양광</div>
+    </div>
+  </div>
+
+  <div class="g2" style="align-items:start;">
+    <div>
+      <div class="card">
+        <div class="card-title">⚙️ 조건 설정</div>
+        <div class="fg">
+          <label class="fl">건물 용도</label>
+          <div class="sel-w"><select class="fsel" id="scBldUse" onchange="updateScenario()">
+            <option value="apartment">공동주택</option>
+            <option value="residential">단독주택</option>
+            <option value="office">업무시설</option>
+            <option value="hospital">의료시설</option>
+            <option value="school">교육시설</option>
+            <option value="commercial">판매시설</option>
+            <option value="factory">공장·창고</option>
+          </select></div>
+        </div>
+        <div class="fg">
+          <label class="fl">외벽 단열재</label>
+          <div class="sel-w"><select class="fsel" id="scWallMat" onchange="updateScenario()">
+            <option value="eps">EPS 비드법 (λ=0.031)</option>
+            <option value="xps">XPS 압출법 (λ=0.028)</option>
+            <option value="pu">경질우레탄폼 (λ=0.024)</option>
+            <option value="glass">유리면 (λ=0.036)</option>
+            <option value="rock">암면 (λ=0.036)</option>
+            <option value="aero">에어로젤 (λ=0.015)</option>
+            <option value="phenol">페놀폼 (λ=0.020)</option>
+          </select></div>
+        </div>
+        <div class="fg">
+          <label class="fl">외벽 두께 <span id="scThickLbl">120mm</span></label>
+          <input type="range" class="fsl" id="scThick" min="30" max="300" value="120" step="10" oninput="document.getElementById('scThickLbl').textContent=this.value+'mm';updateScenario()" style="width:100%;">
+        </div>
+        <div class="fg">
+          <label class="fl">창호 종류</label>
+          <div class="sel-w"><select class="fsel" id="scWindow" onchange="updateScenario()">
+            <option value="triple">삼중 로이유리 (U=0.8)</option>
+            <option value="double_low">이중 로이유리 (U=1.4)</option>
+            <option value="double" selected>이중유리 (U=2.1)</option>
+            <option value="single">단창 (U=5.8)</option>
+          </select></div>
+        </div>
+        <div class="fg">
+          <label class="fl">건물 연면적 <span id="scAreaLbl">300m²</span></label>
+          <input type="range" class="fsl" id="scArea" min="50" max="5000" value="300" step="50" oninput="document.getElementById('scAreaLbl').textContent=this.value+'m²';updateScenario()" style="width:100%;">
+        </div>
+        <div class="fg">
+          <label class="fl">지역 기후 구분</label>
+          <div class="sel-w"><select class="fsel" id="scClimate" onchange="updateScenario()">
+            <option value="north">북부 (중부1 — 강원·경기북부, HDD≈3200)</option>
+            <option value="central" selected>중부 (중부2 — 서울·경기, HDD≈2800)</option>
+            <option value="south">남부 (남부 — 부산·광주, HDD≈2000)</option>
+            <option value="jeju">제주 (제주, HDD≈1200)</option>
+          </select></div>
+        </div>
+      </div>
+
+      <!-- 단열재별 즉석 비교 -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">📊 단열재별 U값 즉석 비교</div>
+        <canvas id="scMatChart" style="max-height:230px;"></canvas>
+      </div>
+    </div>
+
+    <div>
+      <!-- KPI 지표 -->
+      <div class="result-kpis" id="scKPIs">
+        <div class="rkpi"><div class="rkpi-val" id="sc_u" style="color:var(--accent2);">—</div><div class="rkpi-unit">W/m²K</div><div class="rkpi-lbl">외벽 열관류율</div></div>
+        <div class="rkpi"><div class="rkpi-val" id="sc_energy" style="color:var(--accent);">—</div><div class="rkpi-unit">kWh/yr</div><div class="rkpi-lbl">연간 절감 에너지</div></div>
+        <div class="rkpi"><div class="rkpi-val" id="sc_cost" style="color:var(--yellow);">—</div><div class="rkpi-unit">만원/년</div><div class="rkpi-lbl">비용 절감 예상</div></div>
+        <div class="rkpi"><div class="rkpi-val" id="sc_co2" style="color:var(--green);">—</div><div class="rkpi-unit">tCO₂/yr</div><div class="rkpi-lbl">탄소 절감량</div></div>
+      </div>
+
+      <!-- 에너지 차트 -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">📈 월별 에너지 소비 패턴</div>
+        <canvas id="scMonthChart" style="max-height:240px;"></canvas>
+      </div>
+
+      <!-- 투자 회수 차트 -->
+      <div class="card">
+        <div class="card-title">💰 투자 회수 타임라인 (20년)</div>
+        <canvas id="scRoiChart" style="max-height:200px;"></canvas>
+        <div style="margin-top:12px;padding:10px 14px;background:var(--surface2);border-radius:var(--rs);font-size:12px;display:flex;gap:24px;">
+          <span>투자비: <strong id="sc_invest" style="color:var(--accent3);">—</strong> 만원</span>
+          <span>회수기간: <strong id="sc_payback" style="color:var(--accent2);">—</strong> 년</span>
+          <span>20년 절감: <strong id="sc_20yr" style="color:var(--green);">—</strong> 만원</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CO2 계산기 -->
+  <div class="card" style="margin-top:18px;">
+    <div class="card-title">🌿 CO₂ 절감 계산기 · 단열재별 비교</div>
+    <div class="g2">
+      <div>
+        <canvas id="scCo2Chart" style="max-height:250px;"></canvas>
+      </div>
+      <div>
+        <div style="padding:16px;background:var(--green-l);border-radius:12px;border:1.5px solid #a5d6a7;margin-bottom:12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;">🌲 탄소 상쇄 환산</div>
+          <div class="g2" style="gap:10px;">
+            <div style="text-align:center;background:#fff;border-radius:9px;padding:10px;">
+              <div style="font-size:22px;font-weight:900;color:var(--green);" id="sc_trees">—</div>
+              <div style="font-size:11px;color:var(--text3);">소나무 그루 (30년생)</div>
+            </div>
+            <div style="text-align:center;background:#fff;border-radius:9px;padding:10px;">
+              <div style="font-size:22px;font-weight:900;color:var(--accent2);" id="sc_cars">—</div>
+              <div style="font-size:11px;color:var(--text3);">자동차 1대 연간 배출량</div>
+            </div>
+          </div>
+        </div>
+        <!-- 친환경 인증 -->
+        <div class="card-title">🏅 친환경 인증 적합성</div>
+        <div id="scCerts"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE 3: DATABASE ══ -->
+<div class="page" id="page-3">
+  <div class="sec-head">
+    <div class="sec-title">🗂️ 국내 단열재 데이터베이스</div>
+    <div class="sec-desc">KS L 9016 기준 국내 유통 단열재 데이터베이스 (30종)</div>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+    <button class="btn btn-sec" onclick="filterDB('all')">전체</button>
+    <button class="btn btn-sec" onclick="filterDB('foam')">발포 폼류</button>
+    <button class="btn btn-sec" onclick="filterDB('fiber')">섬유류</button>
+    <button class="btn btn-sec" onclick="filterDB('advanced')">고성능</button>
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:14px;">
+    <input type="text" class="finp" placeholder="🔍 제품명, 특징 검색..." id="dbSearch" oninput="filterDB('search')" style="max-width:300px;">
+  </div>
+  <div class="card">
+    <div style="overflow-x:auto;">
+      <table class="dbt">
+        <thead><tr>
+          <th>제품명</th><th>분류</th><th>열전도율 (W/mK)</th><th>밀도 (kg/m³)</th>
+          <th>KS 등급</th><th>가격 (만원/m²)</th><th>주요 적용부위</th><th>특징</th>
+        </tr></thead>
+        <tbody id="dbBody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px;">
+    <div class="card-title">📊 열전도율 비교 (낮을수록 단열 우수)</div>
+    <div style="position:relative;width:100%;min-height:420px;">
+      <canvas id="dbChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE 4: AI CHAT ══ -->
+<div class="page" id="page-4">
+  <div class="sec-head">
+    <div class="sec-title">🤖 Gemini AI 전문가 상담</div>
+    <div class="sec-desc">Google Gemini AI에게 단열, 에너지, 인증에 대해 전문적으로 질문하세요</div>
+  </div>
+  <div class="g2" style="align-items:start;">
+    <div>
+      <div class="chat-wrap">
+        <div class="api-bar">
+          <input type="password" class="api-inp" id="geminiKey" placeholder="Google Gemini API Key (aistudio.google.com에서 무료 발급)">
+          <button class="api-btn" onclick="saveKey()">🔑 설정</button>
+        </div>
+        <div class="chat-msgs" id="chatMsgs">
+          <div class="msg ai">
+            <div class="msg-av">🤖</div>
+            <div class="msg-bub">안녕하세요! 건축 단열 전문 AI입니다. 🏗️<br><br>단열재 선택·에너지기준·열교방지·친환경 인증 전략에 대해 전문적으로 답변합니다.<br><br><strong>Gemini API Key를 입력하시면 실제 AI와 대화할 수 있습니다!</strong></div>
+          </div>
+        </div>
+        <div class="chat-inp-wrap">
+          <textarea class="chat-inp" id="chatInp" placeholder="단열재, 에너지 절감, 시공 방법 등 무엇이든 질문하세요..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+          <button class="chat-send" onclick="sendChat()">➤</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-title">💡 추천 질문</div>
+        <div style="display:flex;flex-direction:column;gap:7px;" id="quickQs"></div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-title">📌 단열 지역 기준 빠른 참조</div>
+        <table class="dbt" style="font-size:11px;">
+          <thead><tr><th>지역 구분</th><th>해당 지역</th><th>외벽 U값 기준</th><th>지붕 U값</th></tr></thead>
+          <tbody>
+            <tr><td><strong>중부1</strong></td><td>강원(해안 제외)·경기북부</td><td>≤0.17</td><td>≤0.15</td></tr>
+            <tr><td><strong>중부2</strong></td><td>서울·경기·인천·충청·강원해안</td><td>≤0.24</td><td>≤0.15</td></tr>
+            <tr><td><strong>남부</strong></td><td>경상·전라·충남일부</td><td>≤0.32</td><td>≤0.18</td></tr>
+            <tr><td><strong>제주</strong></td><td>제주특별자치도</td><td>≤0.43</td><td>≤0.25</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<script>
+// ════════════════════════════
+// DATA
+// ════════════════════════════
+const MAT = {
+  eps:  {name:'EPS 비드법 1종',  lambda:0.031, price:2.8,  cat:'foam'},
+  xps:  {name:'XPS 압출법',       lambda:0.028, price:3.5,  cat:'foam'},
+  pu:   {name:'경질우레탄폼',     lambda:0.024, price:4.8,  cat:'foam'},
+  glass:{name:'유리면',           lambda:0.036, price:2.2,  cat:'fiber'},
+  rock: {name:'암면',             lambda:0.036, price:2.5,  cat:'fiber'},
+  aero: {name:'에어로젤 블랭킷',  lambda:0.015, price:15.0, cat:'advanced'},
+  phenol:{name:'페놀폼',          lambda:0.020, price:6.5,  cat:'advanced'},
+};
+const WIN = {triple:0.8, double_low:1.4, double:2.1, single:5.8};
+const CLIMATE = {
+  north:  {hdd:3200, cdd:200, name:'중부1 (강원·경기북부)', zone:'중부1', avgT:9.5},
+  central:{hdd:2800, cdd:350, name:'중부2 (서울·경기)', zone:'중부2', avgT:12.5},
+  south:  {hdd:2000, cdd:500, name:'남부 (부산·광주)', zone:'남부', avgT:14.8},
+  jeju:   {hdd:1200, cdd:700, name:'제주', zone:'제주', avgT:17.2},
+};
+const BLD_BASE_ENERGY = {
+  apartment:150, residential:180, office:220, commercial:280,
+  hospital:380, school:140, hotel:260, factory:100,
+};
+// CERTS_DEF: 인증별 기준 정의
+// uLimit: 외벽 열관류율 기준 (W/m²K)
+// eLimit: 에너지 원단위 기준 (kWh/m²yr) — 1차 에너지 소요량 기준 (난방+냉방+급탕+조명)
+// note: 세부 조건 안내
+const CERTS_DEF = [
+  {name:'에너지효율 1++ 등급', icon:'🥇', uLimit:0.15, eLimit:90,  note:'건축물 에너지효율등급 인증 최고등급. 외벽 U≤0.15, 1차에너지 ≤90 kWh/m²yr'},
+  {name:'에너지효율 1+ 등급',  icon:'🥈', uLimit:0.17, eLimit:140, note:'외벽 U≤0.17, 1차에너지 ≤140 kWh/m²yr'},
+  {name:'에너지효율 1 등급',   icon:'🥉', uLimit:0.22, eLimit:200, note:'외벽 U≤0.22, 1차에너지 ≤200 kWh/m²yr'},
+  {name:'G-SEED 최우수(그린1)',icon:'🌿', uLimit:0.17, eLimit:120, note:'녹색건축 인증 최우수. 에너지 성능 항목 만점 기준'},
+  {name:'LEED Platinum',        icon:'🏆', uLimit:0.20, eLimit:100, note:'LEED v4 Energy & Atmosphere 최고점수 기준 참고값'},
+  {name:'패시브하우스 (PHI)',   icon:'🏡', uLimit:0.15, eLimit:120, note:'PHI 인증: 외벽 U≤0.15, 난방에너지 ≤15 kWh/m²yr (여기서는 총 에너지 기준 완화 적용)'},
+];
+const INSULATION_DB = [
+  // ── 발포 폼류 ──
+  {name:'EPS 비드법 1종 1호',  lambda:0.031,density:'20~25',  grade:'1',price:2.8, cat:'foam',loc:'외벽·지붕',     desc:'가장 범용적인 단열재, 경량'},
+  {name:'EPS 비드법 1종 2호',  lambda:0.033,density:'15~20',  grade:'2',price:2.4, cat:'foam',loc:'외벽',           desc:'경제성 우수, 일반 외단열'},
+  {name:'EPS 비드법 2종',      lambda:0.035,density:'10~15',  grade:'3',price:1.9, cat:'foam',loc:'지붕·충전',      desc:'저밀도 저단가형'},
+  {name:'XPS 압출법 1호',      lambda:0.028,density:'25~35',  grade:'1',price:3.5, cat:'foam',loc:'바닥·지하',      desc:'흡수율≤0.3%, 압축강도 우수'},
+  {name:'XPS 압출법 2호',      lambda:0.030,density:'20~30',  grade:'2',price:3.0, cat:'foam',loc:'바닥·외벽',      desc:'지하·외부 노출 부위 적합'},
+  {name:'경질우레탄폼 1종 1호',lambda:0.024,density:'30~40',  grade:'1',price:4.8, cat:'foam',loc:'외벽·지붕',      desc:'고성능, 스프레이·패널 공법'},
+  {name:'경질우레탄폼 1종 2호',lambda:0.026,density:'25~35',  grade:'2',price:4.2, cat:'foam',loc:'외벽',           desc:'현장 발포형, 복잡한 형상 적합'},
+  {name:'경질우레탄폼 2종',    lambda:0.027,density:'20~30',  grade:'2',price:3.8, cat:'foam',loc:'지붕·파이프',     desc:'난연처리형, 화재 저항성 강화'},
+  {name:'비드법 그래파이트EPS', lambda:0.031,density:'18~22',  grade:'1',price:3.2, cat:'foam',loc:'외벽·지붕',     desc:'흑연 첨가 차열 기능, 회색 EPS'},
+  {name:'PIR 경질폴리이소시아뉴레이트',lambda:0.022,density:'30~45',grade:'1',price:5.5,cat:'foam',loc:'지붕·외벽', desc:'고성능 방화형, 산업용'},
+  {name:'팽창 폴리에틸렌폼(EPE)',lambda:0.040,density:'20~40', grade:'3',price:1.6, cat:'foam',loc:'충전·완충재',    desc:'유연성 우수, 완충·방진용'},
+  // ── 섬유류 ──
+  {name:'유리면 1호',           lambda:0.036,density:'32~64',  grade:'1',price:2.2, cat:'fiber',loc:'외벽·내벽',    desc:'불연재, 흡음 우수'},
+  {name:'유리면 2호',           lambda:0.038,density:'24~32',  grade:'2',price:1.9, cat:'fiber',loc:'내벽',          desc:'경량, 시공 용이'},
+  {name:'유리면 3호',           lambda:0.040,density:'16~24',  grade:'3',price:1.5, cat:'fiber',loc:'내벽·다락',     desc:'저밀도 경제형'},
+  {name:'암면(미네랄울) 1호',   lambda:0.036,density:'60~120', grade:'1',price:2.5, cat:'fiber',loc:'외벽·지붕',    desc:'불연재, 내열 800°C, 방화구획'},
+  {name:'암면(미네랄울) 2호',   lambda:0.038,density:'40~80',  grade:'2',price:2.1, cat:'fiber',loc:'내벽·지붕',    desc:'방화성능 우수, 흡음'},
+  {name:'셀룰로오스 단열재',    lambda:0.040,density:'40~80',  grade:'2',price:1.8, cat:'fiber',loc:'다락·내벽',     desc:'재활용 신문지, 친환경'},
+  {name:'양모 단열재',          lambda:0.038,density:'20~30',  grade:'2',price:3.5, cat:'fiber',loc:'내벽·지붕',     desc:'자연소재, 습기 조절 우수'},
+  {name:'삼(Hemp) 섬유 단열재', lambda:0.040,density:'25~40',  grade:'2',price:4.0, cat:'fiber',loc:'내벽',          desc:'식물성 친환경 소재'},
+  // ── 고성능·특수 ──
+  {name:'에어로젤 블랭킷',      lambda:0.015,density:'100~150',grade:'특수',price:15.0,cat:'advanced',loc:'외벽·배관',    desc:'초고성능, 두께 최소화, SiO₂ 나노'},
+  {name:'페놀폼 1종',           lambda:0.020,density:'30~50',  grade:'1',price:6.5, cat:'advanced',loc:'외벽·지붕', desc:'화재 안전성·고성능, 저발연'},
+  {name:'페놀폼 2종',           lambda:0.022,density:'25~40',  grade:'2',price:5.8, cat:'advanced',loc:'외벽',       desc:'준불연형, 가격 대비 우수'},
+  {name:'진공단열패널(VIP)',     lambda:0.008,density:'200~250',grade:'특수',price:45.0,cat:'advanced',loc:'고단열 특수부위',desc:'초박형 고성능, 냉장창고·외단열'},
+  {name:'반사형 단열재(알루미늄)',lambda:0.050,density:'3~5',   grade:'3',price:2.0, cat:'advanced',loc:'다락·지붕',  desc:'복사열 차단 주목적, 공기층 필요'},
+  {name:'에어로젤 보드',        lambda:0.018,density:'150~200',grade:'특수',price:22.0,cat:'advanced',loc:'외벽 리모델링',desc:'고성능 보드형 에어로젤'},
+  {name:'탄화코르크 보드',      lambda:0.042,density:'100~200',grade:'2',price:5.0, cat:'advanced',loc:'외벽·지붕', desc:'천연 소재, 방수·방균 우수'},
+  {name:'발포유리(포아글라스)', lambda:0.045,density:'100~150',grade:'2',price:7.0, cat:'advanced',loc:'지하·외벽', desc:'무기질 불연, 내수성 완전'},
+  {name:'팽창 퍼라이트',        lambda:0.045,density:'50~100', grade:'3',price:1.5, cat:'foam',    loc:'충전용',     desc:'무기질 불연재, 고온 적용'},
+  {name:'폴리이미드폼(PI폼)',   lambda:0.021,density:'20~35',  grade:'1',price:12.0,cat:'advanced',loc:'항공·초고온', desc:'극한온도(-269~300°C) 적용'},
+  {name:'스프레이 경질우레탄',  lambda:0.025,density:'25~35',  grade:'1',price:5.2, cat:'foam',    loc:'복잡부위·리모델링',desc:'현장 직접 발포, 기밀성 우수'},
+];
+
+const QUICK_QUESTIONS = [
+  '중부1지역 공동주택 외벽 단열재 최소 두께 기준은?',
+  'EPS와 XPS 단열재의 장단점을 비교해주세요.',
+  '열교(thermal bridge)가 발생하는 주요 위치와 해결 방법은?',
+  'G-SEED 최우수 등급 취득 조건을 알려주세요.',
+  '결로 방지를 위한 단열 설계 방법을 알려주세요.',
+  '의료시설(병원)의 단열 설계 시 주의사항은?',
+  '패시브하우스 인증 기준과 일반 건물의 차이는?',
+  '에어로젤 단열재의 특성과 비용 대비 효과는?',
+];
+
+const PRESETS = {
+  passive:  {wallMat:'pu',   wallThick:200, window:'triple',    area:300, bldUse:'apartment', climate:'central'},
+  standard: {wallMat:'eps',  wallThick:120, window:'double_low',area:300, bldUse:'apartment', climate:'central'},
+  old:      {wallMat:'glass',wallThick:50,  window:'single',    area:300, bldUse:'residential',climate:'central'},
+  hospital: {wallMat:'xps',  wallThick:160, window:'double_low',area:2000,bldUse:'hospital',  climate:'central'},
+  school:   {wallMat:'eps',  wallThick:130, window:'double_low',area:1500,bldUse:'school',     climate:'central'},
+  zero:     {wallMat:'aero', wallThick:100, window:'triple',    area:500, bldUse:'office',     climate:'central'},
+};
+
+// ════════════════════════════
+// STATE
+// ════════════════════════════
+let charts = {};
+let geminiKey = '';
+let selectedClimate = 'central';
+let currentSeason = 'all';
+
+// ════════════════════════════
+// UTILS
+// ════════════════════════════
+function sv(id, vid, unit) {
+  const v = document.getElementById(id).value;
+  document.getElementById(vid).textContent = parseFloat(v).toFixed(unit==='%'?1:0) + ' ' + unit;
+}
+function showPage(n) {
+  document.querySelectorAll('.page').forEach((p,i)=>{
+    p.classList.toggle('active', i===n);
+  });
+  document.querySelectorAll('.nav-tab').forEach((t,i)=>{
+    t.classList.toggle('active', i===n);
+  });
+  if(n===2) { setTimeout(()=>{updateScenario();},50); }
+  if(n===3) { filterDB('all'); initDBChart(); }
+}
+function dc(id) {
+  if(charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+function cdark() {
+  const dark = window.matchMedia('(prefers-color-scheme:dark)').matches;
+  return {color:dark?'#cdd5e0':'#4a5568', grid:dark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)', tick:dark?'#8896ab':'#8896ab'};
+}
+
+// ════════════════════════════
+// CALC ENGINE
+// ════════════════════════════
+function calcU(matKey, thickMm) {
+  const lambda = MAT[matKey]?.lambda || 0.031;
+  const R = (thickMm/1000)/lambda + 0.17; // incl. surface resistance
+  return parseFloat((1/R).toFixed(3));
+}
+function calcFullResult(cfg) {
+  const {wallMat, wallThick, roofMat, roofThick, floorMat, floorThick, windowType, bldUse, bldYear, area, energyCost, inflation, climate} = cfg;
+  const cl = CLIMATE[climate] || CLIMATE.central;
+  const uWall  = calcU(wallMat, wallThick);
+  const uRoof  = calcU(roofMat, roofThick);
+  const uFloor = calcU(floorMat, floorThick);
+  const uWin   = WIN[windowType] || 2.1;
+  const uAvg   = (uWall*0.45 + uRoof*0.25 + uFloor*0.15 + uWin*0.15);
+
+  const baseEnergy = BLD_BASE_ENERGY[bldUse] || 180;
+  const yearFactor = {2023:1.0, 2020:1.1, 2015:1.2, 2010:1.4, 2000:1.7, old:2.2}[bldYear] || 1.2;
+  const climateFactor = cl.hdd/2800;
+  const energyBase = baseEnergy * area * yearFactor * climateFactor;
+  const energySaved = energyBase * (1 - Math.min(uAvg/1.5, 0.9));
+  const costSaved = (energyCost || 500) * (energySaved / energyBase) * 0.35;
+  const co2Saved = energySaved * 0.459 / 1000;
+
+  // grade — KS F 2278 에너지효율등급 기반, 지역별 외벽 기준값과 uWall 비교
+  const zoneStd = {
+    north:  {u1pp:0.12, u1p:0.15, u1:0.17, u2:0.22, u3:0.30},
+    central:{u1pp:0.14, u1p:0.17, u1:0.22, u2:0.30, u3:0.40},
+    south:  {u1pp:0.16, u1p:0.20, u1:0.26, u2:0.35, u3:0.45},
+    jeju:   {u1pp:0.20, u1p:0.25, u1:0.32, u2:0.43, u3:0.55},
+  };
+  const std = zoneStd[climate] || zoneStd.central;
+  let grade='4이하', gradeDesc='단열 대폭 개선 필요', score=25;
+  if(uWall<=std.u1pp){grade='1++';gradeDesc='제로에너지건축 수준 — 최고 단열 성능';score=98;}
+  else if(uWall<=std.u1p){grade='1+';gradeDesc='패시브하우스 수준 — 우수한 단열';score=88;}
+  else if(uWall<=std.u1){grade='1';gradeDesc='에너지효율 최고 등급 — 법적 최고 기준 충족';score=76;}
+  else if(uWall<=std.u2){grade='2';gradeDesc='법적 기준 충족 — 양호한 단열 성능';score=62;}
+  else if(uWall<=std.u3){grade='3';gradeDesc='기준 미달 — 단열 개선 권장';score=42;}
+
+  // economics
+  const wallArea = area * 0.4;
+  const investCost = (MAT[wallMat]?.price||2.8) * wallArea;
+  const payback = investCost / (costSaved || 1);
+  const cum20 = Array.from({length:20},(_,i)=>costSaved*Math.pow(1+inflation/100,i+1)).reduce((a,b)=>a+b,0);
+
+  // season monthly
+  const hddMonth = [600,530,370,160,40,0,0,0,30,120,380,570];
+  const cddMonth = [0,0,0,20,60,130,200,220,100,20,0,0];
+  const saveRate = Math.max(0, Math.min(1, 1 - uAvg/1.5));
+  const monthly_before = hddMonth.map((h,i)=>{
+    const heat = h*0.18*area*0.0001*baseEnergy;
+    const cool = cddMonth[i]*0.14*area*0.0001*baseEnergy;
+    return parseFloat((heat+cool).toFixed(1));
+  });
+  const monthly_after = monthly_before.map(v=>parseFloat((v*(1-saveRate*0.7)).toFixed(1)));
+
+  // certs — uWall(W/m²K) 과 primaryEnergy(kWh/m²yr) 로 판정
+  // 1차에너지 원단위: 건물 실제 소비량을 면적으로 나눈 값 (단열 후 기준)
+  const primaryEnergy = Math.max(10, (energyBase * (1 - saveRate * 0.5)) / area);
+  const certResults = CERTS_DEF.map(c => {
+    const uPass = uWall <= c.uLimit;
+    const ePass = primaryEnergy <= c.eLimit;
+    return {
+      ...c,
+      pass: uPass && ePass,
+      uPass, ePass,
+      uWall: uWall.toFixed(3),
+      ePrimary: Math.round(primaryEnergy),
+    };
+  });
+
+  return {uWall, uRoof, uFloor, uWin, uAvg, grade, gradeDesc, score, energySaved, costSaved, co2Saved, payback, investCost, cum20, monthly_before, monthly_after, certResults, saveRate, cl, primaryEnergy, climate};
+}
+
+// ════════════════════════════
+// LOCATION DROPDOWN
+// ════════════════════════════
+function onLocationChange() {
+  const sel = document.getElementById('locationSelect');
+  const val = sel.value; // e.g. "central|서울특별시 (중부2)"
+  const [zone, nameFull] = val.split('|');
+  selectedClimate = zone;
+  const cl = CLIMATE[zone];
+  document.getElementById('locName').textContent = nameFull.split(' (')[0];
+  document.getElementById('locZone').textContent = cl.zone;
+  document.getElementById('locHDD').textContent = cl.hdd;
+}
+
+// ════════════════════════════
+// PDF EXPORT
+// ════════════════════════════
+function exportPDF() {
+  if(!window.__lastResult) { alert('먼저 분석을 실행해주세요.'); return; }
+  const r = window.__lastResult;
+  const cfg = window.__lastCfg;
+  const cl = r.cl;
+  const locSel = document.getElementById('locationSelect');
+  const locText = locSel.options[locSel.selectedIndex].text;
+
+  const win = window.open('','_blank','width=900,height=700');
+  win.document.write(`<!DOCTYPE html><html lang="ko"><head>
+<meta charset="UTF-8">
+<title>단열 시뮬레이션 결과 보고서</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Noto Sans KR',sans-serif;color:#1a2033;background:#fff;padding:32px 40px;font-size:13px;}
+  h1{font-size:22px;font-weight:900;color:#1a7f6e;margin-bottom:4px;}
+  .sub{font-size:12px;color:#8896ab;margin-bottom:24px;}
+  .grade-box{display:inline-flex;align-items:center;gap:16px;background:linear-gradient(135deg,#e6f7f4,#e3eefa);border:2px solid #1a7f6e;border-radius:14px;padding:16px 24px;margin-bottom:24px;}
+  .grade-circle{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#1a7f6e,#1565c0);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;}
+  .gc-g{font-size:22px;font-weight:900;}
+  .gc-l{font-size:9px;opacity:.85;}
+  .grade-info h2{font-size:16px;font-weight:800;margin-bottom:3px;}
+  .grade-info p{font-size:12px;color:#4a5568;}
+  .section{margin-bottom:24px;}
+  .sec-title{font-size:13px;font-weight:700;color:#1a7f6e;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #b2dfdb;padding-bottom:6px;margin-bottom:14px;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .kpi{background:#f0f2f8;border-radius:10px;padding:12px;text-align:center;}
+  .kpi-val{font-size:20px;font-weight:900;color:#1565c0;}
+  .kpi-unit{font-size:9px;color:#8896ab;}
+  .kpi-lbl{font-size:11px;color:#4a5568;margin-top:4px;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{background:#f0f2f8;padding:8px 10px;text-align:left;font-size:11px;color:#8896ab;text-transform:uppercase;letter-spacing:.7px;}
+  td{padding:8px 10px;border-bottom:1px solid #dde3f0;}
+  .cert-pass{color:#2e7d32;font-weight:700;}
+  .cert-fail{color:#c62828;font-weight:700;}
+  .score-bar{background:#dde3f0;border-radius:4px;height:10px;overflow:hidden;margin-top:6px;}
+  .score-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#1a7f6e,#1565c0);}
+  .footer{margin-top:32px;padding-top:14px;border-top:1px solid #dde3f0;font-size:11px;color:#8896ab;}
+  @media print{body{padding:16px;}button{display:none!important;}}
+</style>
+</head><body>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+  <div>
+    <h1>🏗️ ThermoAI — 단열 시뮬레이션 결과 보고서</h1>
+    <div class="sub">분석일: ${new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} &nbsp;|&nbsp; 위치: ${locText} (${cl.zone}구역, HDD ${cl.hdd})</div>
+  </div>
+  <button onclick="window.print()" style="padding:8px 18px;background:#1a7f6e;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;">🖨️ 인쇄 / PDF 저장</button>
+</div>
+
+<div class="grade-box">
+  <div class="grade-circle"><div class="gc-g">${r.grade}</div><div class="gc-l">단열등급</div></div>
+  <div class="grade-info">
+    <h2>${r.gradeDesc}</h2>
+    <p>종합 단열 점수: ${r.score}점</p>
+    <div class="score-bar"><div class="score-fill" style="width:${r.score}%"></div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-title">📐 건물 정보</div>
+  <table>
+    <tr><th>항목</th><th>내용</th><th>항목</th><th>내용</th></tr>
+    <tr><td>위치</td><td>${locText}</td><td>기후구역</td><td>${cl.name} / HDD ${cl.hdd}</td></tr>
+    <tr><td>외벽 단열재</td><td>${MAT[cfg.wallMat]?.name||cfg.wallMat} / ${cfg.wallThick}mm</td><td>외벽 열관류율</td><td>${r.uWall.toFixed(3)} W/m²K</td></tr>
+    <tr><td>지붕 단열재</td><td>${MAT[cfg.roofMat]?.name||cfg.roofMat} / ${cfg.roofThick}mm</td><td>지붕 열관류율</td><td>${r.uRoof.toFixed(3)} W/m²K</td></tr>
+    <tr><td>바닥 단열재</td><td>${MAT[cfg.floorMat]?.name||cfg.floorMat} / ${cfg.floorThick}mm</td><td>창호</td><td>U=${r.uWin} W/m²K</td></tr>
+    <tr><td>연면적</td><td>${cfg.area.toLocaleString()} m²</td><td>종합 평균 U값</td><td>${r.uAvg.toFixed(3)} W/m²K</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <div class="sec-title">⚡ 에너지·경제성 분석</div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-val" style="color:#d84315;">${Math.round(r.energySaved).toLocaleString()}</div><div class="kpi-unit">kWh/yr</div><div class="kpi-lbl">연간 에너지 절감</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#e65100;">${Math.round(r.costSaved).toLocaleString()}</div><div class="kpi-unit">만원/년</div><div class="kpi-lbl">비용 절감 예상</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#1565c0;">${r.payback.toFixed(1)}</div><div class="kpi-unit">년</div><div class="kpi-lbl">투자 회수기간</div></div>
+    <div class="kpi"><div class="kpi-val" style="color:#2e7d32;">${Math.round(r.cum20).toLocaleString()}</div><div class="kpi-unit">만원</div><div class="kpi-lbl">20년 누적 절감</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-title">🌿 탄소 절감 효과</div>
+  <table>
+    <tr><th>지표</th><th>값</th><th>환산</th></tr>
+    <tr><td>연간 CO₂ 절감량</td><td>${r.co2Saved.toFixed(2)} tCO₂/yr</td><td>소나무 ${Math.round(r.co2Saved*18.3)}그루 흡수량 상당</td></tr>
+    <tr><td>20년 누적 절감</td><td>${(r.co2Saved*20).toFixed(1)} tCO₂</td><td>자동차 ${(r.co2Saved/2.3).toFixed(1)}대 연간 배출량 상당</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <div class="sec-title">🏅 친환경 인증 적합성</div>
+  <div style="font-size:12px;margin-bottom:10px;padding:7px 12px;background:#f0f2f8;border-radius:6px;">
+    현재 외벽 U값: <strong>${r.uWall.toFixed(3)} W/m²K</strong> &nbsp;|&nbsp; 1차 에너지 원단위: <strong>${Math.round(r.primaryEnergy)} kWh/m²yr</strong>
+  </div>
+  <table>
+    <tr><th>인증 종류</th><th>외벽 U 현재/기준</th><th>에너지 현재/기준</th><th>종합 판정</th></tr>
+    ${r.certResults.map(c=>`<tr>
+      <td>${c.icon} ${c.name}</td>
+      <td style="font-family:monospace;">${c.uWall} / ≤${c.uLimit} <span style="color:${c.uPass?'#2e7d32':'#c62828'}">${c.uPass?'✓':'✗'}</span></td>
+      <td style="font-family:monospace;">${c.ePrimary} / ≤${c.eLimit} <span style="color:${c.ePass?'#2e7d32':'#c62828'}">${c.ePass?'✓':'✗'}</span></td>
+      <td class="${c.pass?'cert-pass':'cert-fail'}">${c.pass?'✅ 충족':'❌ 미달'}</td>
+    </tr>`).join('')}
+  </table>
+</div>
+
+${(r.grade==='3'||r.grade==='4이하')?`
+<div class="section">
+  <div class="sec-title" style="color:#c62828;border-color:#c62828;">⚠️ 단열 성능 개선 권고사항</div>
+  <p style="margin-bottom:10px;font-size:12px;line-height:1.7;">현재 <strong>${r.grade}등급</strong>으로 법적 기준 또는 에너지효율 기준에 미달합니다. 아래 방법을 검토하시기 바랍니다.</p>
+  <table>
+    <tr><th>개선 방법</th><th>내용</th><th>예상 효과</th></tr>
+    <tr><td>외벽 단열재 두께 증가</td><td>현재 ${cfg.wallThick}mm → 권장 ${Math.ceil((1/0.22-0.17)*(MAT[cfg.wallMat]?.lambda||0.031)*1000/10)*10}mm 이상</td><td>1등급 달성 가능</td></tr>
+    <tr><td>고성능 단열재 교체</td><td>경질우레탄폼(λ=0.024) 또는 페놀폼(λ=0.020) 교체</td><td>동일 두께 대비 성능 향상</td></tr>
+    <tr><td>창호 교체</td><td>이중→삼중 로이유리(U=0.8) 교체</td><td>창호 열손실 62% 감소</td></tr>
+    <tr><td>열교 차단재 적용</td><td>슬래브·창호 주변 열교차단 시공</td><td>실질 U값 5~15% 개선</td></tr>
+    <tr><td>기밀 시공 강화</td><td>창호·관통부 기밀 테이프 처리 + HRV 환기장치</td><td>환기 손실 50~80% 절감</td></tr>
+  </table>
+</div>`:''}
+
+<div class="footer">
+  본 보고서는 ThermoAI 2.0 시뮬레이션 결과이며, 실제 에너지 성능은 시공 방법·기후 변동·건물 운용 조건에 따라 달라질 수 있습니다.<br>
+  정밀 분석은 에너지 전문가 또는 공인 에너지 진단 기관에 의뢰하시기 바랍니다.
+</div>
+</body></html>`);
+  win.document.close();
+}
+
+
+// ════════════════════════════
+// SIMULATOR: FULL ANALYSIS
+// ════════════════════════════
+function runFullAnalysis() {
+  const locVal = document.getElementById('locationSelect').value;
+  const climateZone = locVal.split('|')[0];
+  const cfg = {
+    wallMat:    document.getElementById('wallMat').value,
+    wallThick:  +document.getElementById('wallThick').value,
+    roofMat:    document.getElementById('roofMat').value,
+    roofThick:  +document.getElementById('roofThick').value,
+    floorMat:   document.getElementById('floorMat').value,
+    floorThick: +document.getElementById('floorThick').value,
+    windowType: document.getElementById('windowType').value,
+    bldUse:     document.getElementById('bldUse').value,
+    bldYear:    document.getElementById('bldYear').value,
+    area:       +document.getElementById('bldArea').value,
+    energyCost: +document.getElementById('enrgCost').value,
+    inflation:  +document.getElementById('inflation').value,
+    climate:    climateZone,
+  };
+  window.__lastCfg = cfg;
+  const r = calcFullResult(cfg);
+  renderSimResult(r, cfg);
+  document.getElementById('pdfBtn').style.display = '';
+}
+
+function renderSimResult(r, cfg) {
+  const cl = r.cl;
+  const html = `
+  <div class="result-hero">
+    <div class="result-grade-circle">
+      <div class="rgc-grade">${r.grade}</div>
+      <div class="rgc-label">단열등급</div>
+    </div>
+    <div style="flex:1;">
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">종합 단열 성능 판정</div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px;">${r.gradeDesc}</div>
+      <div style="font-size:12px;color:var(--text3);">위치: ${cl.name} | HDD ${cl.hdd} | 평균기온 ${cl.avgT}°C</div>
+      <div class="prog-wrap" style="margin-top:8px;">
+        <div class="prog-label"><span>종합 단열 점수</span><span>${r.score}점</span></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${r.score}%;"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-kpis">
+    <div class="rkpi"><div class="rkpi-val" style="color:var(--accent2);">${r.uWall.toFixed(3)}</div><div class="rkpi-unit">W/m²K</div><div class="rkpi-lbl">외벽 열관류율</div></div>
+    <div class="rkpi"><div class="rkpi-val" style="color:var(--accent);">${Math.round(r.energySaved).toLocaleString()}</div><div class="rkpi-unit">kWh/yr</div><div class="rkpi-lbl">연간 에너지 절감</div></div>
+    <div class="rkpi"><div class="rkpi-val" style="color:var(--yellow);">${Math.round(r.costSaved)}</div><div class="rkpi-unit">만원/년</div><div class="rkpi-lbl">비용 절감 예상</div></div>
+    <div class="rkpi"><div class="rkpi-val" style="color:var(--green);">${r.co2Saved.toFixed(2)}</div><div class="rkpi-unit">tCO₂/yr</div><div class="rkpi-lbl">탄소 절감량</div></div>
+  </div>
+
+  <!-- 계절별 성능 -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-title">🌡️ 계절별 에너지 성능</div>
+    <div class="season-tabs">
+      <button class="s-btn active all" onclick="simSeasonSwitch('all',this)">📅 연간 전체</button>
+      <button class="s-btn spring" onclick="simSeasonSwitch('spring',this)">🌸 봄</button>
+      <button class="s-btn summer" onclick="simSeasonSwitch('summer',this)">☀️ 여름</button>
+      <button class="s-btn fall" onclick="simSeasonSwitch('fall',this)">🍂 가을</button>
+      <button class="s-btn winter" onclick="simSeasonSwitch('winter',this)">❄️ 겨울</button>
+    </div>
+    <canvas id="resSeasonChart" style="max-height:230px;"></canvas>
+    <div class="g4" style="margin-top:12px;" id="resSeasonKPIs">
+      ${renderSeasonKPIs(r,'all')}
+    </div>
+  </div>
+
+  <!-- 경제성 -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-title">💰 경제성 분석 (투자 회수기간)</div>
+    <div class="g4" style="margin-bottom:12px;">
+      <div class="stat-card"><div class="stat-num" style="color:var(--accent3);">${Math.round(r.investCost)}</div><div class="stat-label">초기 투자비 (만원)</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--accent);">${Math.round(r.costSaved)}</div><div class="stat-label">연간 절감액 (만원)</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--accent2);">${r.payback.toFixed(1)}</div><div class="stat-label">투자 회수기간 (년)</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--green);">${Math.round(r.cum20)}</div><div class="stat-label">20년 누적 절감 (만원)</div></div>
+    </div>
+    <canvas id="resRoiChart" style="max-height:200px;"></canvas>
+  </div>
+
+  <!-- 탄소 절감 -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-title">🌿 탄소 절감 · 환경 기여</div>
+    <div class="g2">
+      <div>
+        <canvas id="resCo2Chart" style="max-height:200px;"></canvas>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;justify-content:center;padding:8px;">
+        <div style="background:var(--green-l);border-radius:12px;padding:14px;text-align:center;border:1px solid #a5d6a7;">
+          <div style="font-size:32px;font-weight:900;color:var(--green);">${Math.round(r.co2Saved*18.3)} 🌲</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px;">소나무 그루 흡수량 상당 (연간)</div>
+        </div>
+        <div style="background:var(--accent2-l);border-radius:12px;padding:14px;text-align:center;border:1px solid #90caf9;">
+          <div style="font-size:32px;font-weight:900;color:var(--accent2);">${(r.co2Saved/2.3).toFixed(1)} 🚗</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px;">자동차 연간 배출량 상당</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 친환경 인증 -->
+  <div class="card">
+    <div class="card-title">🏅 친환경 인증 적합성 자동 체크</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px;padding:8px 12px;background:var(--surface2);border-radius:var(--rs);">
+      📊 현재 외벽 U값: <strong style="color:var(--accent2);font-family:'Space Mono',monospace;">${r.uWall.toFixed(3)} W/m²K</strong>
+      &nbsp;|&nbsp; 1차에너지 원단위: <strong style="color:var(--accent);font-family:'Space Mono',monospace;">${Math.round(r.primaryEnergy)} kWh/m²yr</strong>
+    </div>
+    <div id="resCerts">
+      ${r.certResults.map(c=>`
+      <div class="cert-item ${c.pass?'pass':'fail'}" style="flex-direction:column;align-items:flex-start;gap:6px;padding:12px 14px;">
+        <div style="display:flex;align-items:center;gap:10px;width:100%;">
+          <div class="cert-icon">${c.icon}</div>
+          <div style="flex:1;">
+            <div class="cert-name">${c.name}</div>
+            <div class="cert-status">${c.pass?'✅ 기준 충족 — 인증 요건 달성 가능':'❌ 기준 미달 — 추가 개선 필요'}</div>
+          </div>
+          <div style="text-align:right;font-size:11px;color:var(--text3);line-height:1.7;">
+            <div>외벽 U: <span style="font-family:'Space Mono',monospace;font-weight:700;color:${c.uPass?'var(--green)':'var(--accent3)'};">${c.uWall}</span> / 기준 ≤${c.uLimit}</div>
+            <div>에너지: <span style="font-family:'Space Mono',monospace;font-weight:700;color:${c.ePass?'var(--green)':'var(--accent3)'};">${c.ePrimary}</span> / 기준 ≤${c.eLimit} kWh</div>
+          </div>
+        </div>
+        ${!c.pass?`<div style="width:100%;background:rgba(216,67,21,.07);border-radius:6px;padding:6px 10px;font-size:11px;color:var(--accent3);">
+          ${!c.uPass&&!c.ePass?'⚠️ 외벽 U값과 에너지 원단위 모두 기준 초과':!c.uPass?'⚠️ 외벽 열관류율이 기준값 초과 — 단열재 두께 증가 또는 고성능 단열재로 교체 필요':'⚠️ 에너지 원단위가 기준값 초과 — 창호 성능 개선·기밀성 향상 필요'}
+        </div>`:''}
+      </div>`).join('')}
+    </div>
+  </div>
+
+  ${renderImprovementAdvice(r, cfg)}
+  `;
+
+  document.getElementById('simResults').innerHTML = html;
+
+  // Draw charts
+  setTimeout(()=>{
+    drawSimSeasonChart(r,'all');
+    drawSimRoiChart(r);
+    drawSimCo2Chart(r);
+  },50);
+}
+
+// ════════════════════════════
+// IMPROVEMENT ADVISOR
+// ════════════════════════════
+function renderImprovementAdvice(r, cfg) {
+  // 3등급 이하 (grade 3, 4이하) 일 때만 표시
+  if(r.grade === '1++' || r.grade === '1+' || r.grade === '1' || r.grade === '2') return '';
+
+  const std = {
+    north:  {u1pp:0.12, u1p:0.15, u1:0.17, u2:0.22, wallU_legal:0.17},
+    central:{u1pp:0.14, u1p:0.17, u1:0.22, u2:0.30, wallU_legal:0.22},
+    south:  {u1pp:0.16, u1p:0.20, u1:0.26, u2:0.35, wallU_legal:0.32},
+    jeju:   {u1pp:0.20, u1p:0.25, u1:0.32, u2:0.43, wallU_legal:0.43},
+  };
+  const zs = std[r.climate] || std.central;
+  const cl = r.cl;
+  const curMat = MAT[cfg.wallMat];
+  const lambda = curMat?.lambda || 0.031;
+
+  // 목표 등급별 필요 두께 계산
+  function neededThick(targetU) {
+    // U = 1/(d/lambda + 0.17) => d = (1/targetU - 0.17)*lambda*1000 mm
+    return Math.ceil((1/targetU - 0.17) * lambda * 1000 / 10) * 10;
+  }
+  const thickFor1 = neededThick(zs.u1);
+  const thickFor1p = neededThick(zs.u1p);
+  const thickFor2 = neededThick(zs.u2);
+
+  // 고성능 단열재로 교체 시 필요 두께
+  const altMats = [
+    {key:'pu',   name:'경질우레탄폼', lambda:0.024, price:4.8},
+    {key:'xps',  name:'XPS 압출법',   lambda:0.028, price:3.5},
+    {key:'phenol',name:'페놀폼',       lambda:0.020, price:6.5},
+    {key:'aero', name:'에어로젤',      lambda:0.015, price:15.0},
+  ].filter(m => m.key !== cfg.wallMat);
+
+  function neededThickForMat(lam, targetU) {
+    return Math.ceil((1/targetU - 0.17)*lam*1000/10)*10;
+  }
+
+  const isGrade4 = r.grade === '4이하';
+  const gradeColor = isGrade4 ? 'var(--accent3)' : 'var(--yellow)';
+  const gradeLabel = isGrade4 ? '4등급 이하' : '3등급';
+
+  return `
+  <div class="card" style="border:2px solid ${gradeColor};margin-top:4px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <div style="width:40px;height:40px;border-radius:50%;background:${gradeColor};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">⚠️</div>
+      <div>
+        <div style="font-size:14px;font-weight:800;color:${gradeColor};">단열 성능 개선 필요 — 현재 ${gradeLabel}</div>
+        <div style="font-size:12px;color:var(--text3);">아래 방법으로 단계적으로 개선하면 에너지비용 절감과 인증 취득이 가능합니다</div>
+      </div>
+    </div>
+
+    <!-- 현재 상태 진단 -->
+    <div style="background:var(--surface2);border-radius:10px;padding:13px 15px;margin-bottom:14px;border-left:4px solid ${gradeColor};">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">📋 현재 상태 진단</div>
+      <div class="g2" style="gap:10px;">
+        <div style="font-size:12px;line-height:1.9;">
+          • 현재 단열재: <strong>${curMat?.name || cfg.wallMat}</strong> (λ=${lambda})<br>
+          • 현재 두께: <strong>${cfg.wallThick}mm</strong><br>
+          • 현재 외벽 U값: <strong style="color:${gradeColor};">${r.uWall.toFixed(3)} W/m²K</strong><br>
+          • 법적 기준 (${cl.zone}): <strong>U≤${zs.wallU_legal} W/m²K</strong>
+        </div>
+        <div style="font-size:12px;line-height:1.9;">
+          • 창호 U값: <strong>${r.uWin} W/m²K</strong><br>
+          • 1차 에너지 원단위: <strong style="color:${gradeColor};">${Math.round(r.primaryEnergy)} kWh/m²yr</strong><br>
+          • 연간 에너지 비용: <strong>${(+document.getElementById('enrgCost').value).toLocaleString()}만원</strong><br>
+          • 지역 기후구역: <strong>${cl.zone} (HDD ${cl.hdd})</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- 개선 방법 1: 두께 증가 -->
+    <div style="background:var(--accent2-l);border-radius:10px;padding:13px 15px;margin-bottom:10px;border:1px solid #90caf9;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:8px;">📐 방법 1 · 현재 단열재 두께 증가 (가장 경제적)</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.85;">
+        ${r.grade==='4이하' ? `• <strong style="color:var(--accent3);">법적 기준(${zs.wallU_legal} W/m²K) 충족</strong>에 필요한 두께: <strong>${neededThick(zs.wallU_legal)}mm</strong> (현재 ${cfg.wallThick}mm → +${Math.max(0,neededThick(zs.wallU_legal)-cfg.wallThick)}mm)<br>` : ''}
+        • <strong>2등급(U≤${zs.u2})</strong> 달성 필요 두께: <strong>${thickFor2}mm</strong> (현재 대비 +${Math.max(0,thickFor2-cfg.wallThick)}mm)<br>
+        • <strong>1등급(U≤${zs.u1})</strong> 달성 필요 두께: <strong>${thickFor1}mm</strong> (+${Math.max(0,thickFor1-cfg.wallThick)}mm)<br>
+        • <strong>1+등급(U≤${zs.u1p})</strong> 달성 필요 두께: <strong>${thickFor1p}mm</strong> (+${Math.max(0,thickFor1p-cfg.wallThick)}mm)<br>
+        <span style="color:var(--text3);font-size:11px;">※ 두께 증가는 건축 가능 공간과 구조 하중을 함께 검토해야 합니다</span>
+      </div>
+    </div>
+
+    <!-- 개선 방법 2: 단열재 교체 -->
+    <div style="background:var(--accent-l);border-radius:10px;padding:13px 15px;margin-bottom:10px;border:1px solid var(--border-a);">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;">🔄 방법 2 · 고성능 단열재로 교체 (두께 절약)</div>
+      <div style="font-size:12px;color:var(--text2);">동일한 1등급(U≤${zs.u1}) 달성 시 각 단열재별 필요 두께:</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:8px;">
+        ${altMats.map(m=>{
+          const t = neededThickForMat(m.lambda, zs.u1);
+          const saving = thickFor1 - t;
+          return `<div style="background:#fff;border-radius:8px;padding:9px 11px;border:1px solid var(--border);">
+            <div style="font-weight:700;font-size:12px;">${m.name}</div>
+            <div style="font-size:11px;color:var(--text3);">λ=${m.lambda} · ${m.price}만원/m²</div>
+            <div style="font-size:12px;margin-top:4px;"><strong style="color:var(--accent);">${t}mm 필요</strong>
+              ${saving>0?`<span style="font-size:10px;color:var(--green);"> (${saving}mm 절약)</span>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- 개선 방법 3: 창호 교체 -->
+    <div style="background:var(--accent4-l);border-radius:10px;padding:13px 15px;margin-bottom:10px;border:1px solid #ce93d8;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent4);margin-bottom:8px;">🪟 방법 3 · 창호 성능 업그레이드</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.85;">
+        ${r.uWin>=2.1?`• <strong>현재 창호(U=${r.uWin})</strong>는 에너지 손실의 주요 경로입니다<br>
+        • 이중 로이유리(U=1.4)로 교체 → 창호 열손실 <strong>약 33% 감소</strong><br>
+        • 삼중 로이유리(U=0.8)로 교체 → 창호 열손실 <strong>약 62% 감소</strong>, 결로 방지<br>
+        • 창호 면적이 전체 외피의 15~25% 차지 → 단열재 두께 증가와 병행 시 <strong>시너지 효과</strong>`:
+        `• 현재 창호(U=${r.uWin})는 ${r.uWin<=0.8?'최고 성능':r.uWin<=1.4?'우수한 성능':'양호한 성능'}입니다<br>
+        • ${r.uWin>1.4?'삼중 로이유리(U=0.8)로 추가 개선 시 냉난방 부하 추가 절감 가능':'창호 성능 기여도 양호 — 단열재 두께 개선에 집중 권장'}`}
+      </div>
+    </div>
+
+    <!-- 개선 방법 4: 기타 -->
+    <div style="background:var(--green-l);border-radius:10px;padding:13px 15px;border:1px solid #a5d6a7;">
+      <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px;">🛠️ 방법 4 · 추가 보완 조치 (기밀·열교 차단)</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.85;">
+        • <strong>기밀 시공 강화</strong>: 창호 주변·배관 관통부 기밀 테이프 처리 → 환기열손실 최소화<br>
+        • <strong>열교(Thermal Bridge) 차단</strong>: 슬래브-외벽 접합부에 열교차단재 삽입 → 실질 U값 개선<br>
+        • <strong>외단열 복합마감시스템(EIFS)</strong>: 기존 건물 리모델링 시 구조체 외부에 단열층 추가<br>
+        • <strong>기계환기(HRV/ERV)</strong>: 열회수환기장치로 환기에 의한 에너지 손실 최대 80% 회수<br>
+        <span style="color:var(--text3);font-size:11px;">※ 조치별 효과는 건물 형태·시공 품질에 따라 차이가 있으므로 에너지 전문가 자문을 권장합니다</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderSeasonKPIs(r, season) {
+  const months = {spring:[2,3,4], summer:[5,6,7], fall:[8,9,10], winter:[11,0,1], all:null};
+  const idx = months[season];
+  let before, after;
+  if(!idx){before=r.monthly_before;after=r.monthly_after;}
+  else{before=idx.map(i=>r.monthly_before[i]);after=idx.map(i=>r.monthly_after[i]);}
+  const sumB = before.reduce((a,b)=>a+b,0);
+  const sumA = after.reduce((a,b)=>a+b,0);
+  const saved = sumB - sumA;
+  const pct = sumB>0?Math.round(saved/sumB*100):0;
+  return `
+    <div class="rkpi"><div class="rkpi-val" style="color:var(--accent3);">${Math.round(sumB).toLocaleString()}</div><div class="rkpi-unit">kWh</div><div class="rkpi-lbl">단열 전 에너지</div></div>
+    <div class="rkpi"><div class="rkpi-val" style="color:var(--accent);">${Math.round(sumA).toLocaleString()}</div><div class="rkpi-unit">kWh</div><div class="rkpi-lbl">단열 후 에너지</div></div>
+    <div class="rkpi"><div class="rkpi-val" style="color:var(--green);">${Math.round(saved).toLocaleString()}</div><div class="rkpi-unit">kWh</div><div class="rkpi-lbl">에너지 절감량</div></div>
+    <div class="rkpi"><div class="rkpi-val" style="color:var(--accent2);">${pct}</div><div class="rkpi-unit">%</div><div class="rkpi-lbl">절감률</div></div>
+  `;
+}
+
+function simSeasonSwitch(season, btn) {
+  document.querySelectorAll('#simResults .s-btn').forEach(b=>b.className='s-btn '+b.textContent.includes('봄')?'s-btn spring':b.textContent.includes('여름')?'s-btn summer':b.textContent.includes('가을')?'s-btn fall':b.textContent.includes('겨울')?'s-btn winter':'s-btn all');
+  btn.className = 's-btn active '+season;
+  // recalc from stored state - just redraw with season filter
+  const labels=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const months={spring:[2,3,4],summer:[5,6,7],fall:[8,9,10],winter:[11,0,1]};
+  const r = window.__lastResult;
+  if(!r) return;
+  document.getElementById('resSeasonKPIs').innerHTML = renderSeasonKPIs(r, season);
+  drawSimSeasonChart(r, season);
+}
+
+function drawSimSeasonChart(r, season) {
+  dc('resSeasonChart');
+  const cd = cdark();
+  const labels=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  const months={spring:[2,3,4],summer:[5,6,7],fall:[8,9,10],winter:[11,0,1]};
+  const idx = season!=='all'?months[season]:null;
+  const lbl = idx?idx.map(i=>labels[i]):labels;
+  const before = idx?idx.map(i=>r.monthly_before[i]):r.monthly_before;
+  const after  = idx?idx.map(i=>r.monthly_after[i]) :r.monthly_after;
+  const ctx = document.getElementById('resSeasonChart')?.getContext('2d');
+  if(!ctx) return;
+  window.__lastResult = r;
+  charts.resSeasonChart = new Chart(ctx,{
+    type:'bar',
+    data:{labels:lbl,datasets:[
+      {label:'단열 전',data:before,backgroundColor:'rgba(216,67,21,.5)',borderRadius:4},
+      {label:'단열 후',data:after, backgroundColor:'rgba(26,127,110,.7)',borderRadius:4},
+    ]},
+    options:{responsive:true,plugins:{legend:{labels:{color:cd.color}}},scales:{y:{grid:{color:cd.grid},ticks:{color:cd.tick}},x:{grid:{display:false},ticks:{color:cd.tick}}}}
+  });
+}
+
+function drawSimRoiChart(r) {
+  dc('resRoiChart');
+  const cd = cdark();
+  const years = Array.from({length:21},(_,i)=>i);
+  const cum = years.map(y=>{
+    let s=0;
+    for(let i=1;i<=y;i++) s+=r.costSaved*Math.pow(1.03,i);
+    return parseFloat(s.toFixed(1));
+  });
+  const ctx = document.getElementById('resRoiChart')?.getContext('2d');
+  if(!ctx) return;
+  charts.resRoiChart = new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:years.map(y=>y+'년'),
+      datasets:[
+        {label:'누적 절감액 (만원)',data:cum,borderColor:'rgba(46,125,50,1)',backgroundColor:'rgba(46,125,50,.12)',tension:.4,fill:true,pointRadius:0},
+        {label:'초기 투자비 (만원)',data:years.map(()=>r.investCost),borderColor:'rgba(216,67,21,.8)',borderDash:[6,3],pointRadius:0,tension:0},
+      ]
+    },
+    options:{responsive:true,plugins:{legend:{labels:{color:cd.color}}},scales:{y:{grid:{color:cd.grid},ticks:{color:cd.tick}},x:{grid:{display:false},ticks:{color:cd.tick,maxTicksLimit:11}}}}
+  });
+}
+
+function drawSimCo2Chart(r) {
+  dc('resCo2Chart');
+  const cd = cdark();
+  const years = Array.from({length:20},(_,i)=>i+1);
+  const co2Cum = years.map(y=>parseFloat((r.co2Saved*y).toFixed(2)));
+  const ctx = document.getElementById('resCo2Chart')?.getContext('2d');
+  if(!ctx) return;
+  charts.resCo2Chart = new Chart(ctx,{
+    type:'bar',
+    data:{labels:years.map(y=>y+'년'),datasets:[{
+      label:'누적 CO₂ 절감 (tCO₂)',data:co2Cum,
+      backgroundColor:co2Cum.map((_,i)=>`rgba(46,125,50,${0.3+i*0.035})`),borderRadius:3,
+    }]},
+    options:{responsive:true,plugins:{legend:{labels:{color:cd.color}}},scales:{y:{grid:{color:cd.grid},ticks:{color:cd.tick}},x:{grid:{display:false},ticks:{color:cd.tick,maxTicksLimit:10}}}}
+  });
+}
+
+// ════════════════════════════
+// SCENARIO EXPLORER
+// ════════════════════════════
+function applyPreset(key) {
+  const p = PRESETS[key];
+  document.getElementById('scBldUse').value  = p.bldUse;
+  document.getElementById('scWallMat').value = p.wallMat;
+  document.getElementById('scThick').value   = p.wallThick;
+  document.getElementById('scThickLbl').textContent = p.wallThick+'mm';
+  document.getElementById('scArea').value    = p.area;
+  document.getElementById('scAreaLbl').textContent = p.area+'m²';
+  document.getElementById('scWindow').value  = p.window;
+  document.getElementById('scClimate').value = p.climate;
+  document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('active'));
+  document.getElementById('preset-'+key)?.classList.add('active');
+  updateScenario();
+}
+
+function updateScenario() {
+  const wallMat  = document.getElementById('scWallMat').value;
+  const wallThick= +document.getElementById('scThick').value;
+  const window_t = document.getElementById('scWindow').value;
+  const area     = +document.getElementById('scArea').value;
+  const bldUse   = document.getElementById('scBldUse').value;
+  const climate  = document.getElementById('scClimate').value;
+  const cfg = {wallMat, wallThick, roofMat:'pu', roofThick:200, floorMat:'xps', floorThick:80, windowType:window_t, bldUse, bldYear:'2020', area, energyCost:500, inflation:3, climate};
+  const r = calcFullResult(cfg);
+
+  document.getElementById('sc_u').textContent     = r.uWall.toFixed(3);
+  document.getElementById('sc_energy').textContent= Math.round(r.energySaved).toLocaleString();
+  document.getElementById('sc_cost').textContent  = Math.round(r.costSaved);
+  document.getElementById('sc_co2').textContent   = r.co2Saved.toFixed(2);
+  document.getElementById('sc_invest').textContent= Math.round(r.investCost);
+  document.getElementById('sc_payback').textContent= r.payback.toFixed(1);
+  document.getElementById('sc_20yr').textContent  = Math.round(r.cum20);
+  document.getElementById('sc_trees').textContent = Math.round(r.co2Saved*18.3);
+  document.getElementById('sc_cars').textContent  = (r.co2Saved/2.3).toFixed(1);
+
+  document.getElementById('scCerts').innerHTML = r.certResults.map(c=>`<div class="cert-item ${c.pass?'pass':'fail'}">
+    <div class="cert-icon">${c.icon}</div>
+    <div><div class="cert-name">${c.name}</div><div class="cert-status">${c.pass?'✅ 충족':'❌ 미달'}</div></div>
+  </div>`).join('');
+
+  drawScenarioCharts(r);
+}
+
+function drawScenarioCharts(r) {
+  const cd = cdark();
+
+  // mat compare
+  dc('scMatChart');
+  const matKeys = Object.keys(MAT);
+  const matU = matKeys.map(k=>parseFloat(calcU(k,+document.getElementById('scThick').value).toFixed(3)));
+  const curKey = document.getElementById('scWallMat').value;
+  charts.scMatChart = new Chart(document.getElementById('scMatChart').getContext('2d'),{
+    type:'bar',
+    data:{labels:matKeys.map(k=>MAT[k].name),datasets:[{
+      label:'열관류율 (W/m²K)',data:matU,
+      backgroundColor:matKeys.map(k=>k===curKey?'rgba(26,127,110,.9)':'rgba(26,127,110,.25)'),
+      borderRadius:4,
+    }]},
+    options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{color:cd.grid},ticks:{color:cd.tick}},y:{grid:{display:false},ticks:{color:cd.tick,font:{size:11}}}}}
+  });
+
+  // monthly
+  dc('scMonthChart');
+  const lbl=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  charts.scMonthChart = new Chart(document.getElementById('scMonthChart').getContext('2d'),{
+    type:'bar',
+    data:{labels:lbl,datasets:[
+      {label:'단열 전',data:r.monthly_before,backgroundColor:'rgba(216,67,21,.45)',borderRadius:3},
+      {label:'단열 후',data:r.monthly_after, backgroundColor:'rgba(26,127,110,.7)',borderRadius:3},
+    ]},
+    options:{responsive:true,plugins:{legend:{labels:{color:cd.color}}},scales:{y:{grid:{color:cd.grid},ticks:{color:cd.tick}},x:{grid:{display:false},ticks:{color:cd.tick}}}}
+  });
+
+  // ROI
+  dc('scRoiChart');
+  const yrs=Array.from({length:21},(_,i)=>i);
+  charts.scRoiChart = new Chart(document.getElementById('scRoiChart').getContext('2d'),{
+    type:'line',
+    data:{labels:yrs.map(y=>y+'년'),datasets:[
+      {label:'누적 절감액',data:yrs.map(y=>{let s=0;for(let i=1;i<=y;i++)s+=r.costSaved*Math.pow(1.03,i);return parseFloat(s.toFixed(1));}),borderColor:'rgba(46,125,50,1)',backgroundColor:'rgba(46,125,50,.1)',tension:.4,fill:true,pointRadius:0},
+      {label:'투자비',data:yrs.map(()=>r.investCost),borderColor:'rgba(216,67,21,.7)',borderDash:[5,3],pointRadius:0},
+    ]},
+    options:{responsive:true,plugins:{legend:{labels:{color:cd.color}}},scales:{y:{grid:{color:cd.grid},ticks:{color:cd.tick}},x:{grid:{display:false},ticks:{color:cd.tick,maxTicksLimit:11}}}}
+  });
+
+  // CO2
+  dc('scCo2Chart');
+  const matCo2 = matKeys.map(k=>{
+    const u=calcU(k,+document.getElementById('scThick').value);
+    const s=Math.max(0,1-u/1.5);
+    return parseFloat((r.energySaved*(s/Math.max(r.saveRate,.01))*0.459/1000).toFixed(2));
+  });
+  charts.scCo2Chart = new Chart(document.getElementById('scCo2Chart').getContext('2d'),{
+    type:'bar',
+    data:{labels:matKeys.map(k=>MAT[k].name),datasets:[{
+      label:'CO₂ 절감 (tCO₂/yr)',data:matCo2,
+      backgroundColor:matKeys.map(k=>k===curKey?'rgba(46,125,50,.9)':'rgba(46,125,50,.28)'),
+      borderRadius:4,
+    }]},
+    options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{color:cd.grid},ticks:{color:cd.tick}},y:{grid:{display:false},ticks:{color:cd.tick,font:{size:11}}}}}
+  });
+}
+
+// ════════════════════════════
+// DATABASE
+// ════════════════════════════
+function filterDB(f) {
+  const q = document.getElementById('dbSearch').value.toLowerCase();
+  let data = f==='search'
+    ? INSULATION_DB.filter(d=>d.name.toLowerCase().includes(q)||d.desc.toLowerCase().includes(q))
+    : f==='all' ? INSULATION_DB : INSULATION_DB.filter(d=>d.cat===f);
+  const gradeClass = g => g==='1'?'1':g==='2'?'2':g==='3'?'3':'4';
+  document.getElementById('dbBody').innerHTML = data.map(d=>`<tr>
+    <td style="font-weight:600;">${d.name}</td>
+    <td><span class="tag ${d.cat==='foam'?'tag-g':d.cat==='fiber'?'tag-b':'tag-o'}">${d.cat==='foam'?'발포 폼':d.cat==='fiber'?'섬유류':'고성능'}</span></td>
+    <td style="font-family:'Space Mono',monospace;font-weight:700;color:var(--accent);">${d.lambda}</td>
+    <td>${d.density}</td>
+    <td><span class="gb gb-${gradeClass(d.grade)}">${d.grade==='특수'?'KS 특수':('KS '+d.grade+'등급')}</span></td>
+    <td style="font-weight:600;color:var(--yellow);">${d.price}만원</td>
+    <td style="font-size:12px;color:var(--text3);">${d.loc}</td>
+    <td style="font-size:12px;color:var(--text3);">${d.desc}</td>
+  </tr>`).join('');
+}
+function initDBChart() {
+  dc('dbChart');
+  const cd = cdark();
+  const sorted = [...INSULATION_DB].sort((a,b)=>a.lambda-b.lambda);
+  const colMap = {foam:'rgba(26,127,110,.75)', fiber:'rgba(21,101,192,.75)', advanced:'rgba(106,27,154,.75)'};
+  const canvas = document.getElementById('dbChart');
+  const itemHeight = 28;
+  canvas.style.height = (sorted.length * itemHeight + 60) + 'px';
+  charts.dbChart = new Chart(canvas.getContext('2d'),{
+    type:'bar',
+    data:{
+      labels: sorted.map(d=>d.name.length>18?d.name.substring(0,18)+'…':d.name),
+      datasets:[{
+        label:'열전도율 (W/mK)',
+        data: sorted.map(d=>d.lambda),
+        backgroundColor: sorted.map(d=>colMap[d.cat]||'rgba(100,100,100,.5)'),
+        borderRadius:4,
+      }]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{color:cd.color, font:{size:12}}},
+        tooltip:{callbacks:{label:ctx=>`λ = ${ctx.raw} W/mK`}},
+      },
+      scales:{
+        x:{grid:{color:cd.grid},ticks:{color:cd.tick},title:{display:true,text:'열전도율 λ (W/mK)',color:cd.tick}},
+        y:{grid:{display:false},ticks:{color:cd.tick,font:{size:11}}},
+      }
+    }
+  });
+}
+
+// ════════════════════════════
+// AI CHAT
+// ════════════════════════════
+function saveKey() {
+  geminiKey = document.getElementById('geminiKey').value.trim();
+  addMsg('ai', geminiKey?'✅ Gemini API Key가 설정되었습니다. 실제 AI와 대화가 가능합니다!':'⚠️ API Key가 입력되지 않았습니다. 기본 응답 모드로 작동합니다.');
+}
+function addMsg(role, text) {
+  const wrap = document.getElementById('chatMsgs');
+  const d = document.createElement('div');
+  d.className = 'msg '+role;
+  d.innerHTML = `<div class="msg-av">${role==='ai'?'🤖':'👤'}</div><div class="msg-bub">${text.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}</div>`;
+  wrap.appendChild(d); wrap.scrollTop=wrap.scrollHeight;
+}
+function addTyping() {
+  const wrap=document.getElementById('chatMsgs');
+  const d=document.createElement('div');
+  d.className='msg ai';d.id='typInd';
+  d.innerHTML=`<div class="msg-av">🤖</div><div class="msg-bub typing"><div class="td"></div><div class="td"></div><div class="td"></div></div>`;
+  wrap.appendChild(d);wrap.scrollTop=wrap.scrollHeight;
+}
+function rmTyping(){const e=document.getElementById('typInd');if(e)e.remove();}
+const FALLBACKS = {
+  eps:`**EPS vs XPS 비교**\n\n• EPS 비드법: λ=0.031, 흡수율≤5%, 경제성 우수\n• XPS 압출법: λ=0.028, 흡수율≤0.3%, 지하·바닥 적합\n• 가격: XPS가 약 20~25% 비쌈\n• 선택: 일반 외벽→EPS, 지하·바닥→XPS`,
+  열교:`**열교(Thermal Bridge) 대책**\n\n발생 위치:\n• 콘크리트 슬래브-외벽 접합부\n• 창호 주변 틀 부위\n\n해결: 외단열 시스템(EIFS), 열교 차단재(Thermal Break) 설치`,
+  병원:`**의료시설 단열 설계 주요사항**\n\n• 24시간 운영으로 에너지 부하가 높음 (약 380 kWh/m²yr)\n• 감염 방지를 위한 양압/음압 설계 고려\n• 결로 방지 철저 (환자 안전)\n• 고성능 창호(U≤1.4) 권장\n• 외단열 복합패널(EIFS) 시스템 추천`,
+  default:`건축 단열 전문 AI입니다.\n\n**Gemini API Key를 입력하시면** 실시간으로 더 정확하고 상세한 답변을 받으실 수 있습니다.\n\nGoogle AI Studio(aistudio.google.com)에서 무료로 발급받으실 수 있습니다.`,
+};
+async function sendChat() {
+  const inp=document.getElementById('chatInp');
+  const msg=inp.value.trim();if(!msg)return;
+  inp.value='';addMsg('user',msg);addTyping();
+  if(geminiKey){
+    try{
+      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          system_instruction:{parts:[{text:'당신은 건축 단열재 및 에너지 전문가입니다. 한국 건축물 에너지절약설계기준, 단열재 KS 규격, 친환경 건축 인증에 대한 전문 지식을 갖추고 있습니다. 마크다운 형식(**굵게**, 목록)을 사용해 한국어로 답변하세요.'}]},
+          contents:[{parts:[{text:msg}]}],
+          generationConfig:{maxOutputTokens:1500,temperature:0.7}
+        })
+      });
+      const data=await res.json();rmTyping();
+      if(data.candidates?.[0]?.content?.parts?.[0]?.text) addMsg('ai',data.candidates[0].content.parts[0].text);
+      else addMsg('ai','⚠️ API 오류: '+(data.error?.message||'알 수 없는 오류'));
+    }catch(e){rmTyping();addMsg('ai','⚠️ 네트워크 오류. 잠시 후 다시 시도해주세요.');}
+  } else {
+    await new Promise(r=>setTimeout(r,800));rmTyping();
+    let resp=FALLBACKS.default;
+    if(msg.includes('EPS')||msg.includes('XPS')||msg.includes('비드')) resp=FALLBACKS.eps;
+    else if(msg.includes('열교')) resp=FALLBACKS.열교;
+    else if(msg.includes('병원')||msg.includes('의료')) resp=FALLBACKS.병원;
+    addMsg('ai',resp);
+  }
+}
+
+// ════════════════════════════
+// INIT
+// ════════════════════════════
+window.addEventListener('load',()=>{
+  setTimeout(()=>{
+    const ol=document.getElementById('loadingOverlay');
+    ol.style.opacity='0';
+    setTimeout(()=>ol.style.display='none',400);
+  },800);
+
+  // Quick questions
+  document.getElementById('quickQs').innerHTML = QUICK_QUESTIONS.map(q=>`<button class="btn btn-sec" onclick="document.getElementById('chatInp').value=this.dataset.q;sendChat();" data-q="${q}" style="text-align:left;justify-content:flex-start;font-size:12px;">💬 ${q}</button>`).join('');
+
+  // Init location dropdown
+  onLocationChange();
+
+  // Init DB
+  filterDB('all');
+
+  // Init sliders
+  [['bldArea','bldAreaV','m²'],['wallThick','wallThickV','mm'],['roofThick','roofThickV','mm'],['floorThick','floorThickV','mm'],['enrgCost','enrgCostV','만원'],['inflation','inflationV','%']]
+    .forEach(([id,vid,u])=>sv(id,vid,u));
+
+  // Init scenario
+  applyPreset('passive');
+});
+</script>
+
+
+</body>
+</html>

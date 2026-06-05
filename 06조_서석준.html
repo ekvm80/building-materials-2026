@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>플라스틱 자외선 노화 시뮬레이터</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+        
+        /* 메인 타이틀 헤더 스타일 */
+        .main-header {
+            background: linear-gradient(135deg, #0056b3, #004494);
+            color: white;
+            padding: 25px 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .main-header h1 { margin: 0; font-size: 2em; letter-spacing: 1px; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
+        .main-header p { margin: 10px 0 0 0; font-size: 1.05em; color: #d1e4f9; font-weight: 500; }
+
+        .top-section { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+        
+        /* 패널 공통 스타일 */
+        .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); box-sizing: border-box; }
+        
+        /* 컨트롤 패널 */
+        .control-panel { width: 320px; flex-shrink: 0; }
+        label { font-weight: bold; margin-top: 15px; display: block; font-size: 0.95em; color: #333; }
+        select, input[type="range"] { width: 100%; margin-top: 8px; padding: 10px; border-radius: 6px; border: 1px solid #ddd; font-size: 1em; box-sizing: border-box; }
+        .checkbox-label { display: flex; align-items: center; gap: 8px; margin-top: 15px; font-weight: bold; cursor: pointer; color: #0056b3; }
+        .checkbox-label input { width: auto; margin: 0; transform: scale(1.2); }
+        
+        /* 리포트 생성 버튼 스타일 */
+        #report-btn {
+            width: 100%; margin-top: 25px; padding: 12px;
+            background-color: #0056b3; color: white; border: none; border-radius: 8px;
+            font-size: 1.05em; font-weight: bold; cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,86,179,0.2);
+        }
+        #report-btn:hover { background-color: #004494; transform: translateY(-2px); box-shadow: 0 6px 10px rgba(0,86,179,0.3); }
+        #report-btn:active { transform: translateY(0); box-shadow: 0 2px 4px rgba(0,86,179,0.2); }
+        #report-btn:disabled { background-color: #6c757d; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* 그래프 패널 */
+        .chart-panel { flex-grow: 1; min-width: 500px; height: 500px; }
+        
+        /* 가상 프리뷰 패널 */
+        .preview-panel { width: 280px; flex-shrink: 0; text-align: center; }
+        .preview-title { font-weight: bold; margin-bottom: 15px; color: #555; }
+        
+        /* 플라스틱 샘플 스타일 */
+        #plastic-sample { 
+            width: 150px; height: 150px; background-color: #f0f0f0; border-radius: 10px; margin: 0 auto; 
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1), 0 5px 15px rgba(0,0,0,0.15);
+            transition: background-color 0.4s ease;
+            position: relative; overflow: hidden; 
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.06'/%3E%3C/svg%3E");
+        }
+
+        /* SVG 균열 레이어 */
+        #crack-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+        /* 상태 표시 태그 */
+        .status-tag { margin-top: 15px; display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; font-weight: bold; background-color: #eee; color: #555; transition: all 0.3s ease; }
+
+        /* AI 리포트 패널 */
+        .report-panel { border-left: 5px solid #0056b3; line-height: 1.7; min-height: 120px; }
+        .report-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .report-title { font-weight: bold; color: #0056b3; font-size: 1.2em; display: flex; align-items: center; gap: 10px; margin: 0; }
+        
+        #export-buttons { display: none; gap: 10px; }
+        .export-btn { padding: 8px 12px; border: none; border-radius: 5px; font-weight: bold; font-size: 0.9em; cursor: pointer; transition: background-color 0.2s ease; display: flex; align-items: center; gap: 5px;}
+        .pdf-btn { background-color: #dc3545; color: white; } .pdf-btn:hover { background-color: #c82333; }
+        .word-btn { background-color: #2b579a; color: white; } .word-btn:hover { background-color: #1e3f73; }
+
+        .highlight { font-weight: bold; color: #d9534f; }
+        .placeholder-text { color: #666; font-style: italic; background-color: #f8f9fa; padding: 15px; border-radius: 8px; display: block; }
+
+        /* 반응형 웹 처리 */
+        @media (max-width: 992px) {
+            .control-panel, .preview-panel, .chart-panel { width: 100%; min-width: auto; }
+            .chart-panel { height: 400px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-header">
+        <h1>☀️ 플라스틱 자외선 노화 시뮬레이터</h1>
+        <p>다중 환경 변수(자외선, 온도) 및 설계 조건(두께, 첨가제) 기반 고분자 소재 열화 분석 시스템</p>
+    </div>
+
+    <div class="top-section">
+        <div class="panel control-panel">
+            <h2 style="margin-top:0;">환경 및 소재 설정</h2>
+            
+            <label for="region">지역 (자외선/온도 데이터 연동)</label>
+            <select id="region" onchange="runSimulation()"></select>
+
+            <label for="material">플라스틱 소재 (주요 용도)</label>
+            <select id="material" onchange="runSimulation()">
+                <option value="3.0,ABS">ABS (가전제품 외장재, 자동차 내장재, 완구류 등)</option>
+                <option value="2.5,PVC">PVC (건축용 창틀, 파이프, 전선 피복, 옥외 패널 등)</option>
+                <option value="1.5,PC">PC (건축물 캐노피, 방음벽, 헤드램프, 투명 커버 등)</option>
+                <option value="0.2,PMMA">PMMA (옥외 간판, 자동차 테일램프, 조명 커버 등)</option>
+                <option value="1.0,PP">PP (야외용 가구, 자동차 범퍼, 산업용 팔레트 등)</option>
+            </select>
+
+            <label for="thickness">소재 두께: <span id="thick-val" class="highlight">2</span> mm</label>
+            <input type="range" id="thickness" min="1" max="10" value="2" step="0.5" oninput="updateLabels(); runSimulation();">
+
+            <label class="checkbox-label">
+                <input type="checkbox" id="uv-stab" onchange="runSimulation()"> 자외선 안정제 첨가 (UV Stabilizer)
+            </label>
+
+            <label for="years" style="margin-top:20px;">노출 기간: <span id="year-val" class="highlight">10</span>년</label>
+            <input type="range" id="years" min="0" max="20" value="10" step="1" oninput="updateLabels(); runSimulation();">
+            
+            <button id="report-btn" onclick="triggerAIReport()">🤖 AI 분석 리포트 생성</button>
+        </div>
+
+        <div class="panel preview-panel">
+            <div class="preview-title">📹 파손 경과 가상 프리뷰 (<span id="preview-year">10</span>년 차)</div>
+            
+            <div id="plastic-sample">
+                <svg id="crack-svg" viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <filter id="crack-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feDropShadow dx="0.5" dy="0.5" stdDeviation="0.5" flood-color="#ffffff" flood-opacity="0.4"/>
+                        </filter>
+                    </defs>
+                    <g stroke="#3b332b" stroke-width="1.2" fill="none" opacity="0.85" stroke-linecap="round" stroke-linejoin="round" filter="url(#crack-shadow)">
+                        <path class="crack-path" d="M -10 -10 L 25 15 L 20 40 L 50 65 L 45 95 L 85 125 L 80 160"/>
+                        <path class="crack-path" d="M 50 65 L 75 55 L 100 65 L 130 45 L 160 50"/>
+                        <path class="crack-path" d="M 45 95 L 20 90 L 5 110"/>
+                        <path class="crack-path" d="M 85 125 L 115 120 L 145 135"/>
+                        <path class="crack-path" d="M 150 100 L 125 90 L 115 105"/>
+                        <path class="crack-path" d="M 60 -10 L 70 20 L 95 25"/>
+                    </g>
+                </svg>
+            </div>
+            
+            <div id="material-status" class="status-tag">상태 분석 중...</div>
+        </div>
+
+        <div class="panel chart-panel">
+            <canvas id="degradationChart"></canvas>
+        </div>
+    </div>
+
+    <div class="panel report-panel">
+        <div class="report-header">
+            <div class="report-title">🤖 시뮬레이션 분석 리포트</div>
+            <div id="export-buttons">
+                <button onclick="exportToPDF()" class="export-btn pdf-btn">📄 PDF 저장</button>
+                <button onclick="exportToWord()" class="export-btn word-btn">📝 Word 저장</button>
+            </div>
+        </div>
+        
+        <div id="ai-report-content">
+            <span class="placeholder-text">좌측의 <strong>'🤖 AI 분석 리포트 생성'</strong> 버튼을 클릭하여 선택한 설정에 대한 종합 진단 및 사후 처리 가이드를 확인하세요.</span>
+        </div>
+    </div>
+
+    <script>
+        let chartInstance = null;
+        let isFirstLoad = true; 
+
+        // 지역별 UV Index와 평균 온도(Temp) 데이터
+        const regionsData = { 
+            "서울": { uv: 4.5, temp: 12.5 }, "부산": { uv: 5.2, temp: 14.7 }, 
+            "대구": { uv: 5.0, temp: 14.1 }, "인천": { uv: 4.4, temp: 12.1 }, 
+            "광주": { uv: 4.8, temp: 13.8 }, "대전": { uv: 4.7, temp: 13.0 }, 
+            "울산": { uv: 5.1, temp: 14.3 }, "제주": { uv: 6.5, temp: 16.5 },
+            "경기": { uv: 4.5, temp: 12.0 }, "강원": { uv: 4.2, temp: 11.0 }
+        };
+
+        function populateRegions() {
+            const regionSelect = document.getElementById('region');
+            Object.keys(regionsData).forEach(city => regionSelect.add(new Option(city, city)));
+        }
+
+        function updateLabels() {
+            const years = document.getElementById('years').value;
+            const thickness = document.getElementById('thickness').value;
+            document.getElementById('year-val').innerText = years;
+            document.getElementById('preview-year').innerText = years;
+            document.getElementById('thick-val').innerText = thickness;
+        }
+
+        function initCracks() {
+            const paths = document.querySelectorAll('.crack-path');
+            paths.forEach(path => {
+                const length = path.getTotalLength();
+                path.dataset.length = length;
+                path.style.strokeDasharray = length;
+                path.style.strokeDashoffset = length; 
+                path.style.transition = 'stroke-dashoffset 0.4s ease-out';
+            });
+        }
+
+        function updateVirtualPreview(yi, strength, years) {
+            const sample = document.getElementById('plastic-sample');
+            const statusTag = document.getElementById('material-status');
+
+            const yellowFactor = Math.min(yi * 4, 150); 
+            const red = 240; 
+            const green = Math.max(240 - yellowFactor * 0.5, 100); 
+            const blue = Math.max(240 - yellowFactor * 1.5, 20);  
+            sample.style.backgroundColor = `rgb(${red}, ${green}, ${blue})`;
+
+            const crackProgress = Math.max(0, Math.min(1, (85 - strength) / 65)); 
+            const paths = document.querySelectorAll('.crack-path');
+            paths.forEach(path => {
+                const length = parseFloat(path.dataset.length);
+                path.style.strokeDashoffset = length * (1 - crackProgress);
+            });
+
+            if (years == 0) {
+                statusTag.innerText = "초기 상태 (건전)"; statusTag.style.backgroundColor = "#eee"; statusTag.style.color = "#555";
+            } else if (strength > 85) {
+                statusTag.innerText = "양호 (미세 변색)"; statusTag.style.backgroundColor = "#dff0d8"; statusTag.style.color = "#3c763d";
+            } else if (strength > 60) {
+                statusTag.innerText = "주의 (균열 시작)"; statusTag.style.backgroundColor = "#fcf8e3"; statusTag.style.color = "#8a6d3b";
+            } else {
+                statusTag.innerText = "파손 위험 (취화 심각)"; statusTag.style.backgroundColor = "#f2dede"; statusTag.style.color = "#a94442";
+            }
+        }
+
+        // 통합 환경 스트레스 계산 함수 (Arrhenius 모델 기반)
+        function calculateDegradation(materialFactor, regionObj, thickness, hasUVStab, year) {
+            const uvFactor = regionObj.uv / 5.0; 
+            const tempFactor = Math.exp(0.05 * (regionObj.temp - 12.5)); 
+            const thickFactor = 2.0 / thickness; 
+            const stabFactor = hasUVStab ? 0.4 : 1.0; 
+            const totalStress = materialFactor * uvFactor * tempFactor * thickFactor * stabFactor;
+
+            let yi = 5 + (year * totalStress * 2.2);
+            let strength = 100 - (Math.pow(year, 1.3) * totalStress * 1.2);
+            if (strength < 0) strength = 0;
+
+            return { yi: yi, strength: strength };
+        }
+
+        function runSimulation() {
+            const cityName = document.getElementById('region').value || "서울";
+            const regionObj = regionsData[cityName];
+            const materialValue = document.getElementById('material').value.split(',');
+            const materialFactor = parseFloat(materialValue[0]);
+            
+            const thickness = parseFloat(document.getElementById('thickness').value);
+            const hasUVStab = document.getElementById('uv-stab').checked;
+            const selectedYear = parseInt(document.getElementById('years').value);
+            
+            const labels = []; const yiData = []; const strengthData = []; 
+            let finalYI, finalStrength;
+
+            for (let i = 0; i <= selectedYear; i++) {
+                labels.push(`${i}년`);
+                const res = calculateDegradation(materialFactor, regionObj, thickness, hasUVStab, i);
+                yiData.push(res.yi.toFixed(1));
+                strengthData.push(res.strength.toFixed(1));
+                if (i === selectedYear) { finalYI = res.yi; finalStrength = res.strength; }
+            }
+
+            drawChart(labels, yiData, strengthData, cityName);
+            updateVirtualPreview(finalYI, finalStrength, selectedYear);
+            
+            if (!isFirstLoad) {
+                const contentDiv = document.getElementById('ai-report-content');
+                contentDiv.innerHTML = '<span class="placeholder-text">⚠️ 변수(두께, 안정제 등) 설정값이 변경되었습니다. 새로운 진단 결과를 보려면 좌측의 <strong>[🤖 AI 분석 리포트 생성]</strong> 버튼을 다시 눌러주세요.</span>';
+                document.getElementById('export-buttons').style.display = 'none';
+            }
+        }
+
+        function triggerAIReport() {
+            const btn = document.getElementById('report-btn');
+            const contentDiv = document.getElementById('ai-report-content');
+            
+            btn.innerText = "⏳ 정밀 분석 데이터 생성 중...";
+            btn.disabled = true;
+            contentDiv.innerHTML = '<span class="placeholder-text">다중 환경 변수(온도, 자외선, 두께, 첨가제)를 종합하여 물리/화학적 열화 메커니즘을 진단하고 있습니다...</span>';
+            document.getElementById('export-buttons').style.display = 'none';
+
+            setTimeout(() => {
+                const cityName = document.getElementById('region').value || "서울";
+                const regionObj = regionsData[cityName];
+                const materialValue = document.getElementById('material').value.split(',');
+                const materialFactor = parseFloat(materialValue[0]);
+                const materialName = materialValue[1];
+                const thickness = parseFloat(document.getElementById('thickness').value);
+                const hasUVStab = document.getElementById('uv-stab').checked;
+                const selectedYear = parseInt(document.getElementById('years').value);
+                
+                const finalRes = calculateDegradation(materialFactor, regionObj, thickness, hasUVStab, selectedYear);
+                
+                // 타임라인 역산 로직 (1~50년 예측)
+                let yCaution = null;
+                let yDanger = null;
+                for(let y = 1; y <= 50; y++){
+                    const tempRes = calculateDegradation(materialFactor, regionObj, thickness, hasUVStab, y);
+                    if(yCaution === null && (tempRes.strength < 80 || tempRes.yi > 10)) yCaution = y;
+                    if(yDanger === null && (tempRes.strength < 50 || tempRes.yi > 25)) {
+                        yDanger = y; break;
+                    }
+                }
+
+                generateAIReport(cityName, regionObj, materialName, thickness, hasUVStab, selectedYear, finalRes.yi, finalRes.strength, yCaution, yDanger);
+                
+                btn.innerText = "🤖 AI 분석 리포트 생성";
+                btn.disabled = false;
+                
+                if (selectedYear > 0) {
+                    document.getElementById('export-buttons').style.display = 'flex';
+                }
+            }, 800);
+        }
+
+        function generateAIReport(cityName, regionObj, materialName, thickness, hasUVStab, years, yi, strength, yCaution, yDanger) {
+            const contentDiv = document.getElementById('ai-report-content');
+            if (years == 0) {
+                contentDiv.innerHTML = "<span class='placeholder-text'>시뮬레이션 기간을 1년 이상으로 설정한 후 다시 실행하여 분석 결과를 확인하세요.</span>";
+                return;
+            }
+
+            const stabText = hasUVStab ? "<span style='color:#0056b3; font-weight:bold;'>첨가됨 (라디칼 포획 및 자외선 흡수 기작 활성화)</span>" : "<span style='color:#d9534f; font-weight:bold;'>미첨가 (광산화 열화 가속 위험 노출)</span>";
+
+            let reportHtml = `<div style="font-family: 'Segoe UI', sans-serif; line-height: 1.6; color: #222; font-size: 0.95em;">`;
+
+            // 1. 개요 (Overview)
+            reportHtml += `<h3 style="color: #0056b3; border-bottom: 2px solid #0056b3; padding-bottom: 8px; margin-bottom: 15px;">📑 내후성 종합 정밀 진단 리포트</h3>`;
+            reportHtml += `<div style="background-color: #f0f7ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #cce5ff;">`;
+            reportHtml += `<p style="margin: 0 0 5px 0;"><strong>📍 노출 환경:</strong> ${cityName} (UV Index: ${regionObj.uv}, 연평균 기온: ${regionObj.temp}℃)</p>`;
+            reportHtml += `<p style="margin: 0 0 5px 0;"><strong>🧪 대상 소재:</strong> ${materialName} (두께: ${thickness}mm) / 노출 기간: ${years}년</p>`;
+            reportHtml += `<p style="margin: 0;"><strong>🛡️ UV 안정제:</strong> ${stabText}</p>`;
+            reportHtml += `</div>`;
+
+            // 2. 광학/외관 특성 분석
+            reportHtml += `<h4 style="color: #333; margin-bottom: 8px;">☀️ 광학 및 외관 특성 (예측 황변도 YI: <span style="color:#d9534f;">${yi.toFixed(1)}</span>)</h4>`;
+            reportHtml += `<ul style="margin-top: 0; padding-left: 20px; margin-bottom: 20px;">`;
+            if (yi > 25) {
+                reportHtml += `<li><strong>현재 상태:</strong> <span style="color:#d9534f; font-weight:bold;">심각한 변색 및 광학적 파괴</span></li>`;
+                reportHtml += `<li><strong>화학적 메커니즘:</strong> 지속적인 자외선(UV) 에너지 흡수로 인해 고분자 주쇄(Backbone)가 끊어지며 발색단(Chromophore)이 대량 형성되었습니다. 투명 소재의 경우 내부 광투과율이 현저히 저하되어 시야 확보나 광학적 기능을 완전히 상실했습니다.</li>`;
+            } else if (yi > 10) {
+                reportHtml += `<li><strong>현재 상태:</strong> <span style="font-weight:bold; color: #8a6d3b;">경미한 황변 진행 (Yellowing)</span></li>`;
+                reportHtml += `<li><strong>화학적 메커니즘:</strong> 표면층을 중심으로 광산화(Photo-oxidation) 반응이 시작되어 육안으로 누런 변색이 인지됩니다. 초기 표면 광택(Gloss)이 점진적으로 감소하는 단계입니다.</li>`;
+            } else {
+                reportHtml += `<li><strong>현재 상태:</strong> <span style="color:#5cb85c; font-weight:bold;">초기 상태 유지 (건전)</span></li>`;
+                reportHtml += `<li><strong>화학적 메커니즘:</strong> 고분자 사슬의 배열이 안정적으로 유지되고 있으며, 가시광선 영역에서의 흡수 현상이 일어나지 않아 고유의 색상과 투명도를 유지하고 있습니다.</li>`;
+            }
+            reportHtml += `</ul>`;
+
+            // 3. 기계적 특성 분석
+            reportHtml += `<h4 style="color: #333; margin-bottom: 8px;">🔨 기계적 및 물리적 특성 (인장강도 유지율: <span style="color:#d9534f;">${strength.toFixed(1)}%</span>)</h4>`;
+            reportHtml += `<ul style="margin-top: 0; padding-left: 20px; margin-bottom: 20px;">`;
+            if (strength < 50) {
+                reportHtml += `<li><strong>현재 상태:</strong> <span style="color:#d9534f; font-weight:bold;">취화 심각 (Embrittlement) 및 파손 위험</span></li>`;
+                reportHtml += `<li><strong>물리적 메커니즘:</strong> 분자량(Molecular Weight)이 급감하는 사슬 절단(Chain Scission) 현상이 한계치를 넘었습니다. 소재가 연성(Ductility)을 잃고 유리처럼 부스러지는 상태이며, 미세 공극이 결합해 작은 충격에도 완전히 파괴됩니다.</li>`;
+            } else if (strength < 80) {
+                reportHtml += `<li><strong>현재 상태:</strong> <span style="color: #8a6d3b; font-weight: bold;">미세 균열 발생 (Micro-cracking) 주의</span></li>`;
+                reportHtml += `<li><strong>물리적 메커니즘:</strong> 표면에 미세한 크랙이 발생하여 응력 집중(Stress Concentration) 유발점이 형성되었습니다. 환경 응력 균열(ESC) 파손으로 이어질 수 있어 동적 하중(진동, 충격)이 가해지는 환경에서는 주의가 필요합니다.</li>`;
+            } else {
+                reportHtml += `<li><strong>현재 상태:</strong> <span style="color:#5cb85c; font-weight:bold;">구조적 강도 유지</span></li>`;
+                reportHtml += `<li><strong>물리적 메커니즘:</strong> 구조 손상이 미미하여 설계 시 의도한 초기 인장 강도와 충격 흡수 성능을 안정적으로 발휘하고 있습니다.</li>`;
+            }
+            reportHtml += `</ul>`;
+
+            // 4. 환경 변수 영향도 평가
+            reportHtml += `<h4 style="color: #333; margin-bottom: 8px;">🌍 설계 및 환경 변수 영향도</h4>`;
+            reportHtml += `<ul style="margin-top: 0; padding-left: 20px; margin-bottom: 20px;">`;
+            if (regionObj.uv > 5.0 || regionObj.temp > 14.0) {
+                reportHtml += `<li><strong>지역 기후 요인:</strong> ${cityName} 지역은 상대적으로 높은 자외선 지수와 기온을 기록하므로, 아레니우스 가속 법칙에 따라 분해 반응이 타 지역 대비 기하급수적으로 가속(Acceleration)되는 환경입니다.</li>`;
+            } else {
+                reportHtml += `<li><strong>지역 기후 요인:</strong> ${cityName} 지역은 온건한 기후 조건으로 광산화 속도가 비교적 완만하게 진행됩니다.</li>`;
+            }
+            
+            if (thickness >= 5.0) {
+                reportHtml += `<li><strong>두께 방어 효과:</strong> ${thickness}mm의 두꺼운 설계가 내부 코어 층까지 자외선이 침투하는 것을 효과적으로 차단(Shielding Effect)하여 물리적 붕괴를 크게 지연시키고 있습니다.</li>`;
+            } else {
+                reportHtml += `<li><strong>두께 취약성:</strong> ${thickness}mm의 얇은 두께로 인해 자외선 에너지가 소재 관통 부피 대비 크게 작용하여 전체적인 열화 속도가 매우 빠릅니다.</li>`;
+            }
+            reportHtml += `</ul>`;
+
+            // 5. 예측 유지보수 타임라인 (Predictive Maintenance Timeline)
+            reportHtml += `<h4 style="color: #333; margin-top: 25px; margin-bottom: 15px;">⏱️ 예측 유지보수 타임라인 (생애주기 기준)</h4>`;
+            reportHtml += `<div style="border-left: 3px solid #dee2e6; padding-left: 20px; margin-left: 10px; position: relative; margin-bottom: 25px;">`;
+            
+            // Timeline 1: 설치
+            reportHtml += `<div style="margin-bottom: 18px; position: relative;">
+                <div style="position: absolute; left: -28px; top: 4px; width: 10px; height: 10px; background: #5cb85c; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 2px #5cb85c;"></div>
+                <strong style="font-size: 1.05em;">0년차 (초기 설치)</strong>
+                <p style="margin: 3px 0 0 0; color: #555; font-size: 0.9em;">성능 100% 발휘. 예방 차원의 오염물(염분, 먼지) 정기 세척 권장.</p>
+            </div>`;
+
+            // Timeline 2: 주의 (Caution)
+            if (yCaution) {
+                reportHtml += `<div style="margin-bottom: 18px; position: relative;">
+                    <div style="position: absolute; left: -28px; top: 4px; width: 10px; height: 10px; background: #f0ad4e; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 2px #f0ad4e;"></div>
+                    <strong style="font-size: 1.05em;">예측 ${yCaution}년차 (유지보수 개입 권고)</strong>
+                    <p style="margin: 3px 0 0 0; color: #555; font-size: 0.9em;">표면 미세 크랙 및 육안 변색(YI>10)이 유의미하게 시작되는 시점입니다.</p>
+                    <p style="margin: 3px 0 0 0; color: #8a6d3b; font-size: 0.9em; font-weight: bold;">👉 조치: 정밀 표면 검사 실시 및 자외선 차단 코팅(UV-blocking) 재도포 요망.</p>
+                </div>`;
+            }
+
+            // Timeline 3: 위험/교체 (Danger)
+            if (yDanger) {
+                reportHtml += `<div style="position: relative;">
+                    <div style="position: absolute; left: -28px; top: 4px; width: 10px; height: 10px; background: #d9534f; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 2px #d9534f;"></div>
+                    <strong style="font-size: 1.05em;">예측 ${yDanger}년차 (수명 종료 및 전면 교체)</strong>
+                    <p style="margin: 3px 0 0 0; color: #555; font-size: 0.9em;">인장강도가 초기 대비 50% 미만으로 취화되거나 극심한 변색 한계점에 도달합니다.</p>
+                    <p style="margin: 3px 0 0 0; color: #d9534f; font-size: 0.9em; font-weight: bold;">👉 조치: 구조적 파손 위험으로 인해 보수가 불가능하며, 부품 전면 교체가 필수적입니다.</p>
+                </div>`;
+            } else {
+                // 50년 이내에 도달하지 않는 경우
+                reportHtml += `<div style="position: relative;">
+                    <div style="position: absolute; left: -28px; top: 4px; width: 10px; height: 10px; background: #5bc0de; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 2px #5bc0de;"></div>
+                    <strong style="font-size: 1.05em;">50년 이상 (장기 내구성 확보)</strong>
+                    <p style="margin: 3px 0 0 0; color: #555; font-size: 0.9em;">현재 환경 및 설계(두께/안정제) 조건에서는 50년 이상 파손 임계점에 도달하지 않는 우수한 내구성을 보입니다.</p>
+                </div>`;
+            }
+            reportHtml += `</div>`;
+
+            // 6. 소재별 유지보수 및 대책 가이드
+            reportHtml += `<div style="background-color: #fdfdfd; padding: 15px; border-radius: 8px; border-left: 5px solid #28a745; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">`;
+            reportHtml += `<h4 style="margin-top: 0; color: #28a745; margin-bottom: 10px;">🛠️ ${materialName} 맞춤형 엔지니어링 및 재설계 가이드</h4>`;
+            reportHtml += `<ul style="margin: 0; padding-left: 20px;">`;
+
+            if (materialName === "ABS") {
+                reportHtml += `<li><strong>화학적 약점:</strong> 고무상(Butadiene) 이중 결합이 자외선과 산소에 의해 매우 쉽게 끊어져 황변과 취화가 동시다발적으로 발생합니다.</li>`;
+                reportHtml += `<li style="margin-top: 5px;"><strong>유지보수 처방:</strong> 정기적인 자외선 차단 코팅(UV-blocking Coating) 도포가 필수적이며, 이미 크랙이 생겼다면 표면 샌딩 후 불투명 우레탄 도장을 통해 복원해야 합니다.</li>`;
+                reportHtml += `<li style="margin-top: 5px;"><strong>소재 전환 제안:</strong> 옥외 노출 부품이라면, 태생적으로 자외선 내성이 뛰어난 아크릴 고무 기반의 <strong>ASA (Acrylonitrile Styrene Acrylate)</strong> 소재로의 변경을 강력히 권장합니다.</li>`;
+            } else if (materialName === "PVC") {
+                reportHtml += `<li><strong>화학적 약점:</strong> 자외선과 열에 의해 염화수소(HCl)가 이탈하는 탈염화수소화(Dehydrochlorination) 반응이 연쇄적으로 일어나며, 폴리엔(Polyene) 구조가 형성되어 급격한 황변(누런/갈색 변색)과 취화가 발생합니다.</li>`;
+                reportHtml += `<li style="margin-top: 5px;"><strong>유지보수 처방:</strong> 노출 초기 백화(Chalking) 현상이 보이면 즉시 표면 세척 후 아크릴계 또는 우레탄계 내후성 페인트로 차광 도장을 실시해야 수명을 연장할 수 있습니다.</li>`;
+                reportHtml += `<li style="margin-top: 5px;"><strong>설계 개선안:</strong> 옥외용으로 필수 사용 시, 원료 배합 단계에서 이산화티타늄(TiO2)과 같은 자외선 차폐제와 복합 열/광안정제를 고농도로 처방해야 하며, 극심한 노출 환경에서는 내열/내후성이 강화된 <strong>CPVC (염소화 폴리염화비닐)</strong>로의 대체를 고려하십시오.</li>`;
+            } else if (materialName === "PC") {
+                reportHtml += `<li><strong>화학적 약점:</strong> 자외선 황변 외에도 빗물과 열이 결합하면 에스테르 결합이 분해되는 가수분해(Hydrolysis)에 매우 취약합니다. 미분화(Chalking) 현상으로 투명도를 잃게 됩니다.</li>`;
+                reportHtml += `<li style="margin-top: 5px;"><strong>유지보수 처방:</strong> 표면에 물이 장기간 고이지 않도록 배수 구조를 점검하고, 표면 스크래치를 미세 컴파운드로 연마한 후 실록산(Siloxane) 계열 하드 코팅막을 재도포하십시오.</li>`;
+                reportHtml += `<li style="margin-top: 5px;"><strong>소재 전환 제안:</strong> 내충격성보다 장기 투명성 및 광학 유지가 더 중요한 어플리케이션이라면 <strong>PMMA (아크릴)</strong>로의 설계를 우선적으로 검토하십시오.</li>`;
+            } else if (materialName === "PMMA") {
+                reportHtml += `<li><strong>소재 강점:</strong> 메타크릴산 에스테르 구조로 인해 내후성이 최고 수준이며, 장기간 노출에도 황변 및 강도 저하가 거의 발생하지 않습니다.</li>`;
+                reportHtml += `<li style="margin-top: 5px;"><strong>유지보수 처방:</strong> 화학적 열화보다는 외부 마찰에 의한 물리적 스크래치가 시야를 방해하는 주원인이므로, 연마제가 없는 중성 세제와 극세사 천으로 주기적인 세척만 진행해도 수명이 극대화됩니다.</li>`;
+                reportHtml += `<li style="margin-top: 5px;"><strong>설계 시 주의점:</strong> 치수 안정성이 상대적으로 낮아 대면적 적용 시 온도 편차(여름/겨울)에 의한 열 수축 및 팽창 변형이 일어날 수 있으므로 기계적 여유 공차를 반드시 설계에 반영하십시오.</li>`;
+            } else if (materialName === "PP") {
+                reportHtml += `<li><strong>화학적 약점:</strong> 대표적인 결정성 고분자로 표면 산화가 일어난 후 구정(Spherulite) 경계면을 따라 깊은 크랙이 내부로 급속히 파고듭니다.</li>`;
+                reportHtml += `<li style="margin-top: 5px;"><strong>유지보수 처방:</strong> 미세 크랙이 육안으로 확인된 시점에서는 이미 강도 복원이 불가능합니다. 파손 전 카본 블랙(Carbon Black)이 고밀도로 포함된 차광 테이프나 시트를 부착하여 직사광선을 영구적으로 가려야 합니다.</li>`;
+                reportHtml += `<li style="margin-top: 5px;"><strong>설계 개선안:</strong> 부품 사출 공정 시 힌더드 아민계 광안정제(HALS) 및 1차/2차 산화방지제(Antioxidant)의 배합 비율을 노출 환경에 맞게 상향 조정하십시오.</li>`;
+            }
+
+            reportHtml += `</ul></div></div>`;
+            contentDiv.innerHTML = reportHtml;
+        }
+
+        function drawChart(labels, yiData, strengthData, cityName) {
+            const ctx = document.getElementById('degradationChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: `황변도 (YI) - ${cityName}`, data: yiData, borderColor: '#d4a017', backgroundColor: 'rgba(212, 160, 23, 0.1)', yAxisID: 'y1', tension: 0.4, fill: true, pointRadius: 2 },
+                        { label: '인장강도 유지율 (%)', data: strengthData, borderColor: '#c9302c', backgroundColor: 'rgba(201, 48, 44, 0.1)', yAxisID: 'y2', tension: 0.4, fill: true, pointRadius: 2 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+                    scales: { y1: { type: 'linear', position: 'left', title: {display: true, text:'황변도 (YI)'} }, y2: { type: 'linear', position: 'right', max: 100, min: 0, title: {display: true, text:'강도 유지율 (%)'}, grid: { drawOnChartArea: false } } }
+                }
+            });
+        }
+
+        function exportToPDF() {
+            const element = document.getElementById('ai-report-content');
+            const cityName = document.getElementById('region').value;
+            const opt = { margin: 15, filename: `플라스틱_내후성_정밀분석리포트_${cityName}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+            html2pdf().set(opt).from(element).save();
+        }
+
+        function exportToWord() {
+            const element = document.getElementById('ai-report-content');
+            const cityName = document.getElementById('region').value;
+            const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>AI Report</title></head><body>`;
+            const footer = "</body></html>";
+            const sourceHTML = header + element.innerHTML + footer;
+            const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+            const fileDownload = document.createElement("a");
+            document.body.appendChild(fileDownload); fileDownload.href = source; fileDownload.download = `플라스틱_내후성_정밀분석리포트_${cityName}.doc`; fileDownload.click(); document.body.removeChild(fileDownload);
+        }
+
+        window.onload = () => { populateRegions(); updateLabels(); initCracks(); runSimulation(); isFirstLoad = false; };
+    </script>
+</body>
+</html>

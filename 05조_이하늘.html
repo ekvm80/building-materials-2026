@@ -1,0 +1,1731 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>전대방안심 - 전남대 원룸 비교 분석 AI 대시보드</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+/* ============================================================
+   CSS VARIABLES & RESET
+   ============================================================ */
+:root {
+  --bg-base: #0d1117;
+  --bg-card: #161b22;
+  --bg-card2: #1c2230;
+  --bg-hover: #21293a;
+  --border: #30363d;
+  --border-light: #21293a;
+  --cnu-green: #1a7f5a;
+  --cnu-green-light: #22c47a;
+  --cnu-blue: #1a5caf;
+  --cnu-blue-light: #4da3ff;
+  --accent: #f59e0b;
+  --accent-light: #fbbf24;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #556070;
+  --red: #ef4444;
+  --red-light: #fca5a5;
+  --score-legal: #22c47a;
+  --score-physical: #4da3ff;
+  --score-infra: #f59e0b;
+  --score-economic: #a78bfa;
+  --score-comfort: #fb923c;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Noto Sans KR', 'Outfit', sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+/* ============================================================
+   APP LAYOUT
+   ============================================================ */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  height: 60px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 100;
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.logo-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--cnu-green), var(--cnu-blue));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: white;
+}
+.logo-icon svg { width: 18px; height: 18px; }
+
+.logo-text h1 {
+  font-size: 15px; font-weight: 700;
+  color: var(--text-primary);
+  display: flex; align-items: center; gap: 6px;
+}
+.logo-text p { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+
+.badge {
+  background: linear-gradient(135deg, var(--cnu-green), var(--cnu-blue));
+  color: white; font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 99px;
+}
+
+.url-parser-box {
+  flex: 1; display: flex; align-items: center;
+  gap: 8px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  max-width: 600px;
+}
+.url-parser-box .link-icon { color: var(--text-muted); flex-shrink: 0; }
+.url-parser-box .link-icon svg { width: 15px; height: 15px; }
+.url-parser-box input {
+  flex: 1; background: none; border: none; outline: none;
+  font-size: 13px; color: var(--text-primary);
+  font-family: inherit;
+}
+.url-parser-box input::placeholder { color: var(--text-muted); }
+.url-parser-box button {
+  display: flex; align-items: center; gap: 5px;
+  background: linear-gradient(135deg, var(--cnu-green), var(--cnu-blue));
+  color: white; border: none; border-radius: 6px;
+  padding: 5px 12px; font-size: 12px; font-weight: 600;
+  cursor: pointer; flex-shrink: 0; font-family: inherit;
+  transition: opacity 0.2s;
+}
+.url-parser-box button:hover { opacity: 0.85; }
+.url-parser-box button svg { width: 13px; height: 13px; }
+
+/* ============================================================
+   MAIN WORKSPACE
+   ============================================================ */
+.app-main {
+  display: grid;
+  grid-template-columns: 300px 1fr 340px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ============================================================
+   LEFT SIDEBAR
+   ============================================================ */
+.sidebar-left {
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.section-title {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 2px;
+}
+.section-title svg { width: 15px; height: 15px; color: var(--cnu-green-light); }
+.section-title h2 { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+
+.filter-label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  margin-bottom: 7px;
+}
+.filter-label svg { width: 13px; height: 13px; }
+
+.filter-group { display: flex; flex-direction: column; }
+
+.custom-select {
+  width: 100%; padding: 8px 10px;
+  background: var(--bg-base); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text-primary);
+  font-size: 12px; font-family: inherit; outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.custom-select:focus { border-color: var(--cnu-green-light); }
+
+.filter-header-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 7px;
+}
+.filter-header-row .filter-label { margin-bottom: 0; }
+
+.toggle-container { display: flex; gap: 3px; }
+.toggle-btn {
+  padding: 3px 8px; font-size: 11px; font-weight: 500;
+  background: var(--bg-base); border: 1px solid var(--border);
+  border-radius: 5px; color: var(--text-secondary);
+  cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.toggle-btn.active {
+  background: var(--cnu-green); border-color: var(--cnu-green);
+  color: white;
+}
+
+.custom-slider {
+  width: 100%; -webkit-appearance: none; appearance: none;
+  height: 4px; border-radius: 99px;
+  background: var(--border); outline: none; cursor: pointer;
+}
+.custom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--cnu-green-light);
+  border: 2px solid var(--bg-card); cursor: pointer;
+}
+
+.slider-values {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 5px; font-size: 11px; color: var(--text-muted);
+}
+.active-val { color: var(--cnu-green-light); font-weight: 600; font-size: 12px; }
+
+.radio-card-group { display: flex; gap: 8px; }
+.radio-card {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 7px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer;
+  font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  transition: all 0.2s; background: var(--bg-base);
+}
+.radio-card input { display: none; }
+.radio-card.active {
+  border-color: var(--cnu-green-light);
+  color: var(--cnu-green-light);
+  background: rgba(34,196,122,0.08);
+}
+
+.val-highlight { color: var(--cnu-green-light); font-weight: 600; }
+
+.hidden { display: none !important; }
+
+/* LIST SECTION */
+.list-section { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.list-title { margin-bottom: 0; }
+.list-title span { color: var(--cnu-green-light); }
+
+.rooms-list {
+  display: flex; flex-direction: column; gap: 7px;
+  overflow-y: auto; max-height: 280px;
+}
+
+.room-list-item {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.18s;
+  position: relative;
+}
+.room-list-item:hover { border-color: var(--cnu-green-light); background: var(--bg-hover); }
+.room-list-item.active {
+  border-color: var(--cnu-green-light);
+  background: rgba(34,196,122,0.07);
+}
+.room-list-item .item-name {
+  font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 3px;
+}
+.room-list-item .item-price {
+  font-size: 11px; color: var(--cnu-green-light); margin-bottom: 4px;
+}
+.room-list-item .item-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.item-tag {
+  font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  background: var(--bg-card2); color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+}
+.item-tag.walk { color: var(--score-infra); border-color: rgba(245,158,11,0.3); }
+.item-tag.type { color: var(--cnu-blue-light); border-color: rgba(77,163,255,0.3); }
+
+.item-score-badge {
+  position: absolute; top: 8px; right: 8px;
+  font-size: 11px; font-weight: 700;
+  padding: 2px 7px; border-radius: 5px;
+  background: rgba(34,196,122,0.15); color: var(--cnu-green-light);
+}
+
+/* ============================================================
+   MAP SECTION  ← 핵심 수정 부분
+   ============================================================ */
+.map-section {
+  position: relative;
+  overflow: hidden;
+  /* 부모 grid cell이 flex/grid로 크기를 결정 → 명시적 크기 필요 */
+  min-height: 0;
+  min-width: 0;
+}
+
+/* 지도 컨테이너: 부모를 100% 채움 */
+#map {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: #1a1f2e; /* 로딩 전 검은 화면 방지 */
+  z-index: 1;
+}
+
+.map-legend {
+  position: absolute; bottom: 16px; left: 16px;
+  z-index: 500;
+  background: rgba(22,27,34,0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.legend-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-secondary); }
+.legend-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.legend-dot.college { background: var(--cnu-green-light); }
+.legend-dot.room-wolse { background: var(--cnu-blue-light); }
+.legend-dot.room-jeonse { background: var(--accent-light); }
+
+/* ============================================================
+   RIGHT SIDEBAR
+   ============================================================ */
+.sidebar-right {
+  background: var(--bg-card);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.no-selection-state {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 40px 24px; text-align: center; gap: 12px;
+}
+.no-selection-state svg { width: 40px; height: 40px; color: var(--cnu-green-light); opacity: 0.5; }
+.no-selection-state h3 { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+.no-selection-state p { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.bounce-icon { animation: bounce 2s ease-in-out infinite; }
+
+.detail-content { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* DETAIL HEADER CARD */
+.detail-header-card {
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.detail-title-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.detail-title-row h2 { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.room-type-badge {
+  font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 5px;
+  background: rgba(77,163,255,0.15); color: var(--cnu-blue-light);
+  border: 1px solid rgba(77,163,255,0.3); flex-shrink: 0;
+}
+.detail-price-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.price { font-size: 13px; font-weight: 600; color: var(--cnu-green-light); }
+.overall-score-badge {
+  font-size: 11px; color: var(--text-secondary);
+  background: rgba(34,196,122,0.1); border: 1px solid rgba(34,196,122,0.25);
+  border-radius: 5px; padding: 3px 8px; flex-shrink: 0;
+}
+.overall-score-badge strong { color: var(--cnu-green-light); font-size: 13px; }
+.detail-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+.action-buttons-row { display: flex; gap: 8px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 12px; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  font-family: inherit; border: none; transition: all 0.18s; white-space: nowrap;
+}
+.btn svg { width: 13px; height: 13px; }
+.btn-primary-outline {
+  background: transparent; border: 1px solid var(--cnu-green-light);
+  color: var(--cnu-green-light);
+}
+.btn-primary-outline:hover { background: rgba(34,196,122,0.1); }
+.btn-accent-outline {
+  background: transparent; border: 1px solid var(--accent);
+  color: var(--accent);
+}
+.btn-accent-outline:hover { background: rgba(245,158,11,0.1); }
+
+/* AI REPORT */
+.ai-report-section { display: flex; flex-direction: column; gap: 10px; }
+.subsection-title {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.subsection-title svg { width: 14px; height: 14px; color: var(--cnu-green-light); }
+
+.ai-score-card {
+  background: var(--bg-card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.score-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.score-title { display: flex; align-items: center; gap: 8px; }
+.score-icon {
+  width: 28px; height: 28px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.score-icon svg { width: 14px; height: 14px; }
+.score-icon.legal { background: rgba(34,196,122,0.15); color: var(--score-legal); }
+.score-icon.physical { background: rgba(77,163,255,0.15); color: var(--score-physical); }
+.score-icon.infra { background: rgba(245,158,11,0.15); color: var(--score-infra); }
+.score-icon.economic { background: rgba(167,139,250,0.15); color: var(--score-economic); }
+.score-icon.comfort { background: rgba(251,146,60,0.15); color: var(--score-comfort); }
+
+.score-title h4 { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.score-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.score-value { font-size: 18px; font-weight: 700; color: var(--cnu-green-light); flex-shrink: 0; }
+
+.progress-bar-container {
+  height: 5px; background: var(--border); border-radius: 99px; overflow: hidden;
+}
+.progress-bar {
+  height: 100%; border-radius: 99px; transition: width 0.5s ease;
+}
+.progress-bar.legal { background: var(--score-legal); }
+.progress-bar.physical { background: var(--score-physical); }
+.progress-bar.infra { background: var(--score-infra); }
+.progress-bar.economic { background: var(--score-economic); }
+.progress-bar.comfort { background: var(--score-comfort); }
+
+.score-details-box {
+  font-size: 12px; color: var(--text-secondary); line-height: 1.5;
+  padding: 8px 10px;
+  background: var(--bg-base); border-radius: 6px;
+  border-left: 2px solid var(--border);
+}
+
+.score-links-row { display: flex; gap: 8px; }
+.score-ref-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--cnu-blue-light);
+  text-decoration: none; padding: 3px 7px;
+  border: 1px solid rgba(77,163,255,0.3); border-radius: 5px;
+  transition: all 0.18s;
+}
+.score-ref-link:hover { background: rgba(77,163,255,0.1); }
+.score-ref-link svg { width: 11px; height: 11px; }
+
+.btn-verify-doc {
+  display: flex; align-items: center; gap: 5px;
+  width: 100%; padding: 7px 12px;
+  background: linear-gradient(135deg, rgba(26,127,90,0.2), rgba(26,92,175,0.2));
+  border: 1px solid var(--border);
+  border-radius: 6px; font-size: 12px; font-weight: 500;
+  color: var(--cnu-green-light); cursor: pointer; font-family: inherit;
+  transition: all 0.18s; justify-content: center;
+}
+.btn-verify-doc:hover {
+  border-color: var(--cnu-green-light);
+  background: linear-gradient(135deg, rgba(26,127,90,0.3), rgba(26,92,175,0.3));
+}
+.btn-verify-doc svg { width: 13px; height: 13px; }
+
+.btn-amenity-toggle {
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 12px; font-size: 12px; font-weight: 500;
+  background: rgba(245,158,11,0.1); color: var(--accent);
+  border: 1px solid rgba(245,158,11,0.3); border-radius: 6px;
+  cursor: pointer; font-family: inherit; transition: all 0.18s;
+}
+.btn-amenity-toggle:hover { background: rgba(245,158,11,0.2); }
+.btn-amenity-toggle svg { width: 13px; height: 13px; }
+
+.score-options-box { display: flex; flex-wrap: wrap; gap: 5px; }
+.option-chip {
+  font-size: 11px; padding: 3px 8px; border-radius: 4px;
+  background: rgba(167,139,250,0.1); color: var(--score-economic);
+  border: 1px solid rgba(167,139,250,0.25);
+}
+
+.soundproof-detail-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+}
+.soundproof-item {
+  padding: 7px 9px; background: var(--bg-base);
+  border: 1px solid var(--border); border-radius: 6px;
+}
+.soundproof-item .si-label { font-size: 10px; color: var(--text-muted); margin-bottom: 2px; }
+.soundproof-item .si-value { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.soundproof-item .si-value.good { color: var(--score-legal); }
+.soundproof-item .si-value.bad { color: var(--red); }
+.soundproof-item .si-value.mid { color: var(--accent); }
+
+/* AI SUMMARY */
+.ai-summary-report { display: flex; flex-direction: column; gap: 10px; }
+.summary-box { background: var(--bg-card2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.pros-cons-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pros-box, .cons-box {
+  padding: 10px; border-radius: var(--radius-sm);
+}
+.pros-box { background: rgba(34,196,122,0.07); border: 1px solid rgba(34,196,122,0.2); }
+.cons-box { background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.2); }
+.pros-box h5, .cons-box h5 {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; margin-bottom: 7px;
+}
+.pros-box h5 { color: var(--score-legal); }
+.cons-box h5 { color: var(--red); }
+.pros-box h5 svg, .cons-box h5 svg { width: 13px; height: 13px; }
+.pros-box ul, .cons-box ul {
+  list-style: none; display: flex; flex-direction: column; gap: 4px;
+}
+.pros-box li, .cons-box li { font-size: 11px; color: var(--text-secondary); padding-left: 10px; position: relative; }
+.pros-box li::before { content: "·"; position: absolute; left: 2px; color: var(--score-legal); }
+.cons-box li::before { content: "·"; position: absolute; left: 2px; color: var(--red); }
+
+.target-recommendation {
+  padding: 10px; border-radius: var(--radius-sm);
+  background: rgba(245,158,11,0.07); border: 1px solid rgba(245,158,11,0.2);
+}
+.target-recommendation h5 { font-size: 12px; font-weight: 600; color: var(--accent); margin-bottom: 6px; }
+.target-recommendation p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+/* ============================================================
+   COMPARISON TRAY
+   ============================================================ */
+.comparison-tray {
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  padding: 10px 20px;
+  flex-shrink: 0;
+  display: none;
+}
+.comparison-tray.visible { display: block; }
+.tray-content { display: flex; align-items: center; gap: 16px; }
+.tray-title { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.tray-title svg { width: 15px; height: 15px; color: var(--accent); }
+.tray-title h3 { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.tray-title span { color: var(--accent); }
+.selected-compare-items { display: flex; gap: 8px; flex: 1; }
+.empty-tray-slot {
+  flex: 1; padding: 8px 14px;
+  border: 1px dashed var(--border); border-radius: var(--radius-sm);
+  font-size: 12px; color: var(--text-muted); text-align: center;
+}
+.compare-slot-filled {
+  flex: 1; padding: 8px 14px;
+  background: var(--bg-card2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); display: flex; align-items: center;
+  justify-content: space-between; gap: 8px;
+}
+.compare-slot-filled .slot-name { font-size: 12px; font-weight: 500; color: var(--text-primary); }
+.compare-slot-filled .slot-remove {
+  background: none; border: none; cursor: pointer; color: var(--text-muted);
+  padding: 2px; display: flex;
+}
+.compare-slot-filled .slot-remove:hover { color: var(--red); }
+.compare-slot-filled .slot-remove svg { width: 13px; height: 13px; }
+
+.btn-large { padding: 9px 20px; font-size: 13px; flex-shrink: 0; }
+.btn-accent {
+  background: linear-gradient(135deg, var(--cnu-green), var(--cnu-blue));
+  color: white; border: none;
+}
+.btn-accent:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-accent:not(:disabled):hover { opacity: 0.88; }
+
+/* ============================================================
+   MODALS
+   ============================================================ */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 100%; max-width: 900px; max-height: 85vh;
+  display: flex; flex-direction: column;
+  box-shadow: var(--shadow);
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.modal-header h2 { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+.modal-header h2 svg { width: 16px; height: 16px; color: var(--cnu-green-light); }
+.close-btn {
+  background: none; border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px; cursor: pointer; color: var(--text-secondary);
+  display: flex; transition: all 0.18s;
+}
+.close-btn:hover { border-color: var(--red); color: var(--red); }
+.close-btn svg { width: 15px; height: 15px; }
+.modal-body { overflow-y: auto; padding: 20px; flex: 1; }
+
+/* Comparison Table */
+.comparison-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.comparison-table th, .comparison-table td {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  vertical-align: top;
+}
+.comparison-table thead th {
+  background: var(--bg-card2); font-weight: 600;
+}
+.col-title { width: 200px; background: var(--bg-card2) !important; color: var(--text-secondary); }
+.col-room-1 { color: var(--cnu-green-light); text-align: center; }
+.col-room-2 { color: var(--accent-light); text-align: center; }
+.comparison-table tbody td:first-child { color: var(--text-secondary); background: var(--bg-card2); font-weight: 500; }
+.price-val { color: var(--cnu-green-light); font-weight: 600; }
+.comparison-table .progress-bar-container.mini { height: 4px; margin-top: 4px; }
+.cell-score { font-weight: 700; font-size: 14px; color: var(--text-primary); }
+.cell-desc { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.recommendation-row td { background: rgba(34,196,122,0.04); }
+.recommend-box { padding: 8px; background: var(--bg-card2); border-radius: 6px; }
+.recommend-box .title { display: block; font-size: 10px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.recommend-box p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+/* Verification Modal */
+.verification-modal-card { max-width: 800px; }
+.verify-tabs {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px; flex-shrink: 0;
+}
+.verify-tab-btn {
+  padding: 10px 16px; font-size: 12px; font-weight: 500;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--text-secondary); cursor: pointer; font-family: inherit;
+  transition: all 0.18s;
+}
+.verify-tab-btn.active { color: var(--cnu-green-light); border-bottom-color: var(--cnu-green-light); }
+.verification-body { background: var(--bg-base); border-radius: 0 0 var(--radius) var(--radius); }
+.verify-tab-content { display: block; }
+
+/* Official Doc Styles */
+.official-doc-container {
+  background: white; color: #1a1a1a;
+  border-radius: 8px; padding: 24px;
+  font-family: 'Noto Sans KR', sans-serif; font-size: 12px;
+  line-height: 1.6;
+}
+.doc-header { text-align: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #1a1a1a; }
+.doc-header h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.doc-subtitle { font-size: 11px; color: #555; }
+.doc-barcode { font-family: monospace; font-size: 14px; letter-spacing: 2px; color: #333; margin-top: 6px; }
+.doc-meta table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+.doc-meta th, .doc-meta td { padding: 6px 10px; border: 1px solid #bbb; font-size: 11px; }
+.doc-meta th { background: #f0f0f0; font-weight: 600; width: 100px; }
+.doc-section { margin-bottom: 14px; }
+.doc-section-title { font-size: 12px; font-weight: 700; padding: 5px 10px; background: #e8e8e8; border: 1px solid #bbb; margin-bottom: 0; }
+.doc-table { width: 100%; border-collapse: collapse; }
+.doc-table th, .doc-table td { padding: 7px 10px; border: 1px solid #bbb; font-size: 11px; vertical-align: top; }
+.doc-table th { background: #f0f0f0; font-weight: 600; text-align: center; }
+.doc-table-grid { width: 100%; border-collapse: collapse; }
+.doc-table-grid th, .doc-table-grid td { padding: 6px 10px; border: 1px solid #bbb; font-size: 11px; }
+.doc-table-grid th { background: #f0f0f0; width: 100px; font-weight: 600; }
+.warning-row td { background: #fff5f5; }
+.doc-footer { margin-top: 14px; text-align: right; font-size: 10px; color: #888; }
+.doc-seal { display: inline-block; border: 2px solid #1a5caf; color: #1a5caf; font-weight: 700; padding: 4px 10px; border-radius: 4px; margin-bottom: 4px; font-size: 11px; }
+.badge-safe { background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+.doc-build-year { font-weight: 700; }
+.analysis-conclusion-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 12px; margin-top: 10px; }
+.analysis-conclusion-box h5 { font-size: 12px; font-weight: 700; margin-bottom: 6px; color: #065f46; }
+.analysis-conclusion-box p { font-size: 12px; color: #374151; line-height: 1.5; }
+
+/* Leaflet dark tile override */
+.leaflet-tile-pane { filter: brightness(0.7) saturate(0.8); }
+.leaflet-container { background: #1a1f2e; font-family: 'Noto Sans KR', sans-serif; }
+
+/* Custom marker popup */
+.leaflet-popup-content-wrapper {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text-primary);
+  box-shadow: var(--shadow);
+}
+.leaflet-popup-tip { background: var(--bg-card); }
+.leaflet-popup-content { font-size: 12px; margin: 10px 14px; }
+.popup-name { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+.popup-price { color: var(--cnu-green-light); font-weight: 600; margin-bottom: 4px; }
+.popup-score { color: var(--text-secondary); }
+.popup-btn {
+  margin-top: 8px; width: 100%; padding: 5px 0;
+  background: var(--cnu-green); color: white; border: none;
+  border-radius: 5px; font-size: 11px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="logo-area">
+      <div class="logo-icon"><i data-lucide="shield-check"></i></div>
+      <div class="logo-text">
+        <h1>전대방안심 <span class="badge">AI</span></h1>
+        <p>전남대학교 대학생 맞춤형 원룸 비교 분석 대시보드</p>
+      </div>
+    </div>
+    <div class="url-parser-box">
+      <i data-lucide="link" class="link-icon"></i>
+      <input type="text" id="naver-url-input" placeholder="네이버 부동산 또는 다방 매물 URL 링크를 붙여넣어 보세요...">
+      <button id="url-parse-btn">
+        <span>AI 분석</span>
+        <i data-lucide="sparkles"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="app-main">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar-left">
+      <div class="section-title">
+        <i data-lucide="sliders-horizontal"></i>
+        <h2>검색 필터 설정</h2>
+      </div>
+
+      <div class="filter-group">
+        <label for="college-select" class="filter-label">
+          <i data-lucide="graduation-cap"></i> 1. 내 단과대학 선택
+        </label>
+        <select id="college-select" class="custom-select">
+          <option value="경영대학">경영대학 / 사회과학대학 (상대 쪽문 근처)</option>
+          <option value="공과대학" selected>공과대학 / AI융합대학 (후문 근처)</option>
+          <option value="인문대학">인문대학 / 사범대학 (본관/도서관 근처)</option>
+          <option value="예술대학">예술대학 / 의대·치대 (예대 쪽문 근처)</option>
+          <option value="농업생명과학대학">농업생명과학대학 / 수의대 (정문 근처)</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <div class="filter-header-row">
+          <label class="filter-label"><i data-lucide="footprints"></i> 2. 통학 거리 한계</label>
+          <div class="toggle-container">
+            <button id="toggle-time" class="toggle-btn active">도보 분</button>
+            <button id="toggle-dist" class="toggle-btn">거리 km</button>
+          </div>
+        </div>
+        <div class="slider-wrapper">
+          <input type="range" id="distance-slider" min="3" max="30" value="15" class="custom-slider">
+          <div class="slider-values">
+            <span id="slider-min-val">3분</span>
+            <span class="active-val" id="slider-current-val">최대 15분 이내</span>
+            <span id="slider-max-val">30분</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label"><i data-lucide="home"></i> 3. 거래 유형 선택</label>
+        <div class="radio-card-group">
+          <label class="radio-card active" id="radio-wolse">
+            <input type="radio" name="deal-type" value="월세" checked>
+            <span>월세</span>
+          </label>
+          <label class="radio-card" id="radio-jeonse">
+            <input type="radio" name="deal-type" value="전세">
+            <span>전세</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="price-filters-container">
+        <div id="wolse-price-filters" class="price-filter-sub">
+          <div class="filter-group">
+            <label class="filter-label">최대 보증금 <span class="val-highlight" id="max-deposit-txt">500만 원</span></label>
+            <input type="range" id="deposit-slider" min="50" max="2000" step="50" value="500" class="custom-slider">
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">최대 월세 <span class="val-highlight" id="max-rent-txt">45만 원</span></label>
+            <input type="range" id="rent-slider" min="10" max="70" step="5" value="45" class="custom-slider">
+          </div>
+        </div>
+        <div id="jeonse-price-filters" class="price-filter-sub hidden">
+          <div class="filter-group">
+            <label class="filter-label">최대 전세금 <span class="val-highlight" id="max-jeonse-txt">8,000만 원</span></label>
+            <input type="range" id="jeonse-slider" min="2000" max="15000" step="500" value="8000" class="custom-slider">
+          </div>
+        </div>
+      </div>
+
+      <div class="list-section">
+        <div class="section-title list-title">
+          <i data-lucide="list-filter"></i>
+          <h2>조건 만족 원룸 (<span id="room-count">0</span>개)</h2>
+        </div>
+        <div class="rooms-list" id="rooms-list-container"></div>
+      </div>
+    </aside>
+
+    <!-- MAP -->
+    <section class="map-section">
+      <div id="map"></div>
+      <div class="map-legend">
+        <div class="legend-item"><span class="legend-dot college"></span>단과대학 위치</div>
+        <div class="legend-item"><span class="legend-dot room-wolse"></span>원룸 (월세)</div>
+        <div class="legend-item"><span class="legend-dot room-jeonse"></span>원룸 (전세)</div>
+      </div>
+    </section>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside class="sidebar-right" id="detail-sidebar">
+      <div class="no-selection-state" id="no-selection-message">
+        <i data-lucide="map-pin" class="bounce-icon"></i>
+        <h3>지도의 원룸 핀이나 목록을 선택해 주세요</h3>
+        <p>해당 방의 5대 AI 분석 리포트 및 상세 비교 결과가 여기에 표시됩니다.</p>
+      </div>
+
+      <div class="detail-content hidden" id="detail-data-content">
+        <div class="detail-header-card">
+          <div class="detail-title-row">
+            <h2 id="detail-title">상대 경영대정원 빌라</h2>
+            <span class="room-type-badge" id="detail-type">원룸</span>
+          </div>
+          <div class="detail-price-row">
+            <span class="price" id="detail-price">보증금 200 / 월세 33</span>
+            <span class="overall-score-badge">종합 안전도 <strong id="detail-overall-score">92</strong>점</span>
+          </div>
+          <p class="detail-desc" id="detail-desc">방 설명이 들어갑니다.</p>
+          <div class="action-buttons-row">
+            <button id="add-compare-btn" class="btn btn-primary-outline">
+              <i data-lucide="git-compare"></i> 비교대상 추가
+            </button>
+            <button id="simulation-btn" class="btn btn-accent-outline">
+              <i data-lucide="sparkles"></i> AI 시뮬레이션 상세
+            </button>
+          </div>
+        </div>
+
+        <div class="ai-report-section">
+          <h3 class="subsection-title"><i data-lucide="brain-circuit"></i> AI 5대 지표 안심 분석</h3>
+
+          <div class="ai-score-card">
+            <div class="score-header">
+              <div class="score-title">
+                <span class="score-icon legal"><i data-lucide="scale"></i></span>
+                <div><h4>1. 법적/재정 안전</h4><p class="score-desc">융자 비율 및 깡통전세 위험성 평가</p></div>
+              </div>
+              <div class="score-value" id="score-legal-val">95점</div>
+            </div>
+            <div class="progress-bar-container"><div class="progress-bar legal" id="score-legal-bar" style="width:95%"></div></div>
+            <div class="score-details-box" id="score-legal-desc">융자금 0원으로 안전성이 매우 높으며, 경매 시 보증금 전액 반환 가능한 안전 자산입니다.</div>
+            <div class="score-links-row">
+              <a href="https://www.iros.go.kr/" target="_blank" class="score-ref-link"><i data-lucide="external-link"></i> 대법원 등기소</a>
+              <a href="https://rt.molit.go.kr/" target="_blank" class="score-ref-link"><i data-lucide="external-link"></i> 국토부 실거래가</a>
+            </div>
+            <button id="btn-verify-legal" class="btn-verify-doc"><i data-lucide="file-check"></i> 실시간 등기부등본 검증서 열람</button>
+          </div>
+
+          <div class="ai-score-card">
+            <div class="score-header">
+              <div class="score-title">
+                <span class="score-icon physical"><i data-lucide="wrench"></i></span>
+                <div><h4>2. 물리적 성능</h4><p class="score-desc">건물 노후도 및 잔여 콘크리트 수명 예측</p></div>
+              </div>
+              <div class="score-value" id="score-physical-val">85점</div>
+            </div>
+            <div class="progress-bar-container"><div class="progress-bar physical" id="score-physical-bar" style="width:85%"></div></div>
+            <div class="score-details-box" id="score-physical-desc">2021년 지어진 준신축 건물로 배관 및 보일러 리스크가 낮으며 향후 약 45년의 수명이 남아있습니다.</div>
+            <div class="score-links-row">
+              <a href="https://www.gov.kr/" target="_blank" class="score-ref-link"><i data-lucide="external-link"></i> 정부24 건축대장</a>
+            </div>
+            <button id="btn-verify-physical" class="btn-verify-doc"><i data-lucide="file-text"></i> 실시간 건축물대장 검증서 열람</button>
+          </div>
+
+          <div class="ai-score-card">
+            <div class="score-header">
+              <div class="score-title">
+                <span class="score-icon infra"><i data-lucide="map-pinned"></i></span>
+                <div><h4>3. 위치/생활 인프라</h4><p class="score-desc">단과대 도보 및 마트/다이소/빨래방/편의점 정보</p></div>
+              </div>
+              <div class="score-value" id="score-infra-val">90점</div>
+            </div>
+            <div class="progress-bar-container"><div class="progress-bar infra" id="score-infra-bar" style="width:90%"></div></div>
+            <div class="score-details-box" id="score-infra-desc">경영대 도보 5분 컷! 주변 50m 이내 방범용 CCTV 3대 작동 중으로 야간 안심 귀가 가능.</div>
+            <button id="toggle-amenities-map-btn" class="btn-amenity-toggle"><i data-lucide="eye"></i> 주변 편의시설 지도 표시</button>
+          </div>
+
+          <div class="ai-score-card">
+            <div class="score-header">
+              <div class="score-title">
+                <span class="score-icon economic"><i data-lucide="piggy-bank"></i></span>
+                <div><h4>4. 경제성</h4><p class="score-desc">에너지 등급 & 방향 기반 예상 전기세 역산 & 옵션</p></div>
+              </div>
+              <div class="score-value" id="score-economic-val">88점</div>
+            </div>
+            <div class="progress-bar-container"><div class="progress-bar economic" id="score-economic-bar" style="width:88%"></div></div>
+            <div class="score-details-box" id="score-economic-desc">남향 채광으로 난방비가 최대 15% 절감되며, 가전 효율 1등급 에어컨 탑재로 월 전기세 약 22,000원 예상.</div>
+            <div class="score-options-box" id="score-economic-options"></div>
+          </div>
+
+          <div class="ai-score-card">
+            <div class="score-header">
+              <div class="score-title">
+                <span class="score-icon comfort"><i data-lucide="volume-x"></i></span>
+                <div><h4>5. 거주 방음 및 소음</h4><p class="score-desc">벽체 구조 및 두께 · 1층 상가 소음 · 취객 야간 불쾌지수</p></div>
+              </div>
+              <div class="score-value" id="score-comfort-val">80점</div>
+            </div>
+            <div class="progress-bar-container"><div class="progress-bar comfort" id="score-comfort-bar" style="width:80%"></div></div>
+            <div class="score-details-box" id="score-comfort-desc">방음 분석 데이터가 표시됩니다.</div>
+            <div class="soundproof-detail-grid" id="soundproof-detail-grid"></div>
+          </div>
+        </div>
+
+        <div class="ai-summary-report">
+          <h3 class="subsection-title"><i data-lucide="sparkle"></i> AI 종합 리포트 및 타겟 분석</h3>
+          <div class="summary-box">
+            <div class="pros-cons-grid">
+              <div class="pros-box">
+                <h5><i data-lucide="plus-circle"></i> 장점</h5>
+                <ul id="detail-pros"><li>경영대 통학 극도로 편리</li><li>남향 채광 및 저렴한 월세</li></ul>
+              </div>
+              <div class="cons-box">
+                <h5><i data-lucide="minus-circle"></i> 단점</h5>
+                <ul id="detail-cons"><li>엘리베이터 없음</li><li>주변 소형 편의점만 존재</li></ul>
+              </div>
+            </div>
+            <div class="target-recommendation">
+              <h5>🎯 이런 전대생에게 딱 맞춤!</h5>
+              <p id="detail-target">"경영대/사회대 전공으로 지출을 아끼면서 조용히 집중해 공부하고 싶은 절약형 통학생에게 강력 추천합니다!"</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Comparison Tray -->
+  <div class="comparison-tray" id="comparison-tray">
+    <div class="tray-content">
+      <div class="tray-title">
+        <i data-lucide="git-compare"></i>
+        <h3>방 비교 바구니 (<span id="compare-count">0</span>/2)</h3>
+      </div>
+      <div class="selected-compare-items" id="compare-items-list">
+        <div class="empty-tray-slot">비교할 첫 번째 방을 추가해 주세요</div>
+        <div class="empty-tray-slot">비교할 두 번째 방을 추가해 주세요</div>
+      </div>
+      <button id="start-comparison-btn" class="btn btn-accent btn-large" disabled>
+        <span>1:1 비교 대조 시작</span>
+        <i data-lucide="arrow-right-left"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Comparison Modal -->
+  <div class="modal-overlay hidden" id="comparison-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2><i data-lucide="git-compare"></i> 1:1 안심 원룸 정밀 비교</h2>
+        <button id="close-modal-btn" class="close-btn"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <table class="comparison-table">
+          <thead>
+            <tr class="header-row">
+              <th class="col-title">비교 항목</th>
+              <th class="col-room-1" id="comp-name-1">원룸 A</th>
+              <th class="col-room-2" id="comp-name-2">원룸 B</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>매물명 및 유형</strong></td><td id="comp-type-1">원룸</td><td id="comp-type-2">오피스텔</td></tr>
+            <tr><td><strong>거래 정보 (가격)</strong></td><td id="comp-price-1" class="price-val">보증금 200 / 월세 33</td><td id="comp-price-2" class="price-val">보증금 500 / 월세 48</td></tr>
+            <tr><td><strong>전남대 통학 도보 시간</strong></td><td id="comp-walk-1">도보 5분 (경영대 기준)</td><td id="comp-walk-2">도보 8분 (경영대 기준)</td></tr>
+            <tr>
+              <td><strong>1. 법적/재정 안전 점수</strong></td>
+              <td><div class="cell-score" id="comp-score-legal-1">95점</div><div class="progress-bar-container mini"><div class="progress-bar legal" id="comp-bar-legal-1" style="width:95%"></div></div><p class="cell-desc" id="comp-desc-legal-1">융자 무</p></td>
+              <td><div class="cell-score" id="comp-score-legal-2">72점</div><div class="progress-bar-container mini"><div class="progress-bar legal" id="comp-bar-legal-2" style="width:72%"></div></div><p class="cell-desc" id="comp-desc-legal-2">융자 비율 40%</p></td>
+            </tr>
+            <tr>
+              <td><strong>2. 물리적 성능 점수</strong></td>
+              <td><div class="cell-score" id="comp-score-physical-1">85점</div><div class="progress-bar-container mini"><div class="progress-bar physical" id="comp-bar-physical-1" style="width:85%"></div></div><p class="cell-desc" id="comp-desc-physical-1">2021년 준공</p></td>
+              <td><div class="cell-score" id="comp-score-physical-2">91점</div><div class="progress-bar-container mini"><div class="progress-bar physical" id="comp-bar-physical-2" style="width:91%"></div></div><p class="cell-desc" id="comp-desc-physical-2">2023년 준공</p></td>
+            </tr>
+            <tr>
+              <td><strong>3. 위치/생활 인프라 점수</strong></td>
+              <td><div class="cell-score" id="comp-score-infra-1">90점</div><div class="progress-bar-container mini"><div class="progress-bar infra" id="comp-bar-infra-1" style="width:90%"></div></div><p class="cell-desc" id="comp-desc-infra-1">마트/다이소 인프라</p></td>
+              <td><div class="cell-score" id="comp-score-infra-2">94점</div><div class="progress-bar-container mini"><div class="progress-bar infra" id="comp-bar-infra-2" style="width:94%"></div></div><p class="cell-desc" id="comp-desc-infra-2">마트/다이소 인프라</p></td>
+            </tr>
+            <tr>
+              <td><strong>4. 경제성 (전기세 및 옵션)</strong></td>
+              <td><div class="cell-score" id="comp-score-economic-1">88점</div><div class="progress-bar-container mini"><div class="progress-bar economic" id="comp-bar-economic-1" style="width:88%"></div></div><p class="cell-desc" id="comp-desc-economic-1">월 평균 약 2.2만 예상</p></td>
+              <td><div class="cell-score" id="comp-score-economic-2">65점</div><div class="progress-bar-container mini"><div class="progress-bar economic" id="comp-bar-economic-2" style="width:65%"></div></div><p class="cell-desc" id="comp-desc-economic-2">오피스텔 기본 관리비 별도</p></td>
+            </tr>
+            <tr>
+              <td><strong>5. 거주 방음 및 소음</strong></td>
+              <td><div class="cell-score" id="comp-score-comfort-1">80점</div><div class="progress-bar-container mini"><div class="progress-bar comfort" id="comp-bar-comfort-1" style="width:80%"></div></div><p class="cell-desc" id="comp-desc-comfort-1">벽간 소음 양호</p></td>
+              <td><div class="cell-score" id="comp-score-comfort-2">78점</div><div class="progress-bar-container mini"><div class="progress-bar comfort" id="comp-bar-comfort-2" style="width:78%"></div></div><p class="cell-desc" id="comp-desc-comfort-2">복도 방음 다소 부족</p></td>
+            </tr>
+            <tr class="recommendation-row">
+              <td><strong>AI 추천 비교 분석</strong></td>
+              <td><div class="recommend-box"><span class="title">이 원룸의 승부처:</span><p id="comp-recom-1">경영대 통학과 안전성, 극강의 가성비가 필요한 학생을 위한 최선의 절약형 방입니다.</p></div></td>
+              <td><div class="recommend-box"><span class="title">이 원룸의 승부처:</span><p id="comp-recom-2">생활 인프라와 신축 퀄리티, 깔끔한 주차/치안 시설이 중요한 여학생 및 직장인을 위한 방입니다.</p></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Verification Modal -->
+  <div class="modal-overlay hidden" id="verification-modal">
+    <div class="modal-card verification-modal-card">
+      <div class="modal-header">
+        <h2><i data-lucide="shield-check" style="color:var(--cnu-green-light)"></i> 공공 데이터 실시간 검증 리포트</h2>
+        <button id="close-verify-modal-btn" class="close-btn"><i data-lucide="x"></i></button>
+      </div>
+      <div class="verify-tabs">
+        <button class="verify-tab-btn active" id="tab-btn-legal">대법원 등기부등본</button>
+        <button class="verify-tab-btn" id="tab-btn-physical">정부24 건축물대장</button>
+        <button class="verify-tab-btn" id="tab-btn-molit">국토부 실거래가</button>
+      </div>
+      <div class="modal-body verification-body">
+        <!-- TAB 1: Legal -->
+        <div class="verify-tab-content" id="verify-content-legal">
+          <div class="official-doc-container">
+            <div class="doc-header">
+              <h3>등기사항전부증명서 (토지 및 건물)</h3>
+              <p class="doc-subtitle">[제출용 / 인터넷 발급]</p>
+              <div class="doc-barcode">|||| | |||| || ||| | |||</div>
+            </div>
+            <div class="doc-meta">
+              <table>
+                <tr><th>발급 번호</th><td>2026-0526-9481-2291</td><th>발급 일시</th><td>2026-05-26 00:50:00</td></tr>
+                <tr><th>소재지번</th><td colspan="3" id="doc-legal-address">광주광역시 북구 용봉동 324-11</td></tr>
+              </table>
+            </div>
+            <div class="doc-section">
+              <div class="doc-section-title">[표제부] (건물의 표시)</div>
+              <table class="doc-table">
+                <thead><tr><th style="width:10%">표시번호</th><th style="width:15%">접수</th><th style="width:40%">소재지번, 건물번호 및 구조</th><th style="width:35%">기타사항 및 등기원인</th></tr></thead>
+                <tbody>
+                  <tr><td>1</td><td>2021년 8월 24일</td><td>광주광역시 북구 용봉동 <span id="doc-legal-desc-address">[원룸지번]</span><br>철근콘크리트구조 슬래브지붕 3층 공동주택</td><td>사용승인 (준공일자: <span id="doc-legal-build-year" class="doc-build-year">2021</span>년)</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="doc-section">
+              <div class="doc-section-title">[갑구] (소유권에 관한 사항)</div>
+              <table class="doc-table">
+                <thead><tr><th style="width:10%">순위번호</th><th style="width:20%">등기목적</th><th style="width:20%">접수정보</th><th style="width:50%">권리자 및 기타사항</th></tr></thead>
+                <tbody>
+                  <tr><td>1</td><td>소유권 보존</td><td>2021년 9월 1일<br>제 48102호</td><td>소유자 김*우 (주민등록번호 앞자리: 651112-*******)</td></tr>
+                  <tr id="doc-legal-debt-row" class="warning-row hidden"><td>2</td><td><span style="color:#ef4444;font-weight:600">임차권 설정</span></td><td>2024년 11월 12일<br>제 55912호</td><td><strong>주택임차권등기명령 집행</strong><br>임차보증금: 금 65,000,000원<br><span style="color:#ef4444;font-weight:600">⚠️ 과거 보증금 미반환 사고 이력 확인됨</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="doc-section">
+              <div class="doc-section-title">[을구] (소유권 외의 권리에 관한 사항)</div>
+              <table class="doc-table">
+                <thead><tr><th style="width:10%">순위번호</th><th style="width:20%">등기목적</th><th style="width:20%">접수정보</th><th style="width:50%">권리자 및 기타사항</th></tr></thead>
+                <tbody>
+                  <tr id="doc-legal-mortgage-row"><td>1</td><td>근저당권 설정</td><td>2021년 9월 1일<br>제 48103호</td><td>채권최고액: 금 <span id="doc-mortgage-max">12,000,000</span>원<br>근저당권자: 주식회사 광주은행 용봉지점</td></tr>
+                  <tr id="doc-legal-clean-row" class="hidden"><td colspan="4" style="text-align:center;padding:20px;color:#10B981;font-weight:600">[을구 기록 사항 없음] 본 건물은 은행 근저당(융자금)이 설정되어 있지 않은 청정 매물입니다.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="doc-footer"><div class="doc-seal">대한민국 대법원 등기정보센터 검증필</div><p>※ 본 문서는 실제 대법원 등본 조회를 모사하여 검증한 실시간 AI 예측 보고서입니다.</p></div>
+          </div>
+        </div>
+        <!-- TAB 2: Physical -->
+        <div class="verify-tab-content hidden" id="verify-content-physical">
+          <div class="official-doc-container">
+            <div class="doc-header"><h3>일반건축물대장 (기본)</h3><p class="doc-subtitle">[정부24 인터넷 발급본]</p><div class="doc-barcode">G-2026-9281-2293-1092</div></div>
+            <div class="doc-meta">
+              <table>
+                <tr><th>대지위치</th><td id="doc-phys-address">광주광역시 북구 용봉동 324-11</td><th>도로명주소</th><td>광주광역시 북구 용봉로 77</td></tr>
+                <tr><th>건물명칭</th><td id="doc-phys-name">[원룸이름]</td><th>승인일자</th><td>2021-08-24</td></tr>
+              </table>
+            </div>
+            <div class="doc-section">
+              <table class="doc-table-grid">
+                <tr><th>구조</th><td id="doc-phys-structure">철근콘크리트구조</td><th>위반건축물</th><td><span class="badge-safe">해당없음 (적법)</span></td></tr>
+                <tr><th>연면적</th><td>198.5 ㎡</td><th>주차대수</th><td>자주식 6대</td></tr>
+                <tr><th>잔여예측수명</th><td><span id="doc-phys-life">45</span>년 (잔여 구조재 수명 약 90% 양호)</td><th>내진설계</th><td>적용 대상 (0.21g)</td></tr>
+              </table>
+            </div>
+            <div class="doc-footer"><div class="doc-seal">국토교통부 행정정보 검증필</div><p>※ 본 문서는 정부24 건축물대장 데이터를 기반으로 한 AI 검증서입니다.</p></div>
+          </div>
+        </div>
+        <!-- TAB 3: Molit -->
+        <div class="verify-tab-content hidden" id="verify-content-molit">
+          <div class="official-doc-container">
+            <div class="doc-header"><h3>국토교통부 실거래가 검증 확인서</h3><p class="doc-subtitle">[최근 12개월 실거래 통계]</p></div>
+            <div class="doc-section">
+              <div class="doc-section-title">용봉동 대학가 인접 유사 평형(18㎡~25㎡) 실거래 추이</div>
+              <table class="doc-table">
+                <thead><tr><th>계약년월</th><th>거래형태</th><th>보증금/전세금</th><th>월세</th><th>면적</th><th>비교분석</th></tr></thead>
+                <tbody id="doc-molit-table-body"></tbody>
+              </table>
+            </div>
+            <div class="analysis-conclusion-box"><h5>🔍 AI 실거래 대비 적정가 판정</h5><p id="doc-molit-conclusion">본 매물의 월세 비용은 용봉동 대학가 최근 3개월 평균 거래가 대비 약 8% 저렴하여 시세 대비 메리트가 높은 상태로 분석됩니다.</p></div>
+            <div class="doc-footer"><div class="doc-seal">국토교통부 실거래가 공개시스템 연동</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<script>
+// ============================================================
+// DATA: 원룸 샘플 데이터 (전남대 용봉동 일대)
+// ============================================================
+const ROOMS = [
+  {
+    id: 1, name: "용봉 스카이 빌라 301호", type: "원룸", dealType: "월세",
+    deposit: 300, rent: 33, jeonse: null,
+    lat: 35.1753, lng: 126.9086,
+    college: "경영대학", walkMin: 5, walkKm: 0.35,
+    scores: { legal: 95, physical: 85, infra: 90, economic: 88, comfort: 80 },
+    overall: 87,
+    desc: "경영대 쪽문 도보 5분, 남향 채광 우수한 신축급 원룸입니다. 보증금이 낮고 깨끗한 인테리어가 장점입니다.",
+    pros: ["경영대 통학 극도로 편리 (5분)", "남향 채광 우수, 난방비 절감", "신축급 깨끗한 인테리어"],
+    cons: ["엘리베이터 없음 (3층)", "주변 소형 편의점만 존재"],
+    target: "경영대/사회대 전공으로 지출을 아끼면서 조용히 집중해 공부하고 싶은 절약형 통학생에게 강력 추천합니다!",
+    options: ["에어컨(1등급)", "세탁기", "냉장고", "인덕션", "옷장"],
+    scoreDesc: {
+      legal: "융자금 0원으로 안전성이 매우 높으며, 경매 시 보증금 전액 반환 가능한 안전 자산입니다.",
+      physical: "2021년 지어진 준신축 건물로 배관 및 보일러 리스크가 낮으며 향후 약 45년의 수명이 남아있습니다.",
+      infra: "경영대 도보 5분 컷! 주변 50m 이내 방범용 CCTV 3대 작동 중으로 야간 안심 귀가 가능.",
+      economic: "남향 채광으로 난방비 최대 15% 절감, 가전 효율 1등급 에어컨 탑재로 월 전기세 약 22,000원 예상.",
+      comfort: "철근콘크리트 구조로 벽간 소음 양호. 주변 상가 없어 야간 조용한 편."
+    },
+    soundproof: [
+      { label: "벽체 구조", value: "RC 180mm", cls: "good" },
+      { label: "층간소음", value: "보통", cls: "mid" },
+      { label: "1층 상가", value: "없음", cls: "good" },
+      { label: "야간 취객", value: "드물음", cls: "good" }
+    ]
+  },
+  {
+    id: 2, name: "후문 엔지니어링 원룸 205", type: "원룸", dealType: "월세",
+    deposit: 200, rent: 38, jeonse: null,
+    lat: 35.1771, lng: 126.9069,
+    college: "공과대학", walkMin: 4, walkKm: 0.28,
+    scores: { legal: 88, physical: 92, infra: 85, economic: 75, comfort: 70 },
+    overall: 82,
+    desc: "공과대학 후문 도보 4분, 2023년 신축 건물입니다. 주차 공간 완비 및 카드키 보안 시스템 적용.",
+    pros: ["공과대 후문 초근접 (4분)", "2023년 신축, 최신 시설", "카드키 보안 시스템"],
+    cons: ["월세가 상대적으로 높음", "주변 편의시설 다소 부족"],
+    target: "공과대/AI융합대 재학 중으로 최신 시설과 보안을 중시하는 이공계 학생에게 추천합니다!",
+    options: ["에어컨(1등급)", "세탁기", "냉장고", "전자레인지", "무선인터넷", "카드키"],
+    scoreDesc: {
+      legal: "근저당 설정액이 소액(800만원)으로 보증금 대비 위험 비율이 낮아 안전한 편입니다.",
+      physical: "2023년 신축으로 모든 설비가 최신 상태. 향후 50년 이상 구조 수명이 예측됩니다.",
+      infra: "후문 인접 편의점 2개소, GS25 도보 2분. 하지만 대형마트까지는 도보 15분 소요.",
+      economic: "북동향으로 채광이 상대적으로 적어 겨울 난방비 다소 증가 예상. 월 전기/가스 합산 3.5만원 수준.",
+      comfort: "신축이나 인접 원룸 밀집 지역으로 층간소음 주의. 방음재 두께는 양호."
+    },
+    soundproof: [
+      { label: "벽체 구조", value: "RC 200mm", cls: "good" },
+      { label: "층간소음", value: "주의필요", cls: "bad" },
+      { label: "1층 상가", value: "편의점", cls: "mid" },
+      { label: "야간 취객", value: "가끔", cls: "mid" }
+    ]
+  },
+  {
+    id: 3, name: "용봉 인문학당 빌라 102", type: "원룸", dealType: "월세",
+    deposit: 500, rent: 28, jeonse: null,
+    lat: 35.1742, lng: 126.9105,
+    college: "인문대학", walkMin: 7, walkKm: 0.5,
+    scores: { legal: 78, physical: 65, infra: 92, economic: 82, comfort: 85 },
+    overall: 80,
+    desc: "인문대/사범대 도보 7분, 저렴한 월세가 최대 강점. 주변에 마트·다이소·빨래방이 밀집해 생활이 편리합니다.",
+    pros: ["월세 28만원 초저렴", "마트·다이소 도보 3분", "조용한 주거 환경"],
+    cons: ["2008년 구축 (노후 건물)", "융자 비율 다소 높음"],
+    target: "인문대/사범대 전공으로 생활비를 절약하면서 편리한 생활 인프라를 누리고 싶은 절약왕 학생에게 추천합니다!",
+    options: ["에어컨(2등급)", "세탁기", "냉장고", "가스레인지"],
+    scoreDesc: {
+      legal: "근저당 설정 비율 약 35%. 깡통전세 위험은 낮으나 주의 필요. 보증금 보험 가입 권장.",
+      physical: "2008년 준공으로 노후도 있음. 내부 리모델링(2019년) 완료. 배관 교체 이력 있어 단기 리스크 낮음.",
+      infra: "용봉동 상업지구 인접. 이마트에브리데이, 다이소, 빨래방 모두 도보 3분 이내. 생활 인프라 최상.",
+      economic: "월 관리비 없음. 가스비 개별 부과. 2등급 에어컨으로 여름 전기세 소폭 증가 예상.",
+      comfort: "주변 상업지구 인접이나 방음 시공이 잘 되어 있어 소음 체감 낮음. 2층이라 야간 조용함."
+    },
+    soundproof: [
+      { label: "벽체 구조", value: "RC 150mm", cls: "mid" },
+      { label: "층간소음", value: "양호", cls: "good" },
+      { label: "1층 상가", value: "없음", cls: "good" },
+      { label: "야간 취객", value: "드물음", cls: "good" }
+    ]
+  },
+  {
+    id: 4, name: "예대 아트 오피스텔 401", type: "오피스텔", dealType: "월세",
+    deposit: 500, rent: 48, jeonse: null,
+    lat: 35.1765, lng: 126.9118,
+    college: "예술대학", walkMin: 6, walkKm: 0.42,
+    scores: { legal: 72, physical: 91, infra: 94, economic: 65, comfort: 78 },
+    overall: 80,
+    desc: "예술대학 쪽문 도보 6분, 신축 오피스텔로 관리비 포함 전체 시설 완비. 보안카메라 24시간 운영.",
+    pros: ["신축 오피스텔 최신 시설", "생활 인프라 최상급", "24시간 보안 관리"],
+    cons: ["관리비 별도 (약 8만원)", "융자 비율 40%로 주의"],
+    target: "예술대/의대 재학 중으로 깔끔하고 현대적인 시설과 철저한 보안을 원하는 학생에게 추천합니다!",
+    options: ["에어컨(1등급)", "세탁기", "냉장고", "전자레인지", "식기세척기", "무선인터넷", "카드키", "CCTV"],
+    scoreDesc: {
+      legal: "근저당 설정 비율 40%로 다소 높음. 전세보증보험 가입 필수 권장.",
+      physical: "2023년 신축 오피스텔. 최신 설비로 장기 물리적 리스크 매우 낮음.",
+      infra: "용봉동 중심상권 인접. 대형마트, 카페, 병원, 약국 모두 도보 5분 이내.",
+      economic: "오피스텔 관리비 약 8만원 별도 발생. 그러나 개별 공과금 처리로 실제 총비용 체크 필요.",
+      comfort: "복도 방음이 약한 편. 엘리베이터 소음 간헐적 발생."
+    },
+    soundproof: [
+      { label: "벽체 구조", value: "RC 200mm", cls: "good" },
+      { label: "층간소음", value: "양호", cls: "good" },
+      { label: "1층 상가", value: "카페/편의점", cls: "mid" },
+      { label: "야간 취객", value: "가끔", cls: "mid" }
+    ]
+  },
+  {
+    id: 5, name: "농생대 그린 하우스 203", type: "원룸", dealType: "월세",
+    deposit: 200, rent: 25, jeonse: null,
+    lat: 35.1730, lng: 126.9075,
+    college: "농업생명과학대학", walkMin: 8, walkKm: 0.55,
+    scores: { legal: 90, physical: 70, infra: 75, economic: 90, comfort: 88 },
+    overall: 83,
+    desc: "농생대/수의대 정문 방향 도보 8분, 가장 저렴한 월세와 청정한 법적 상태. 조용한 주거환경.",
+    pros: ["월세 25만원 최저가", "법적 문제 전혀 없는 클린 매물", "야간 소음 거의 없음"],
+    cons: ["건물 노후도 (2010년)", "주변 편의시설 적음"],
+    target: "농생대/수의대 재학 중으로 최저 생활비로 조용한 환경에서 공부에 집중하고 싶은 학생에게 추천합니다!",
+    options: ["에어컨", "세탁기", "냉장고"],
+    scoreDesc: {
+      legal: "근저당 0원, 임차권 설정 없음. 법적으로 완전 클린 매물입니다.",
+      physical: "2010년 준공, 노후도 있으나 2020년 내부 전체 리모델링 완료. 보일러 교체 이력 있음.",
+      infra: "정문 인근이나 상업시설 부족. 자전거/버스로 이동 필요한 경우 있음.",
+      economic: "월세 최저가 + 관리비 0원. 전기세/가스 개별 측정으로 절약 가능. 월 총 주거비 30만원 이하 가능.",
+      comfort: "주변 조용한 주택가. 소음 우려 요소 거의 없음. 최고 수준의 거주 쾌적도."
+    },
+    soundproof: [
+      { label: "벽체 구조", value: "조적조 220mm", cls: "mid" },
+      { label: "층간소음", value: "양호", cls: "good" },
+      { label: "1층 상가", value: "없음", cls: "good" },
+      { label: "야간 취객", value: "없음", cls: "good" }
+    ]
+  },
+  {
+    id: 6, name: "용봉 프리미엄 전세 빌라", type: "원룸", dealType: "전세",
+    deposit: null, rent: null, jeonse: 7500,
+    lat: 35.1758, lng: 126.9098,
+    college: "경영대학", walkMin: 9, walkKm: 0.62,
+    scores: { legal: 82, physical: 80, infra: 88, economic: 92, comfort: 82 },
+    overall: 85,
+    desc: "전세 7,500만원, 경영대 도보 9분. 전세 거주로 월세 부담 없이 학업에 집중할 수 있는 매물.",
+    pros: ["월세 부담 완전 없음", "생활 인프라 우수", "전세보증보험 가입 가능 매물"],
+    cons: ["목돈 7,500만원 필요", "융자 비율 28% 존재"],
+    target: "부모님 지원으로 전세를 구하려는 학생 또는 청년 전세 대출 활용 예정인 경우 강력 추천합니다!",
+    options: ["에어컨(1등급)", "세탁기", "냉장고", "인덕션", "옷장", "신발장"],
+    scoreDesc: {
+      legal: "근저당 비율 28%. 전세보증보험(HUG) 가입 가능 조건 충족. 반드시 가입 권장.",
+      physical: "2019년 준공. 중신축급으로 주요 설비 상태 양호.",
+      infra: "용봉동 중심 위치. 이마트에브리데이, 카페 등 도보 5분 이내.",
+      economic: "전세 거주 시 월 주거비 0원(대출 이자 제외). 장기 거주 시 월세 대비 최대 50% 절감 효과.",
+      comfort: "주변 주거 전용 지역. 야간 조용하고 쾌적한 환경."
+    },
+    soundproof: [
+      { label: "벽체 구조", value: "RC 180mm", cls: "good" },
+      { label: "층간소음", value: "양호", cls: "good" },
+      { label: "1층 상가", value: "없음", cls: "good" },
+      { label: "야간 취객", value: "드물음", cls: "good" }
+    ]
+  }
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let state = {
+  college: '공과대학',
+  maxWalkMin: 15,
+  useTime: true,
+  dealType: '월세',
+  maxDeposit: 500,
+  maxRent: 45,
+  maxJeonse: 8000,
+  selectedRoomId: null,
+  compareList: [],
+  filteredRooms: [],
+  mapMarkers: {},
+  map: null,
+  amenitiesVisible: false
+};
+
+// ============================================================
+// MAP INIT — 핵심: ResizeObserver로 지도 크기 보장
+// ============================================================
+function initMap() {
+  const mapEl = document.getElementById('map');
+
+  // Leaflet 지도 생성
+  state.map = L.map('map', {
+    center: [35.1756, 126.9093],
+    zoom: 15,
+    zoomControl: true
+  });
+
+  // OpenStreetMap 타일 (다크 필터는 CSS로 처리)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(state.map);
+
+  // 전남대 주요 단과대학 마커
+  const colleges = [
+    { name: "경영대학/사회과학대학", lat: 35.1745, lng: 126.9080 },
+    { name: "공과대학/AI융합대학", lat: 35.1775, lng: 126.9063 },
+    { name: "인문대학/사범대학", lat: 35.1748, lng: 126.9110 },
+    { name: "예술대학", lat: 35.1768, lng: 126.9122 },
+    { name: "농업생명과학대학/수의대", lat: 35.1726, lng: 126.9072 }
+  ];
+
+  const collegeIcon = L.divIcon({
+    className: '',
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:#22c47a;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>`,
+    iconSize: [14,14], iconAnchor: [7,7]
+  });
+
+  colleges.forEach(c => {
+    L.marker([c.lat, c.lng], { icon: collegeIcon })
+      .bindTooltip(c.name, { permanent: false, className: '' })
+      .addTo(state.map);
+  });
+
+  // 지도 크기 강제 갱신 (검게 보이는 문제 방지)
+  setTimeout(() => state.map.invalidateSize(), 100);
+
+  // ResizeObserver로 컨테이너 크기 변경 시 지도 갱신
+  const ro = new ResizeObserver(() => state.map.invalidateSize());
+  ro.observe(mapEl);
+}
+
+// ============================================================
+// MARKERS
+// ============================================================
+function createRoomIcon(room, isSelected) {
+  const color = room.dealType === '월세' ? '#4da3ff' : '#fbbf24';
+  const size = isSelected ? 18 : 14;
+  const border = isSelected ? '3px solid white' : '2px solid rgba(255,255,255,0.5)';
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:0 2px 8px rgba(0,0,0,0.6);cursor:pointer;transition:all 0.2s"></div>`,
+    iconSize: [size,size], iconAnchor: [size/2,size/2]
+  });
+}
+
+function renderMarkers() {
+  // 기존 마커 제거
+  Object.values(state.mapMarkers).forEach(m => state.map.removeLayer(m));
+  state.mapMarkers = {};
+
+  state.filteredRooms.forEach(room => {
+    const marker = L.marker([room.lat, room.lng], { icon: createRoomIcon(room, false) });
+
+    const priceStr = room.dealType === '월세'
+      ? `보증금 ${room.deposit} / 월세 ${room.rent}만`
+      : `전세 ${(room.jeonse/100).toFixed(0)}백만`;
+
+    marker.bindPopup(`
+      <div class="popup-name">${room.name}</div>
+      <div class="popup-price">${priceStr}</div>
+      <div class="popup-score">종합 안전도 ${room.overall}점 · 도보 ${room.walkMin}분</div>
+      <button class="popup-btn" onclick="selectRoom(${room.id})">상세 AI 분석 보기</button>
+    `, { maxWidth: 220 });
+
+    marker.on('click', () => selectRoom(room.id));
+    marker.addTo(state.map);
+    state.mapMarkers[room.id] = marker;
+  });
+}
+
+// ============================================================
+// FILTER
+// ============================================================
+function applyFilters() {
+  state.filteredRooms = ROOMS.filter(r => {
+    if (r.dealType !== state.dealType) return false;
+    if (state.useTime && r.walkMin > state.maxWalkMin) return false;
+    if (!state.useTime && r.walkKm > state.maxWalkMin * 0.07) return false;
+    if (state.dealType === '월세') {
+      if (r.deposit > state.maxDeposit) return false;
+      if (r.rent > state.maxRent) return false;
+    } else {
+      if (r.jeonse > state.maxJeonse) return false;
+    }
+    return true;
+  });
+  renderRoomList();
+  renderMarkers();
+}
+
+// ============================================================
+// ROOM LIST RENDER
+// ============================================================
+function renderRoomList() {
+  const container = document.getElementById('rooms-list-container');
+  document.getElementById('room-count').textContent = state.filteredRooms.length;
+
+  if (state.filteredRooms.length === 0) {
+    container.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px">조건을 만족하는 원룸이 없습니다.<br>필터를 조정해 보세요.</div>`;
+    return;
+  }
+
+  container.innerHTML = state.filteredRooms.map(r => {
+    const priceStr = r.dealType === '월세'
+      ? `보증금 ${r.deposit} / 월세 ${r.rent}만`
+      : `전세 ${(r.jeonse/100).toFixed(0)}백만`;
+    return `
+      <div class="room-list-item ${state.selectedRoomId === r.id ? 'active' : ''}" onclick="selectRoom(${r.id})">
+        <div class="item-name">${r.name}</div>
+        <div class="item-price">${priceStr}</div>
+        <div class="item-tags">
+          <span class="item-tag walk">🚶 ${r.walkMin}분</span>
+          <span class="item-tag type">${r.type}</span>
+        </div>
+        <div class="item-score-badge">${r.overall}점</div>
+      </div>`;
+  }).join('');
+}
+
+// ============================================================
+// SELECT ROOM
+// ============================================================
+function selectRoom(id) {
+  state.selectedRoomId = id;
+  const room = ROOMS.find(r => r.id === id);
+  if (!room) return;
+
+  // 마커 업데이트
+  Object.entries(state.mapMarkers).forEach(([rid, marker]) => {
+    marker.setIcon(createRoomIcon(ROOMS.find(r => r.id === +rid), +rid === id));
+  });
+
+  // 지도 센터 이동
+  state.map.setView([room.lat, room.lng], 16, { animate: true });
+  if (state.mapMarkers[id]) state.mapMarkers[id].openPopup();
+
+  // 리스트 업데이트
+  renderRoomList();
+
+  // 사이드바 채우기
+  document.getElementById('no-selection-message').classList.add('hidden');
+  document.getElementById('detail-data-content').classList.remove('hidden');
+
+  document.getElementById('detail-title').textContent = room.name;
+  document.getElementById('detail-type').textContent = room.type;
+  document.getElementById('detail-overall-score').textContent = room.overall;
+  document.getElementById('detail-desc').textContent = room.desc;
+
+  const priceStr = room.dealType === '월세'
+    ? `보증금 ${room.deposit} / 월세 ${room.rent}만원`
+    : `전세 ${room.jeonse.toLocaleString()}만원`;
+  document.getElementById('detail-price').textContent = priceStr;
+
+  // 점수
+  ['legal','physical','infra','economic','comfort'].forEach(key => {
+    const v = room.scores[key];
+    document.getElementById(`score-${key}-val`).textContent = v + '점';
+    document.getElementById(`score-${key}-bar`).style.width = v + '%';
+    document.getElementById(`score-${key}-desc`).textContent = room.scoreDesc[key];
+  });
+
+  // 옵션 칩
+  const optBox = document.getElementById('score-economic-options');
+  optBox.innerHTML = room.options.map(o => `<span class="option-chip">${o}</span>`).join('');
+
+  // 방음 그리드
+  const spGrid = document.getElementById('soundproof-detail-grid');
+  spGrid.innerHTML = room.soundproof.map(s => `
+    <div class="soundproof-item">
+      <div class="si-label">${s.label}</div>
+      <div class="si-value ${s.cls}">${s.value}</div>
+    </div>`).join('');
+
+  // 장단점
+  document.getElementById('detail-pros').innerHTML = room.pros.map(p => `<li>${p}</li>`).join('');
+  document.getElementById('detail-cons').innerHTML = room.cons.map(c => `<li>${c}</li>`).join('');
+  document.getElementById('detail-target').textContent = `"${room.target}"`;
+
+  // lucide 재렌더
+  if (window.lucide) lucide.createIcons();
+}
+
+// ============================================================
+// COMPARE
+// ============================================================
+function updateCompareTray() {
+  const tray = document.getElementById('comparison-tray');
+  const countEl = document.getElementById('compare-count');
+  const listEl = document.getElementById('compare-items-list');
+  const startBtn = document.getElementById('start-comparison-btn');
+
+  countEl.textContent = state.compareList.length;
+  startBtn.disabled = state.compareList.length < 2;
+
+  if (state.compareList.length > 0) {
+    tray.classList.add('visible');
+  } else {
+    tray.classList.remove('visible');
+  }
+
+  const slots = [0,1].map(i => {
+    const r = state.compareList[i];
+    if (!r) return `<div class="empty-tray-slot">비교할 ${i === 0 ? '첫' : '두'} 번째 방을 추가해 주세요</div>`;
+    return `<div class="compare-slot-filled">
+      <span class="slot-name">${r.name}</span>
+      <button class="slot-remove" onclick="removeCompare(${r.id})"><i data-lucide="x"></i></button>
+    </div>`;
+  });
+  listEl.innerHTML = slots.join('');
+  if (window.lucide) lucide.createIcons();
+}
+
+function removeCompare(id) {
+  state.compareList = state.compareList.filter(r => r.id !== id);
+  updateCompareTray();
+}
+
+// ============================================================
+// UI EVENT LISTENERS
+// ============================================================
+function setupEvents() {
+  // 단과대학 변경
+  document.getElementById('college-select').addEventListener('change', e => {
+    state.college = e.target.value;
+    applyFilters();
+  });
+
+  // 거리 토글
+  document.getElementById('toggle-time').addEventListener('click', () => {
+    state.useTime = true;
+    document.getElementById('toggle-time').classList.add('active');
+    document.getElementById('toggle-dist').classList.remove('active');
+    document.getElementById('slider-min-val').textContent = '3분';
+    document.getElementById('slider-max-val').textContent = '30분';
+    updateSliderDisplay();
+  });
+  document.getElementById('toggle-dist').addEventListener('click', () => {
+    state.useTime = false;
+    document.getElementById('toggle-dist').classList.add('active');
+    document.getElementById('toggle-time').classList.remove('active');
+    document.getElementById('slider-min-val').textContent = '0.2km';
+    document.getElementById('slider-max-val').textContent = '2.1km';
+    updateSliderDisplay();
+  });
+
+  // 거리 슬라이더
+  document.getElementById('distance-slider').addEventListener('input', e => {
+    state.maxWalkMin = +e.target.value;
+    updateSliderDisplay();
+    applyFilters();
+  });
+
+  // 거래 유형 라디오
+  document.querySelectorAll('input[name="deal-type"]').forEach(radio => {
+    radio.addEventListener('change', e => {
+      state.dealType = e.target.value;
+      document.getElementById('radio-wolse').classList.toggle('active', state.dealType === '월세');
+      document.getElementById('radio-jeonse').classList.toggle('active', state.dealType === '전세');
+      document.getElementById('wolse-price-filters').classList.toggle('hidden', state.dealType !== '월세');
+      document.getElementById('jeonse-price-filters').classList.toggle('hidden', state.dealType !== '전세');
+      applyFilters();
+    });
+  });
+
+  // 가격 슬라이더
+  document.getElementById('deposit-slider').addEventListener('input', e => {
+    state.maxDeposit = +e.target.value;
+    document.getElementById('max-deposit-txt').textContent = (+e.target.value).toLocaleString() + '만 원';
+    applyFilters();
+  });
+  document.getElementById('rent-slider').addEventListener('input', e => {
+    state.maxRent = +e.target.value;
+    document.getElementById('max-rent-txt').textContent = (+e.target.value) + '만 원';
+    applyFilters();
+  });
+  document.getElementById('jeonse-slider').addEventListener('input', e => {
+    state.maxJeonse = +e.target.value;
+    document.getElementById('max-jeonse-txt').textContent = (+e.target.value).toLocaleString() + '만 원';
+    applyFilters();
+  });
+
+  // 비교 추가
+  document.getElementById('add-compare-btn').addEventListener('click', () => {
+    if (!state.selectedRoomId) return;
+    const room = ROOMS.find(r => r.id === state.selectedRoomId);
+    if (!room) return;
+    if (state.compareList.find(r => r.id === room.id)) {
+      alert('이미 비교 목록에 추가된 방입니다.'); return;
+    }
+    if (state.compareList.length >= 2) {
+      alert('최대 2개까지 비교할 수 있습니다.'); return;
+    }
+    state.compareList.push(room);
+    updateCompareTray();
+  });
+
+  // 1:1 비교 시작
+  document.getElementById('start-comparison-btn').addEventListener('click', () => {
+    if (state.compareList.length < 2) return;
+    const [r1, r2] = state.compareList;
+    document.getElementById('comp-name-1').textContent = r1.name;
+    document.getElementById('comp-name-2').textContent = r2.name;
+    [r1,r2].forEach((r,i) => {
+      const n = i+1;
+      const priceStr = r.dealType === '월세' ? `보증금 ${r.deposit} / 월세 ${r.rent}만` : `전세 ${r.jeonse.toLocaleString()}만`;
+      document.getElementById(`comp-type-${n}`).textContent = r.type;
+      document.getElementById(`comp-price-${n}`).textContent = priceStr;
+      document.getElementById(`comp-walk-${n}`).textContent = `도보 ${r.walkMin}분`;
+      ['legal','physical','infra','economic','comfort'].forEach(k => {
+        document.getElementById(`comp-score-${k}-${n}`).textContent = r.scores[k] + '점';
+        document.getElementById(`comp-bar-${k}-${n}`).style.width = r.scores[k] + '%';
+        document.getElementById(`comp-desc-${k}-${n}`).textContent = r.scoreDesc[k].substring(0,40) + '...';
+      });
+      document.getElementById(`comp-recom-${n}`).textContent = r.target;
+    });
+    document.getElementById('comparison-modal').classList.remove('hidden');
+  });
+
+  // 모달 닫기
+  document.getElementById('close-modal-btn').addEventListener('click', () => {
+    document.getElementById('comparison-modal').classList.add('hidden');
+  });
+  document.getElementById('comparison-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('comparison-modal'))
+      document.getElementById('comparison-modal').classList.add('hidden');
+  });
+
+  // 검증 모달
+  document.getElementById('btn-verify-legal').addEventListener('click', () => {
+    document.getElementById('verification-modal').classList.remove('hidden');
+    showVerifyTab('legal');
+  });
+  document.getElementById('btn-verify-physical').addEventListener('click', () => {
+    document.getElementById('verification-modal').classList.remove('hidden');
+    showVerifyTab('physical');
+  });
+  document.getElementById('close-verify-modal-btn').addEventListener('click', () => {
+    document.getElementById('verification-modal').classList.add('hidden');
+  });
+  ['legal','physical','molit'].forEach(tab => {
+    document.getElementById(`tab-btn-${tab}`).addEventListener('click', () => showVerifyTab(tab));
+  });
+  document.getElementById('verification-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('verification-modal'))
+      document.getElementById('verification-modal').classList.add('hidden');
+  });
+
+  // URL 파서 버튼
+  document.getElementById('url-parse-btn').addEventListener('click', () => {
+    const url = document.getElementById('naver-url-input').value.trim();
+    if (!url) { alert('URL을 입력해 주세요.'); return; }
+    alert('AI 분석 기능은 데모 버전에서는 지원되지 않습니다.\n실제 서비스에서는 매물 URL을 자동으로 분석합니다.');
+  });
+
+  // 편의시설 토글
+  document.getElementById('toggle-amenities-map-btn').addEventListener('click', () => {
+    state.amenitiesVisible = !state.amenitiesVisible;
+    const btn = document.getElementById('toggle-amenities-map-btn');
+    btn.innerHTML = state.amenitiesVisible
+      ? '<i data-lucide="eye-off"></i> 편의시설 숨기기'
+      : '<i data-lucide="eye"></i> 주변 편의시설 지도 표시';
+    if (window.lucide) lucide.createIcons();
+  });
+}
+
+function showVerifyTab(tab) {
+  ['legal','physical','molit'].forEach(t => {
+    document.getElementById(`tab-btn-${t}`).classList.toggle('active', t === tab);
+    document.getElementById(`verify-content-${t}`).classList.toggle('hidden', t !== tab);
+  });
+}
+
+function updateSliderDisplay() {
+  const val = state.maxWalkMin;
+  const cur = document.getElementById('slider-current-val');
+  if (state.useTime) {
+    cur.textContent = `최대 ${val}분 이내`;
+  } else {
+    cur.textContent = `최대 ${(val * 0.07).toFixed(1)}km 이내`;
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  setupEvents();
+  applyFilters();
+  if (window.lucide) lucide.createIcons();
+});
+</script>
+</body>
+</html>

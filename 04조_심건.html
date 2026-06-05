@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏗️ 콘크리트 역학 시뮬레이터 (통합본)</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #111;
+    }
+    /* UI 크기를 2배로 키우기 위한 스타일 구문 */
+    .lil-gui {
+      --width: 450px !important; 
+      font-size: 18px !important;  
+    }
+    .lil-gui .title {
+      font-size: 20px !important;
+      font-weight: bold;
+    }
+    .lil-gui .name {
+      width: 45% !important;
+    }
+    .lil-gui input[type="number"], .lil-gui select {
+      font-size: 16px !important;
+      height: 28px !important;
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/examples/jsm/controls/OrbitControls": "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js",
+        "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.18/+esm"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GUI } from 'lil-gui';
+    import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+
+    // --- 1. 그래프를 위한 Canvas 레이어 생성 (왼쪽 위) ---
+    const canvasContainer = document.createElement('div');
+    canvasContainer.style.position = 'absolute';
+    canvasContainer.style.top = '10px';  
+    canvasContainer.style.left = '10px'; 
+    canvasContainer.style.width = '320px';
+    canvasContainer.style.height = '230px';
+    canvasContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+    canvasContainer.style.border = '1px solid #555';
+    canvasContainer.style.borderRadius = '5px';
+    canvasContainer.style.padding = '10px';
+    canvasContainer.style.pointerEvents = 'none'; 
+    canvasContainer.style.zIndex = '100'; 
+    document.body.appendChild(canvasContainer);
+
+    const chartTitle = document.createElement('div');
+    chartTitle.innerText = 'Stress-Strain Curve (실시간)';
+    chartTitle.style.color = '#fff';
+    chartTitle.style.fontSize = '13px';
+    chartTitle.style.marginBottom = '5px';
+    chartTitle.style.fontFamily = 'sans-serif';
+    canvasContainer.appendChild(chartTitle);
+
+    const graphCanvas = document.createElement('canvas');
+    graphCanvas.width = 320;
+    graphCanvas.height = 190;
+    canvasContainer.appendChild(graphCanvas);
+    const ctx = graphCanvas.getContext('2d');
+
+    // --- 2. Three.js 기본 설정 ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111111);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100000);
+    camera.position.set(0, 200, 500); 
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 90, 0); 
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    dirLight.position.set(2000, 5000, 2000);
+    scene.add(dirLight);
+    scene.add(new THREE.GridHelper(10000, 50, 0x444444, 0x222222));
+
+    const params = {
+      diameter: 150,
+      height: 300,
+      appliedLoad: 0,
+      unitWater: 180, 
+      wcRatio: 50,
+      sandRatio: 40,
+      airContent: 4.0,
+      gMax: 25,
+      calcCement: 0,
+      predictedStrength: 0,
+      currentStress: 0,
+      deformation: 0,
+      strain: 0, 
+      status: "NORMAL",
+      maxLoadRange: 0
+    };
+
+    let dataHistory = [];
+
+    // 콘크리트 원기둥 생성
+    let concrete = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.5, 0.5, 1, 32),
+      new THREE.MeshPhongMaterial({ color: 0x888888, transparent: true, opacity: 0.6 })
+    );
+    scene.add(concrete);
+
+    const gravelMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshPhongMaterial({ color: 0x555555 }), 4000);
+    const sandMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 4, 4), new THREE.MeshPhongMaterial({ color: 0xc2a26a }), 6000);
+    scene.add(gravelMesh, sandMesh);
+
+    // --- 🧍 [단순화된 스케일 마네킹 생성] ---
+    const humanGroup = new THREE.Group();
+    const mannequinMat = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.85, roughness: 0.5 });
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(10, 16, 16), mannequinMat);
+    head.position.y = 170;
+    humanGroup.add(head);
+
+    const upperTorso = new THREE.Mesh(new THREE.BoxGeometry(26, 30, 14), mannequinMat);
+    upperTorso.position.y = 145;
+    humanGroup.add(upperTorso);
+
+    const lowerTorso = new THREE.Mesh(new THREE.BoxGeometry(24, 25, 14), mannequinMat);
+    lowerTorso.position.y = 112.5;
+    humanGroup.add(lowerTorso);
+
+    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(5, 4, 100, 8), mannequinMat);
+    leftLeg.position.set(-7, 50, 0);
+    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(5, 4, 100, 8), mannequinMat);
+    rightLeg.position.set(7, 50, 0);
+    humanGroup.add(leftLeg, rightLeg);
+
+    const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(4, 3.5, 55, 8), mannequinMat);
+    leftArm.position.set(-18, 137, 0);
+    const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(4, 3.5, 55, 8), mannequinMat);
+    rightArm.position.set(18, 137, 0);
+    humanGroup.add(leftArm, rightArm);
+
+    humanGroup.position.set(150, 0, 0);
+    scene.add(humanGroup);
+
+    let loadController;
+
+    function drawGraph() {
+      ctx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(40, 10); ctx.lineTo(40, 150); ctx.lineTo(300, 150);
+      ctx.stroke();
+
+      ctx.fillStyle = '#aaa';
+      ctx.font = '10px sans-serif';
+      ctx.fillText('Stress (MPa)', 45, 18);
+      ctx.fillText('Strain (ε)', 255, 145);
+
+      if (dataHistory.length < 2) return;
+
+      ctx.strokeStyle = '#00ffcc';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      const maxStrain = 0.0035; 
+      const maxStress = params.predictedStrength * 1.2;
+
+      dataHistory.forEach((point, i) => {
+        const x = 40 + (point.strain / maxStrain) * 240;
+        const y = 150 - (point.stress / maxStress) * 130;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      if (dataHistory.length > 0) {
+        const lastPoint = dataHistory[dataHistory.length - 1];
+        const currentX = 40 + (lastPoint.strain / maxStrain) * 240;
+        const currentY = 150 - (lastPoint.stress / maxStress) * 130;
+        
+        ctx.fillStyle = params.status === "🚨 FAILURE" ? '#ff0000' : '#ffea00';
+        ctx.beginPath();
+        ctx.arc(currentX, currentY, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function calculatePhysics() {
+      params.calcCement = Math.round(params.unitWater / (params.wcRatio / 100));
+      const vol_total_agg = 1000 - (params.unitWater + params.calcCement / 3.15 + params.airContent * 10);
+      
+      if (vol_total_agg > 0) {
+        let baseFck = 26 * (params.calcCement / params.unitWater) * (1 - (params.airContent - 1) * 0.05);
+        baseFck *= (1.0 - (Math.abs(params.sandRatio - 40) * 0.005));
+
+        const aspect = params.height / params.diameter;
+        const aspectFactor = aspect < 2 ? (1 / (0.82 + 0.18 * Math.exp(-0.85 * (aspect - 1)))) : 1;
+        const sizeFactor = 1.2 / Math.sqrt(1 + params.diameter / (3 * params.gMax));
+        params.predictedStrength = parseFloat((baseFck * aspectFactor * sizeFactor).toFixed(2));
+
+        const area = Math.PI * Math.pow(params.diameter / 2, 2);
+        const failureLoad = (params.predictedStrength * area) / 1000;
+        params.maxLoadRange = Math.round(failureLoad * 1.5);
+        
+        if (loadController) loadController.max(params.maxLoadRange);
+
+        params.currentStress = parseFloat(((params.appliedLoad * 1000) / area).toFixed(2));
+        const Ec = 4700 * Math.sqrt(params.predictedStrength);
+        
+        const stressRatio = Math.min(params.currentStress / params.predictedStrength, 1.0);
+        const nonLinearFactor = 1 + (stressRatio * 0.25); 
+        
+        params.strain = (params.currentStress / Ec) * nonLinearFactor;
+        params.deformation = parseFloat((params.strain * params.height).toFixed(4));
+
+        if (params.currentStress < params.predictedStrength) {
+          params.status = "✅ STABLE";
+          concrete.material.color.set(0x888888);
+          
+          if (dataHistory.length === 0 || dataHistory[dataHistory.length - 1].load !== params.appliedLoad) {
+              dataHistory.push({ stress: params.currentStress, strain: params.strain, load: params.appliedLoad });
+              
+              if (dataHistory.length > 1 && dataHistory[dataHistory.length - 1].load < dataHistory[dataHistory.length - 2].load) {
+                  dataHistory = [{ stress: params.currentStress, strain: params.strain, load: params.appliedLoad }];
+              }
+          }
+        } else {
+          params.status = "🚨 FAILURE";
+          concrete.material.color.set(0xff0000);
+          
+          if (dataHistory.length > 0 && dataHistory[dataHistory.length - 1].stress < params.predictedStrength) {
+            dataHistory.push({ stress: params.predictedStrength, strain: params.predictedStrength / Ec * 1.25, load: params.appliedLoad });
+          }
+        }
+        drawGraph();
+      }
+    }
+
+    const dummy = new THREE.Object3D();
+    function updateModel() {
+      calculatePhysics();
+      const sD = params.diameter / 10; 
+      const sH = params.height / 10;
+      const defScale = (params.height - params.deformation) / params.height;
+
+      concrete.scale.set(sD, sH * defScale, sD);
+      concrete.position.y = (sH * defScale) / 2;
+
+      humanGroup.position.x = (sD / 2) + 40;
+
+      const updateAgg = (mesh, count) => {
+        for (let i = 0; i < mesh.count; i++) {
+          if (i < count && params.predictedStrength > 0) {
+            const r = Math.random() * (sD * 0.45);
+            const theta = Math.random() * Math.PI * 2;
+            dummy.position.set(r * Math.cos(theta), Math.random() * sH * defScale, r * Math.sin(theta));
+            dummy.scale.setScalar(params.gMax / 12);
+          } else {
+            dummy.position.set(0, -10000, 0);
+          }
+          dummy.updateMatrix();
+          mesh.setMatrixAt(i, dummy.matrix);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+      };
+      updateAgg(gravelMesh, 2000);
+      updateAgg(sandMesh, 3000);
+    }
+
+    // GUI 설정
+    const gui = new GUI({ title: '🏗️ 구조 분석 실험 (대형 UI)' });
+
+    const f1 = gui.addFolder('📐 하중 및 구조제어');
+    f1.add(params, 'diameter', 150, 5000).name('지름(mm)').onChange(() => { dataHistory = []; updateModel(); });
+    f1.add(params, 'height', 300, 10000).name('높이(mm)').onChange(() => { dataHistory = []; updateModel(); });
+    loadController = f1.add(params, 'appliedLoad', 0, 1000).name('가압 하중(kN)').onChange(updateModel);
+
+    const f2 = gui.addFolder('🧪 배합 제원');
+    f2.add(params, 'unitWater', 140, 220, 1).name('단위수량 (kg/m³)').onChange(() => { dataHistory = []; updateModel(); });
+    f2.add(params, 'wcRatio', 20, 80).name('W/C (%)').onChange(() => { dataHistory = []; updateModel(); });
+    f2.add(params, 'sandRatio', 20, 70).name('s/a (%)').onChange(() => { dataHistory = []; updateModel(); });
+
+    const f3 = gui.addFolder('📊 실시간 측정 데이터');
+    f3.add(params, 'predictedStrength').name('fck(MPa)').listen().disable();
+    f3.add(params, 'calcCement').name('계산된 시멘트량(kg)').listen().disable(); 
+    f3.add(params, 'strain', 0, 0.005).name('변형률(ε)').listen().disable();
+    f3.add(params, 'status').name('상태').listen().disable();
+
+    updateModel();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>하자 진단 시스템 v3.0</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:#f1f5f9;min-height:100vh;font-size:14px;color:#1e293b}
+:root{--p:#1A3A5C;--p2:#2C6FAC;--bd:#CBD5E1;--card:#fff}
+#bar{background:var(--p);color:#fff;height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:300;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+#bar-title{font-size:15px;font-weight:800}
+#bar-btn{background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;font:14px 'Malgun Gothic',sans-serif}
+.page{max-width:520px;margin:0 auto;padding:18px 14px;display:none}
+.page.on{display:block}
+.banner{background:linear-gradient(135deg,var(--p),var(--p2));border-radius:13px;padding:18px 20px;margin-bottom:20px;color:#fff}
+.banner-badge{font-size:11px;color:rgba(255,255,255,.65);margin-bottom:3px}
+.banner-title{font-size:20px;font-weight:800}
+.banner-sub{font-size:11px;color:rgba(255,255,255,.5);margin-top:3px}
+.card{background:#fff;border-radius:11px;box-shadow:0 2px 8px rgba(0,0,0,.07);padding:16px;margin-bottom:13px}
+.sec{font-size:13px;font-weight:700;color:var(--p);margin-bottom:8px;display:block}
+.field{margin-bottom:12px}
+.field:last-child{margin-bottom:0}
+.field label{font-size:12px;font-weight:700;color:var(--p);display:block;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;padding:9px 11px;border-radius:8px;border:1.5px solid #d1d5db;font-size:13px;outline:none;background:#f9fafb;font-family:inherit;transition:border .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--p)}
+.field textarea{resize:vertical;min-height:70px}
+.err{color:#ef4444;font-size:11px;margin-top:3px;display:none}
+.err.on{display:block}
+.btn{width:100%;padding:11px;border-radius:8px;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:opacity .15s}
+.btn:hover{opacity:.88}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-p{background:var(--p);color:#fff}
+.btn-o{background:#fff;color:var(--p);border:1.5px solid var(--p)!important}
+.btn-g{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;box-shadow:0 3px 10px rgba(22,163,74,.3)}
+.btn-pdf{background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;box-shadow:0 3px 10px rgba(26,58,92,.3)}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.sc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:16px}
+.sc-btn{border-radius:8px;padding:9px 3px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:inherit}
+.sc-btn .ic{font-size:17px}
+.sc-btn .lb{font-size:10px;font-weight:700}
+.inp-row{padding:10px 0}
+.inp-row+.inp-row{border-top:1px solid #f3f4f6}
+.inp-header{display:flex;gap:9px;margin-bottom:7px}
+.inp-bar{width:4px;border-radius:3px;min-height:32px;flex-shrink:0}
+.inp-label{font-size:12px;font-weight:700}
+.inp-info{font-size:10px;color:#9ca3af}
+.inp-wrap{display:flex;gap:5px;align-items:center}
+.inp-wrap input{flex:1;padding:8px 10px;border-radius:7px;border:1.5px solid #d1d5db;font-size:13px;outline:none;background:#f9fafb;font-family:inherit}
+.inp-wrap input:focus{border-color:var(--p)}
+.inp-unit{font-size:12px;color:#6b7280;white-space:nowrap;min-width:24px}
+.formula{background:#f8fafc;border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:10px;color:#6b7280;line-height:1.85}
+.formula strong{font-weight:700;color:#374151;display:block;margin-bottom:2px}
+.site-bar{background:#f0f5fb;border-radius:9px;padding:9px 12px;margin-bottom:16px;border:1px solid rgba(26,58,92,.18);display:flex;align-items:center;gap:7px}
+.site-bar .sn{font-size:12px;font-weight:700;color:var(--p);flex:1}
+.site-bar .si{font-size:11px;color:#6b7280}
+.res-banner{border-radius:12px;padding:16px 18px;margin-bottom:16px;display:flex;gap:13px;align-items:center;border-width:1.5px;border-style:solid}
+.res-icon{width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:25px;flex-shrink:0}
+.info-row{display:flex;align-items:center;padding:5px 0;font-size:12px;border-bottom:1px solid #f3f4f6}
+.info-row:last-child{border-bottom:none}
+.info-row .il{color:#6b7280;flex:1}
+.info-row .iv{font-weight:600}
+.val-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.vc{border-radius:8px;padding:8px 3px;text-align:center}
+.vc .vv{font-size:14px;font-weight:800}
+.vc .vl{font-size:8.5px;color:#6b7280;margin-top:2px;line-height:1.35;white-space:pre-line}
+.calc-row{display:flex;gap:9px;align-items:flex-start}
+.calc-row+.calc-row{border-top:1px solid #f3f4f6;margin-top:10px;padding-top:10px}
+.calc-info{flex:1}
+.clbl{font-size:12px;font-weight:700}
+.cform{font-size:10px;color:#9ca3af;margin-top:1px}
+.csub{font-size:10px;color:#6b7280;margin-top:2px}
+.cval{text-align:right;flex-shrink:0}
+.cnum{font-size:16px;font-weight:800}
+.ctag{margin-top:3px;padding:2px 6px;border-radius:5px;font-size:9.5px;font-weight:700;display:inline-block}
+.detail-card{border-left:4px solid;border-left-style:solid}
+.hist-tile{background:#fff;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.07);padding:10px 14px;margin-bottom:7px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.hist-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .65s linear infinite;flex-shrink:0}
+
+/* ── 보수 가이드 & 견적서 탭 ── */
+.tab-bar{display:flex;gap:0;margin-bottom:14px;border-radius:9px;overflow:hidden;border:1.5px solid var(--bd)}
+.tab{flex:1;padding:9px;font-size:12px;font-weight:700;cursor:pointer;background:#f9fafb;border:none;font-family:inherit;color:#6b7280;transition:background .15s}
+.tab.act{background:var(--p);color:#fff}
+.guide-item{margin-bottom:10px;border-radius:9px;border:1px solid var(--bd);overflow:hidden}
+.guide-head{display:flex;align-items:center;gap:9px;padding:10px 12px;cursor:pointer;background:#f9fafb}
+.guide-head .gico{font-size:18px;flex-shrink:0}
+.guide-head .gtitle{font-size:13px;font-weight:700;flex:1}
+.guide-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px}
+.guide-body{padding:12px;background:#fff;border-top:1px solid #f1f5f9;display:none}
+.guide-body.open{display:block}
+.step-list{list-style:none;counter-reset:step}
+.step-list li{counter-increment:step;display:flex;gap:10px;margin-bottom:9px;font-size:12px;line-height:1.6;color:#374151}
+.step-list li::before{content:counter(step);background:var(--p);color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px}
+.mat-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px}
+.mat-table th{background:#f1f5f9;color:var(--p);font-weight:700;padding:5px 8px;text-align:left;border:0.5px solid var(--bd)}
+.mat-table td{padding:5px 8px;border:0.5px solid var(--bd);vertical-align:middle}
+.mat-table tr:nth-child(even) td{background:#f9fafb}
+.price-badge{background:#e0f2fe;color:#0369a1;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px}
+.warn-box{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 11px;font-size:11px;color:#92400e;display:flex;gap:6px;margin-top:9px}
+.pro-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:9px 11px;font-size:11px;color:#991b1b;display:flex;gap:6px;margin-top:9px}
+
+/* ── 견적 의뢰서 ── */
+.estimate-form .field{margin-bottom:11px}
+.estimate-preview{background:#fff;border:1.5px solid var(--bd);border-radius:10px;overflow:hidden;margin-bottom:14px}
+.ep-head{background:var(--p);color:#fff;padding:14px 16px}
+.ep-head h2{font-size:14px;font-weight:800;margin-bottom:2px}
+.ep-head .ep-sub{font-size:10px;color:rgba(255,255,255,.65)}
+.ep-section{padding:12px 16px;border-bottom:1px solid #f1f5f9}
+.ep-section:last-child{border-bottom:none}
+.ep-section h3{font-size:11px;font-weight:700;color:var(--p);margin-bottom:8px}
+.ep-row{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:0.5px solid #f1f5f9}
+.ep-row:last-child{border-bottom:none}
+.ep-row .ek{color:#64748b}
+.ep-row .ev{font-weight:600}
+.ep-items-table{width:100%;border-collapse:collapse;font-size:10.5px}
+.ep-items-table th{background:#f1f5f9;color:var(--p);font-weight:700;padding:5px 7px;text-align:left;border:0.5px solid var(--bd)}
+.ep-items-table td{padding:5px 7px;border:0.5px solid var(--bd)}
+.ep-total{background:#1A3A5C;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center}
+.ep-total .tl{font-size:12px;font-weight:600}
+.ep-total .tv{font-size:16px;font-weight:800}
+.sign-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.sign-cell{border:1px solid var(--bd);border-radius:8px;padding:10px;min-height:60px;display:flex;flex-direction:column}
+.sign-cell .sl{font-size:11px;color:#6b7280;margin-bottom:auto}
+.sign-cell .sl2{font-size:10px;color:#9ca3af;margin-top:4px}
+
+/* PDF 오버레이 */
+#pdf-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:none;flex-direction:column;align-items:center;justify-content:center;padding:14px}
+#pdf-ov.on{display:flex}
+#pdf-modal{background:#fff;border-radius:13px;width:100%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+#pdf-tb{background:var(--p);color:#fff;padding:11px 15px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#pdf-tb span{font-size:14px;font-weight:700}
+.ptb-btn{background:rgba(255,255,255,.18);border:none;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit}
+.ptb-btn:hover{background:rgba(255,255,255,.28)}
+#pdf-area{flex:1;overflow:auto;background:#e2e8f0;padding:14px;display:flex;flex-direction:column;align-items:center}
+.a4{background:#fff;width:595px;min-width:595px;padding:26px;box-shadow:0 4px 16px rgba(0,0,0,.12);font-size:8.5px;line-height:1.5;color:#1e293b;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif}
+.a4 .ah{background:linear-gradient(135deg,#1A3A5C,#2C6FAC);color:#fff;padding:12px 16px;border-radius:3px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-end}
+.a4 .at{font-size:12px;font-weight:800}
+.a4 .as{font-size:7px;color:rgba(255,255,255,.65);margin-top:2px}
+.a4 .ad{text-align:right;font-size:7px;color:rgba(255,255,255,.7)}
+.a4 .stitle{background:#e8eef5;border-left:3px solid #1A3A5C;padding:3px 7px;font-size:7.5px;font-weight:700;color:#1A3A5C;margin-bottom:4px;margin-top:8px}
+.a4 table{width:100%;border-collapse:collapse;font-size:7.5px;margin-bottom:8px}
+.a4 table th{background:#e8eef5;color:#1A3A5C;font-weight:700;padding:3px 6px;border:0.5px solid #cbd5e1;text-align:center}
+.a4 table td{border:0.5px solid #cbd5e1;padding:3px 6px;vertical-align:middle}
+.a4 .lbl{font-weight:700;color:#1A3A5C;background:#f8fafc;width:26%}
+.a4 .cen{text-align:center}
+.a4 .v-ok{background:#dcfce7;color:#16a34a;border:0.5px solid #86efac;padding:1px 6px;border-radius:3px;font-weight:700;display:inline-block}
+.a4 .v-ng{background:#fee2e2;color:#dc2626;border:0.5px solid #fca5a5;padding:1px 6px;border-radius:3px;font-weight:700;display:inline-block}
+.a4 .img-box{border:0.8px solid #cbd5e1;border-radius:2px;background:#eef2f7;height:75px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#64748b;font-size:7.5px;gap:4px;margin-bottom:8px}
+.a4 .op-box{border:0.5px solid #cbd5e1;border-radius:2px;overflow:hidden;margin-bottom:8px}
+.a4 .op-head{padding:3px 7px;font-size:7.5px;font-weight:700}
+.a4 .op-body{padding:6px 8px;font-size:7px;line-height:1.7}
+.a4 .op-note{padding:3px 8px;font-size:6.5px;color:#94a3b8;border-top:0.5px solid #e2e8f0}
+.a4 .sign-g{display:grid;grid-template-columns:1fr 1fr 1fr;border:0.5px solid #cbd5e1;border-radius:2px;overflow:hidden;margin-bottom:7px}
+.a4 .sg{padding:6px 8px;border-right:0.5px solid #cbd5e1;min-height:50px;display:flex;flex-direction:column}
+.a4 .sg:last-child{border-right:none}
+.a4 .sl{font-size:7px;color:#64748b}
+.a4 .sline{margin-top:auto;border-top:0.5px solid #cbd5e1}
+.a4 .footer{border-top:0.5px solid #cbd5e1;padding-top:3px;display:flex;justify-content:space-between;font-size:6px;color:#94a3b8}
+.a4 .rep-head{background:#1A3A5C;color:#fff;padding:10px 14px;border-radius:3px;margin-bottom:8px}
+.a4 .rep-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid #f1f5f9;font-size:7.5px}
+.a4 .rep-row .rk{color:#64748b}
+.a4 .rep-total{background:#1A3A5C;color:#fff;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;font-size:7.5px}
+</style>
+</head>
+<body>
+<div id="bar">
+  <div id="bar-title">🏗️ 하자 진단 시스템 v3.0</div>
+  <button id="bar-btn" onclick="goHome()"></button>
+</div>
+
+<!-- ══ 홈 ══ -->
+<div id="pg-home" class="page on">
+  <div class="banner">
+    <div class="banner-badge">🏗️ 결로·단열 하자 판정 + 보수 가이드 + 견적 의뢰서</div>
+    <div class="banner-title">MVP v3.0</div>
+    <div class="banner-sub">현장 실측 → 하자 판정 → 보수 방법 + 견적서 자동 생성</div>
+  </div>
+  <span class="sec">현장 정보 입력</span>
+  <div class="card">
+    <div class="field"><label>🏢 현장명</label><input id="h-site" placeholder="ex) 강남구 OO아파트 101동"><div class="err" id="er-site">현장명을 입력하세요</div></div>
+    <div class="field"><label>👤 감리자 / 조사관</label><input id="h-insp" placeholder="ex) 홍길동"><div class="err" id="er-insp">감리자 이름을 입력하세요</div></div>
+    <div class="field"><label>📐 측정 부위</label>
+      <select id="h-part">
+        <option>외벽 (북측)</option><option>외벽 (남측)</option><option>외벽 (동측)</option><option>외벽 (서측)</option>
+        <option>최상층 천장</option><option>최하층 바닥</option><option>창호 주변</option><option>열교 부위</option>
+        <option>지하 외벽</option><option>기타</option>
+      </select>
+    </div>
+  </div>
+  <button class="btn btn-p" onclick="startMeasure()">🌡️ 측정 시작</button>
+  <div id="hist-wrap" style="margin-top:22px;display:none">
+    <span class="sec">최근 측정 이력</span>
+    <div id="hist-list"></div>
+  </div>
+</div>
+
+<!-- ══ 측정 ══ -->
+<div id="pg-measure" class="page">
+  <div id="m-bar" class="site-bar"><span>📍</span><span id="m-sn" class="sn"></span><span id="m-in" class="si"></span></div>
+  <span class="sec">시나리오 선택 (테스트용)</span>
+  <div class="sc-grid">
+    <button class="sc-btn" style="border:1.5px solid rgba(220,38,38,.3);background:rgba(220,38,38,.06)" onclick="fillSc('cond')"><span class="ic">💧</span><span class="lb" style="color:#dc2626">결로 위험</span></button>
+    <button class="sc-btn" style="border:1.5px solid rgba(234,88,12,.3);background:rgba(234,88,12,.06)" onclick="fillSc('ins')"><span class="ic">🌡️</span><span class="lb" style="color:#ea580c">단열 하자</span></button>
+    <button class="sc-btn" style="border:1.5px solid rgba(22,163,74,.3);background:rgba(22,163,74,.06)" onclick="fillSc('norm')"><span class="ic">✅</span><span class="lb" style="color:#16a34a">정상</span></button>
+    <button class="sc-btn" style="border:1.5px solid rgba(124,58,237,.3);background:rgba(124,58,237,.06)" onclick="fillSc('rand')"><span class="ic">🔀</span><span class="lb" style="color:#7c3aed">랜덤</span></button>
+  </div>
+  <span class="sec">측정값 입력</span>
+  <div class="card">
+    <div class="inp-row"><div class="inp-header"><div class="inp-bar" style="background:#fb923c"></div><div><div class="inp-label">🌡️ Ti — 실내 공기 온도</div><div class="inp-info">건구온도</div></div></div><div class="inp-wrap"><input id="v-ti" type="number" step="0.1" placeholder="22.0"><span class="inp-unit">°C</span></div><div class="err" id="er-ti"></div></div>
+    <div class="inp-row"><div class="inp-header"><div class="inp-bar" style="background:#60a5fa"></div><div><div class="inp-label">💧 RH — 실내 상대습도</div><div class="inp-info">0 초과 ~ 100 이하</div></div></div><div class="inp-wrap"><input id="v-rh" type="number" step="0.1" placeholder="60.0"><span class="inp-unit">%</span></div><div class="err" id="er-rh"></div></div>
+    <div class="inp-row"><div class="inp-header"><div class="inp-bar" style="background:#2dd4bf"></div><div><div class="inp-label">🧱 Tsi — 실내 표면 온도</div><div class="inp-info">적외선 온도계 측정값</div></div></div><div class="inp-wrap"><input id="v-tsi" type="number" step="0.1" placeholder="15.0"><span class="inp-unit">°C</span></div><div class="err" id="er-tsi"></div></div>
+    <div class="inp-row"><div class="inp-header"><div class="inp-bar" style="background:#818cf8"></div><div><div class="inp-label">☁️ To — 실외 공기 온도</div><div class="inp-info">외기 온도</div></div></div><div class="inp-wrap"><input id="v-to" type="number" step="0.1" placeholder="-5.0"><span class="inp-unit">°C</span></div><div class="err" id="er-to"></div></div>
+  </div>
+  <div class="formula"><strong>적용 공식 안내</strong>• 이슬점 Td: γ=(17.27·Ti)/(237.3+Ti)+ln(RH/100) → Td=(237.3·γ)/(17.27−γ)<br>• TDR=(Ti−Tsi)/(Ti−To) ※ 국토교통부 기준 0.25</div>
+  <div class="btn-row"><button class="btn btn-o" onclick="showPg('home')">← 뒤로</button><button class="btn btn-p" id="btn-meas" onclick="runMeasure()">📊 하자 판정 실행</button></div>
+</div>
+
+<!-- ══ 결과 ══ -->
+<div id="pg-result" class="page">
+  <div id="r-banner" class="res-banner"><div id="r-icon" class="res-icon"></div><div><div id="r-sub" style="font-size:11px;font-weight:600;margin-bottom:1px"></div><div id="r-main" style="font-size:18px;font-weight:800"></div></div></div>
+  <span class="sec">현장 정보</span><div class="card" id="r-site"></div>
+  <span class="sec">입력 측정값</span><div class="card"><div class="val-grid" id="r-vals"></div></div>
+  <span class="sec">계산 결과</span><div class="card" id="r-calc"></div>
+  <span class="sec">판정 세부</span><div class="card detail-card" id="r-detail"></div>
+
+  <!-- ★ 보수 가이드 / 견적 의뢰서 탭 -->
+  <span class="sec" style="margin-top:6px">보수 안내</span>
+  <div class="tab-bar">
+    <button class="tab act" id="tab-guide" onclick="switchTab('guide')">🔧 보수 가이드</button>
+    <button class="tab" id="tab-est" onclick="switchTab('est')">📋 시공 견적 의뢰서</button>
+  </div>
+  <div id="panel-guide"></div>
+  <div id="panel-est" style="display:none"></div>
+
+  <button class="btn btn-pdf" style="margin-top:14px" onclick="openPdf('diag')">📄 하자 판정 PDF 보고서</button>
+  <button class="btn btn-pdf" style="margin-top:8px;background:linear-gradient(135deg,#0f766e,#0d9488)" onclick="openPdf('est')">📋 견적 의뢰서 PDF 출력</button>
+  <div class="btn-row" style="margin-top:10px;margin-bottom:24px">
+    <button class="btn btn-o" onclick="showPg('measure')">🔄 재측정</button>
+    <button class="btn btn-p" onclick="goHome()">🏠 새 현장 등록</button>
+  </div>
+</div>
+
+<!-- ══ PDF 오버레이 ══ -->
+<div id="pdf-ov">
+  <div id="pdf-modal">
+    <div id="pdf-tb">
+      <span id="pdf-tb-title">📄 미리보기</span>
+      <div style="display:flex;gap:7px">
+        <button class="ptb-btn" onclick="dlPdf()">⬇ 다운로드</button>
+        <button class="ptb-btn" onclick="printPdf()">🖨 인쇄</button>
+        <button class="ptb-btn" onclick="closePdf()">✕</button>
+      </div>
+    </div>
+    <div id="pdf-area"><div class="a4" id="a4-content"></div></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// 상수 & 상태
+// ═══════════════════════════════════════
+var TDR_THR=0.25, ST={site:null,records:[]}, CUR=null, PDF_MODE='diag';
+var RM={
+  normal:      {label:'정상 (이상 없음)',         color:'#16a34a',bg:'#f0fdf4',bd:'#86efac',icon:'✅'},
+  condensation:{label:'결로 발생 위험',            color:'#1d4ed8',bg:'#eff6ff',bd:'#93c5fd',icon:'💧'},
+  insulation:  {label:'단열 하자 의심',            color:'#ea580c',bg:'#fff7ed',bd:'#fdba74',icon:'🌡️'},
+  both:        {label:'복합 하자 (결로+단열)',      color:'#dc2626',bg:'#fef2f2',bd:'#fca5a5',icon:'⚠️'}
+};
+var RD={
+  normal:'측정 결과 결로 발생 및 단열 하자 위험이 없습니다.',
+  condensation:'실내 표면 온도가 이슬점 이하입니다. 결로 발생 가능성이 높으며 곰팡이·마감재 손상에 주의하십시오.',
+  insulation:'TDR이 기준치를 초과하였습니다. 단열재 결손 또는 열교(Thermal Bridge) 현상이 의심됩니다.',
+  both:'결로 위험과 단열 하자가 동시에 감지되었습니다. 즉각적인 보수 조치가 필요합니다.'
+};
+
+// ═══════════════════════════════════════
+// 보수 가이드 데이터
+// ═══════════════════════════════════════
+var GUIDES={
+  normal:[
+    {icon:'✅',title:'이상 없음 — 정기 점검 권고',diy:true,level:'관리',badge:'유지 관리',bc:'#dcfce7',btc:'#15803d',
+     desc:'현 시점 결로 및 단열 하자가 없습니다. 아래 예방 조치를 꾸준히 실시하십시오.',
+     steps:['환기를 하루 2회 이상 실시하여 실내 습도를 50% 이하로 유지하십시오.','창문·욕실 등 결로 발생 취약 부위를 월 1회 이상 점검하십시오.','난방기 작동 시 습도계로 실내 습도를 모니터링하십시오.','연 1회 단열재 시공 상태를 육안 점검하십시오.'],
+     mats:[{name:'디지털 온습도계',unit:'개',qty:1,low:8000,high:25000},{name:'환기팬 (욕실용)',unit:'개',qty:1,low:25000,high:80000}]}
+  ],
+  condensation:[
+    {icon:'💧',title:'1단계 — DIY 즉시 처치 (비전문인 가능)',diy:true,level:'DIY 가능',badge:'직접 가능',bc:'#dbeafe',btc:'#1d4ed8',
+     desc:'경미한 결로 및 곰팡이는 비전문인도 처리할 수 있습니다. 아래 순서대로 진행하세요.',
+     steps:['창문과 환기구를 열어 습도를 낮추십시오. 하루 30분 이상 환기는 필수입니다.','결로가 생긴 표면을 마른 걸레로 닦아낸 후 완전히 건조시키십시오.','곰팡이 발생 시 시중 곰팡이 제거제를 도포하고 10분 후 닦아내십시오.','건조 후 방습 페인트(방곰팡이 페인트)를 2회 도포하십시오.','제습기를 설치하여 실내 습도를 40~50%로 유지하십시오.'],
+     mats:[{name:'곰팡이 제거제 (500ml)',unit:'개',qty:2,low:5000,high:12000},{name:'방습·방곰팡이 페인트 (4L)',unit:'통',qty:1,low:25000,high:60000},{name:'제습기 (가정용)',unit:'대',qty:1,low:80000,high:300000},{name:'실리콘 실란트 (창호용)',unit:'개',qty:2,low:5000,high:15000}]},
+    {icon:'🔧',title:'2단계 — 창호 기밀 보완 (반전문인)',diy:true,level:'반DIY',badge:'약간 어려움',bc:'#fef9c3',btc:'#a16207',
+     desc:'창호 주변 틈새가 결로의 원인일 수 있습니다. 실란트 보강 작업은 비전문인도 가능합니다.',
+     steps:['창호 주변 기존 실란트의 균열·박리 여부를 확인하십시오.','오래된 실란트는 칼이나 전용 제거제로 완전히 제거하십시오.','마스킹 테이프로 작업 라인을 잡은 후 신규 실리콘 실란트를 충전하십시오.','손가락이나 주걱으로 표면을 정리하고 24시간 이상 양생하십시오.'],
+     mats:[{name:'실리콘 실란트 건 (코킹건)',unit:'개',qty:1,low:5000,high:20000},{name:'방수 실리콘 실란트',unit:'개',qty:3,low:5000,high:18000},{name:'실란트 제거제',unit:'개',qty:1,low:8000,high:20000},{name:'마스킹 테이프',unit:'롤',qty:2,low:2000,high:5000}]},
+    {icon:'🚫',title:'3단계 — 단열재 보강 (전문업체 필수)',diy:false,level:'전문업체',badge:'전문 필수',bc:'#fee2e2',btc:'#dc2626',
+     desc:'표면 처리 후에도 결로가 반복된다면 단열재 결손이 원인입니다. 반드시 전문업체에 의뢰하십시오.',
+     steps:['열화상 카메라로 열교(Cold Bridge) 발생 위치를 정밀 파악해야 합니다.','단열재 재시공 또는 내단열 추가 설치가 필요합니다.','방습층(Vapor Barrier) 설치 여부를 전문가와 협의하십시오.','시공 후 재측정을 통해 TDR 값이 기준치 이하인지 반드시 확인하십시오.'],
+     mats:[{name:'압출법 단열보드 (XPS, 50mm)',unit:'㎡',qty:10,low:15000,high:28000},{name:'비드법 단열보드 (EPS, 50mm)',unit:'㎡',qty:10,low:8000,high:15000},{name:'방습 필름 (PE, 0.2mm)',unit:'㎡',qty:10,low:1500,high:4000},{name:'단열 테이프',unit:'롤',qty:3,low:5000,high:15000}]}
+  ],
+  insulation:[
+    {icon:'🔍',title:'1단계 — 열교 부위 파악 (반전문인)',diy:true,level:'반DIY',badge:'약간 어려움',bc:'#fef9c3',btc:'#a16207',
+     desc:'단열 하자의 위치를 먼저 파악해야 합니다. 열화상 카메라 앱이나 적외선 온도계로 확인 가능합니다.',
+     steps:['야간 냉각 시 적외선 온도계로 벽면 전체를 스캔하여 냉점(Cold Spot)을 찾으십시오.','의심 부위 주변 마감재(걸레받이, 몰딩 등)를 제거하여 단열재 상태를 확인하십시오.','단열재 탈락·공극·누락 여부를 사진으로 기록하십시오.','발견된 결함의 위치와 범위를 도면에 표시하십시오.'],
+     mats:[{name:'적외선 온도계',unit:'개',qty:1,low:20000,high:80000},{name:'열화상 카메라 스마트폰 모듈',unit:'개',qty:1,low:150000,high:500000}]},
+    {icon:'🧱',title:'2단계 — 국소 단열재 보수 (반전문인)',diy:true,level:'반DIY',badge:'약간 어려움',bc:'#fef9c3',btc:'#a16207',
+     desc:'탈락된 단열재가 접근 가능한 위치라면 비전문인도 보수할 수 있습니다.',
+     steps:['탈락된 단열재를 동일 규격의 신규 단열재로 교체하십시오.','단열재 이음부에는 단열 테이프를 충분히 붙여 기밀성을 확보하십시오.','단열재 위에 방습 필름을 덧씌운 후 마감재를 복구하십시오.','보수 후 24시간 이상 경과한 뒤 표면 온도를 재측정하여 효과를 확인하십시오.'],
+     mats:[{name:'XPS 단열보드 (50mm)',unit:'㎡',qty:5,low:15000,high:28000},{name:'우레탄 폼 (발포형)',unit:'개',qty:2,low:12000,high:30000},{name:'단열 테이프 (알루미늄)',unit:'롤',qty:2,low:8000,high:20000},{name:'방습 필름 (PE)',unit:'㎡',qty:5,low:1500,high:4000}]},
+    {icon:'🚫',title:'3단계 — 전면 단열재 재시공 (전문업체 필수)',diy:false,level:'전문업체',badge:'전문 필수',bc:'#fee2e2',btc:'#dc2626',
+     desc:'TDR이 크게 초과하거나 광범위한 단열 결손의 경우 전문업체 재시공이 필요합니다.',
+     steps:['건물 에너지 효율 등급에 맞는 단열 두께 및 공법을 전문가와 협의하십시오.','외단열(EIFS)과 내단열 중 건물 구조에 적합한 방식을 선택하십시오.','시공 중 단열재 이음부 처리 및 방습층 설치를 반드시 감리하십시오.','완료 후 적외선 열화상 전수 검사로 시공 품질을 확인하십시오.'],
+     mats:[{name:'외단열 시스템 (EIFS, ㎡당)',unit:'㎡',qty:20,low:80000,high:150000},{name:'무기질 단열재 (미네랄울)',unit:'㎡',qty:20,low:20000,high:45000},{name:'열교차단재 (Thermal Break)',unit:'m',qty:10,low:15000,high:40000},{name:'단열재 전용 접착제',unit:'개',qty:3,low:15000,high:35000}]}
+  ],
+  both:[
+    {icon:'⚠️',title:'긴급 응급 처치 (DIY)',diy:true,level:'DIY 가능',badge:'즉시 시행',bc:'#dbeafe',btc:'#1d4ed8',
+     desc:'복합 하자는 즉각적인 응급 조치와 전문 보수가 모두 필요합니다. 먼저 아래를 시행하십시오.',
+     steps:['즉시 환기하여 실내 습도를 낮추십시오.','결로 발생 부위를 건조 유지하고 곰팡이 제거제로 살균하십시오.','임시 방수 실란트로 누수 틈새를 막으십시오.','제습기를 최대 출력으로 24시간 가동하십시오.'],
+     mats:[{name:'곰팡이 제거제',unit:'개',qty:2,low:5000,high:12000},{name:'제습기',unit:'대',qty:1,low:80000,high:300000},{name:'방수 실란트',unit:'개',qty:3,low:5000,high:18000}]},
+    {icon:'🚫',title:'종합 보수 — 전문업체 필수 의뢰',diy:false,level:'전문업체',badge:'전문 필수',bc:'#fee2e2',btc:'#dc2626',
+     desc:'복합 하자는 단순 부분 보수로는 근본 해결이 불가능합니다. 전문업체에 종합 진단 및 보수를 의뢰하십시오.',
+     steps:['정밀 열화상 진단으로 결함 범위를 전수 파악하십시오.','단열재 재시공 + 방습층 설치를 동시에 진행해야 합니다.','창호 기밀 성능도 함께 점검 및 교체 여부를 검토하십시오.','보수 완료 후 TDR·이슬점 재측정으로 성능을 반드시 검증하십시오.'],
+     mats:[{name:'복합 단열 보수 공사 (㎡)',unit:'㎡',qty:20,low:100000,high:200000},{name:'방습층 시스템',unit:'㎡',qty:20,low:15000,high:40000},{name:'창호 실란트 전체 재시공',unit:'창',qty:5,low:50000,high:150000},{name:'열화상 정밀 진단 비용',unit:'회',qty:1,low:200000,high:500000}]}
+  ]
+};
+
+// ═══════════════════════════════════════
+// 견적 의뢰서 항목 데이터
+// ═══════════════════════════════════════
+var EST_ITEMS={
+  normal:[],
+  condensation:[
+    {name:'결로 부위 곰팡이 제거 및 살균 처리',unit:'㎡',qty:5,uprice:35000},
+    {name:'방습·방곰팡이 페인트 도포 (2회)',unit:'㎡',qty:5,uprice:28000},
+    {name:'창호 주변 실리콘 재시공',unit:'창',qty:3,uprice:80000},
+    {name:'단열 보완재 시공 (취약 부위)',unit:'㎡',qty:3,uprice:65000},
+    {name:'시공 후 열화상 검사',unit:'회',qty:1,uprice:200000}
+  ],
+  insulation:[
+    {name:'단열재 교체 (XPS 50mm)',unit:'㎡',qty:10,uprice:85000},
+    {name:'방습층 설치 (PE 필름)',unit:'㎡',qty:10,uprice:18000},
+    {name:'열교차단 처리',unit:'m',qty:8,uprice:35000},
+    {name:'마감재 복구 (석고보드+도장)',unit:'㎡',qty:10,uprice:55000},
+    {name:'정밀 열화상 진단',unit:'회',qty:1,uprice:300000}
+  ],
+  both:[
+    {name:'정밀 열화상 전수 조사',unit:'회',qty:1,uprice:400000},
+    {name:'결로 부위 곰팡이 제거·살균',unit:'㎡',qty:8,uprice:35000},
+    {name:'단열재 전면 재시공 (XPS)',unit:'㎡',qty:15,uprice:95000},
+    {name:'방습층 설치 (PE 필름)',unit:'㎡',qty:15,uprice:18000},
+    {name:'창호 기밀 전체 재시공',unit:'창',qty:4,uprice:120000},
+    {name:'방습 페인트 도포',unit:'㎡',qty:8,uprice:28000},
+    {name:'마감재 복구 (석고보드+도장)',unit:'㎡',qty:15,uprice:55000},
+    {name:'완료 후 성능 검증 측정',unit:'회',qty:1,uprice:150000}
+  ]
+};
+
+// ═══════════════════════════════════════
+// 계산 로직
+// ═══════════════════════════════════════
+function dp(ti,rh){var g=(17.27*ti)/(237.3+ti)+Math.log(rh/100);return Math.round((237.3*g)/(17.27-g)*100)/100}
+function tdrCalc(ti,tsi,to){var d=ti-to;if(Math.abs(d)<1e-9)return 0;return Math.round(((ti-tsi)/d)*10000)/10000}
+function diagnose(ti,rh,tsi,to){var d=dp(ti,rh),t=tdrCalc(ti,tsi,to),c=tsi<=d,i=t>TDR_THR;return{dewPoint:d,tdr:t,cond:c,ins:i,result:c&&i?'both':c?'condensation':i?'insulation':'normal'}}
+
+// ═══════════════════════════════════════
+// 더미
+// ═══════════════════════════════════════
+function j(b,r){return Math.round((b+(Math.random()*2-1)*r)*10)/10}
+var SC={cond:function(){return{ti:j(22,.5),rh:j(65,3),tsi:j(8,1),to:j(-5,2)}},ins:function(){return{ti:j(20,.5),rh:j(45,3),tsi:j(10,1),to:j(-8,2)}},norm:function(){return{ti:j(22,.5),rh:j(40,3),tsi:j(18,1),to:j(2,2)}},rand:function(){var k=['cond','ins','norm'];return SC[k[Math.floor(Math.random()*3)]]()}};
+function fillSc(k){var d=SC[k]();['ti','rh','tsi','to'].forEach(function(f){document.getElementById('v-'+f).value=d[f]});clearErrs()}
+
+// ═══════════════════════════════════════
+// 화면 전환
+// ═══════════════════════════════════════
+function showPg(n){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('on')});document.getElementById('pg-'+n).classList.add('on');var b=document.getElementById('bar-btn');b.textContent=n==='home'?(ST.records.length?'이력 '+ST.records.length+'건':''):'⌂';b.onclick=n==='home'?null:goHome;window.scrollTo(0,0)}
+function goHome(){renderHist();showPg('home')}
+
+// ═══════════════════════════════════════
+// 홈 → 측정
+// ═══════════════════════════════════════
+function startMeasure(){
+  var sn=document.getElementById('h-site').value.trim(),ins=document.getElementById('h-insp').value.trim(),ok=true;
+  if(!sn){on('er-site');ok=false}else off('er-site');
+  if(!ins){on('er-insp');ok=false}else off('er-insp');
+  if(!ok)return;
+  ST.site={siteName:sn,inspector:ins,buildingPart:document.getElementById('h-part').value,inspectedAt:new Date()};
+  document.getElementById('m-sn').textContent=sn+' · '+ST.site.buildingPart;
+  document.getElementById('m-in').textContent=ins;
+  clearErrs();showPg('measure');
+}
+function clearErrs(){['ti','rh','tsi','to'].forEach(function(k){var e=document.getElementById('er-'+k);e.textContent='';e.classList.remove('on')})}
+function on(id){document.getElementById(id).classList.add('on')}
+function off(id){document.getElementById(id).classList.remove('on')}
+
+// ═══════════════════════════════════════
+// 측정 실행
+// ═══════════════════════════════════════
+function runMeasure(){
+  clearErrs();var vals={},ok=true;
+  var flds={ti:'실내 온도',rh:'상대 습도',tsi:'표면 온도',to:'실외 온도'};
+  for(var k in flds){var raw=document.getElementById('v-'+k).value.trim(),e=document.getElementById('er-'+k);
+    if(!raw){e.textContent=flds[k]+' 값을 입력하세요';e.classList.add('on');ok=false;continue}
+    var n=parseFloat(raw);if(isNaN(n)){e.textContent='숫자를 입력하세요';e.classList.add('on');ok=false;continue}
+    if(k==='rh'&&(n<=0||n>100)){e.textContent='0 초과 ~ 100 이하';e.classList.add('on');ok=false;continue}
+    vals[k]=n;}
+  if(!ok)return;
+  var btn=document.getElementById('btn-meas');btn.disabled=true;btn.innerHTML='<span class="spinner"></span>분석 중...';
+  setTimeout(function(){
+    var calc=diagnose(vals.ti,vals.rh,vals.tsi,vals.to);
+    var rec={id:Date.now().toString(),siteInfo:Object.assign({},ST.site),input:vals,calcResult:calc,createdAt:new Date()};
+    ST.records.unshift(rec);btn.disabled=false;btn.innerHTML='📊 하자 판정 실행';
+    renderResult(rec);showPg('result');
+  },750);
+}
+
+// ═══════════════════════════════════════
+// 결과 화면
+// ═══════════════════════════════════════
+function renderResult(r){
+  CUR=r;var meta=RM[r.calcResult.result],c=r.calcResult,inp=r.input,s=r.siteInfo;var isD=c.result!=='normal',rc=meta.color;
+  var bn=document.getElementById('r-banner');bn.style.background=meta.bg;bn.style.borderColor=meta.bd;
+  var ri=document.getElementById('r-icon');ri.style.background=hexA(meta.color,.15);ri.textContent=meta.icon;
+  var rs=document.getElementById('r-sub');rs.style.color=rc;rs.textContent=isD?'하자 감지됨':'이상 없음';
+  var rm=document.getElementById('r-main');rm.style.color=rc;rm.textContent=meta.label;
+  document.getElementById('r-site').innerHTML=[['🏢','현장명',s.siteName],['📐','측정 부위',s.buildingPart],['👤','감리자',s.inspector],['📅','조사 일시',fmtD(r.createdAt)]].map(function(x){return'<div class="info-row"><span>'+x[0]+'</span><span class="il" style="margin-left:6px">'+x[1]+'</span><span class="iv">'+x[2]+'</span></div>'}).join('');
+  document.getElementById('r-vals').innerHTML=[{l:'Ti\n실내온도',v:inp.ti+'°C',c:'#fb923c'},{l:'RH\n상대습도',v:inp.rh+'%',c:'#60a5fa'},{l:'Tsi\n표면온도',v:inp.tsi+'°C',c:'#2dd4bf'},{l:'To\n실외온도',v:inp.to+'°C',c:'#818cf8'}].map(function(x){return'<div class="vc" style="background:'+hexA(x.c,.14)+'"><div class="vv">'+x.v+'</div><div class="vl">'+x.l+'</div></div>'}).join('');
+  var cc=c.cond?'#dc2626':'#16a34a',ic=c.ins?'#dc2626':'#16a34a';
+  document.getElementById('r-calc').innerHTML=calcRowH('이슬점 온도 (Td)','Magnus-Tetens 공식',c.dewPoint+' °C','표면온도(Tsi) '+inp.tsi+'°C  vs  이슬점 '+c.dewPoint+'°C',cc,c.cond?'Tsi≤Td → 결로위험':'Tsi>Td → 안전')+'<div style="border-top:1px solid #f3f4f6;margin:10px 0"></div>'+calcRowH('TDR (실내표면온도차비율)','(Ti−Tsi)/(Ti−To)',c.tdr.toFixed(4),'기준값 '+TDR_THR+' → 측정값 '+c.tdr.toFixed(4),ic,c.ins?'TDR>'+TDR_THR+'→단열하자':'TDR≤'+TDR_THR+'→정상');
+  var dc=document.getElementById('r-detail');dc.style.borderLeftColor=rc;dc.innerHTML='<div style="display:flex;align-items:center;gap:7px;margin-bottom:9px"><span style="font-size:16px">'+meta.icon+'</span><span style="font-weight:700;font-size:13px;color:'+rc+'">'+meta.label+'</span></div><p style="font-size:12px;line-height:1.7;color:#374151">'+RD[c.result]+'</p>'+(isD?'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-top:9px;font-size:10px;color:#92400e;display:flex;gap:5px"><span>ℹ️</span><span>본 결과는 전문가 판단을 보조하기 위한 참고 자료입니다.</span></div>':'');
+  renderGuide(c.result);renderEstimate(c.result,s,r.createdAt);
+  switchTab('guide');
+}
+function calcRowH(label,formula,value,sub,color,tag){return'<div class="calc-row"><div class="calc-info"><div class="clbl">'+label+'</div><div class="cform">'+formula+'</div><div class="csub">'+sub+'</div></div><div class="cval"><div class="cnum">'+value+'</div><span class="ctag" style="background:'+hexA(color,.1)+';border:1px solid '+hexA(color,.4)+';color:'+color+'">'+tag+'</span></div></div>'}
+
+// ═══════════════════════════════════════
+// 보수 가이드 렌더링
+// ═══════════════════════════════════════
+function renderGuide(result){
+  var items=GUIDES[result],html='';
+  if(!items||!items.length){document.getElementById('panel-guide').innerHTML='<div class="card" style="text-align:center;color:#6b7280;font-size:13px;padding:24px">해당 판정에 대한 보수 가이드가 없습니다.</div>';return}
+  items.forEach(function(g,i){
+    var matRows=g.mats.map(function(m){
+      var avg=Math.round((m.low+m.high)/2);
+      return'<tr><td>'+m.name+'</td><td class="cen">'+m.unit+'</td><td class="cen">'+m.qty+'</td><td class="cen">'+m.low.toLocaleString()+'~'+m.high.toLocaleString()+'</td><td class="cen"><span class="price-badge">약 '+Math.round(avg*m.qty/10000*10)/10+'만원</span></td></tr>';
+    }).join('');
+    var proWarn=!g.diy?'<div class="pro-box"><span>🚫</span><span><strong>비전문인 직접 시공 금지.</strong> 반드시 전문 시공업체에 의뢰하십시오. 잘못된 시공은 하자를 악화시킬 수 있습니다.</span></div>':'';
+    var warnBox=g.diy?'<div class="warn-box"><span>⚠️</span><span>작업 전 반드시 안전장갑·마스크를 착용하고, 환기를 충분히 하십시오.</span></div>':'';
+    html+='<div class="guide-item"><div class="guide-head" onclick="toggleGuide('+i+')">'
+      +'<span class="gico">'+g.icon+'</span>'
+      +'<span class="gtitle">'+g.title+'</span>'
+      +'<span class="guide-badge" style="background:'+g.bc+';color:'+g.btc+'">'+g.badge+'</span>'
+      +'<span style="margin-left:6px;color:#9ca3af;font-size:14px" id="g-arrow-'+i+'">▼</span>'
+      +'</div>'
+      +'<div class="guide-body" id="g-body-'+i+'">'
+      +'<p style="font-size:12px;color:#374151;margin-bottom:10px;line-height:1.6">'+g.desc+'</p>'
+      +proWarn
+      +'<div style="font-size:11px;font-weight:700;color:#1A3A5C;margin-bottom:6px">📋 작업 순서</div>'
+      +'<ol class="step-list">'+g.steps.map(function(s){return'<li>'+s+'</li>'}).join('')+'</ol>'
+      +warnBox
+      +'<div style="font-size:11px;font-weight:700;color:#1A3A5C;margin:10px 0 5px">💰 필요 자재 및 예상 단가</div>'
+      +'<table class="mat-table"><tr><th>자재명</th><th>단위</th><th>수량</th><th>단가 범위 (원)</th><th>예상 소계</th></tr>'+matRows+'</table>'
+      +'</div></div>';
+  });
+  document.getElementById('panel-guide').innerHTML=html;
+}
+function toggleGuide(i){var b=document.getElementById('g-body-'+i),a=document.getElementById('g-arrow-'+i);var open=b.classList.contains('open');b.classList.toggle('open');a.textContent=open?'▼':'▲'}
+
+// ═══════════════════════════════════════
+// 견적 의뢰서 렌더링
+// ═══════════════════════════════════════
+function renderEstimate(result,site,dt){
+  var items=EST_ITEMS[result];
+  if(!items||!items.length){document.getElementById('panel-est').innerHTML='<div class="card" style="text-align:center;color:#6b7280;font-size:13px;padding:24px">정상 판정 — 별도 견적이 필요하지 않습니다.</div>';return}
+  var total=items.reduce(function(s,x){return s+x.qty*x.uprice},0);
+  var rows=items.map(function(x){return'<tr><td>'+x.name+'</td><td class="cen">'+x.unit+'</td><td class="cen">'+x.qty+'</td><td class="cen">'+x.uprice.toLocaleString()+'</td><td class="cen">'+((x.qty*x.uprice).toLocaleString())+'</td></tr>'}).join('');
+  var docNo='EST-'+fmtDocNo(dt)+'-'+(Math.floor(Math.random()*9000)+1000);
+  window._EST_ITEMS=items;window._EST_TOTAL=total;window._EST_DOCNO=docNo;
+  var html='<div class="estimate-preview">'
+    +'<div class="ep-head"><h2>시공 견적 의뢰서</h2><div class="ep-sub">Construction Estimate Request — 하자 진단 시스템 v3.0 자동 생성</div></div>'
+    +'<div class="ep-section"><h3>📌 의뢰 기본 정보</h3>'
+    +'<div class="ep-row"><span class="ek">문서 번호</span><span class="ev">'+docNo+'</span></div>'
+    +'<div class="ep-row"><span class="ek">작성 일시</span><span class="ev">'+fmtD(dt)+'</span></div>'
+    +'<div class="ep-row"><span class="ek">현장명</span><span class="ev">'+site.siteName+'</span></div>'
+    +'<div class="ep-row"><span class="ek">점검 부위</span><span class="ev">'+site.buildingPart+'</span></div>'
+    +'<div class="ep-row"><span class="ek">의뢰인 (감리자)</span><span class="ev">'+site.inspector+'</span></div>'
+    +'<div class="ep-row"><span class="ek">하자 판정</span><span class="ev" style="color:'+RM[result].color+'">'+RM[result].label+'</span></div>'
+    +'</div>'
+    +'<div class="ep-section"><h3>📋 견적 요청 항목</h3>'
+    +'<table class="ep-items-table"><tr><th>공종/품목</th><th>단위</th><th>수량</th><th>단가(원)</th><th>금액(원)</th></tr>'+rows+'</table>'
+    +'</div>'
+    +'<div class="ep-total"><span class="tl">합계 (VAT 별도)</span><span class="tv">'+total.toLocaleString()+' 원</span></div>'
+    +'</div>'
+    +'<div class="card"><div style="font-size:12px;font-weight:700;color:#1A3A5C;margin-bottom:10px">📝 추가 요청 사항 / 특이 사항</div>'
+    +'<div class="field"><textarea id="est-note" placeholder="시공업체에 전달할 추가 요청 사항을 입력하세요.&#10;예) 야간 공사 불가, 특정 자재 브랜드 지정, 방문 견적 요청 일시 등"></textarea></div>'
+    +'<div class="sign-row">'
+    +'<div class="sign-cell"><div class="sl">의뢰인 (인)<br>Requestor</div><div class="sl2">서명란</div></div>'
+    +'<div class="sign-cell"><div class="sl">수신 업체 (인)<br>Contractor</div><div class="sl2">서명란</div></div>'
+    +'</div></div>';
+  document.getElementById('panel-est').innerHTML=html;
+}
+
+function switchTab(name){
+  document.getElementById('tab-guide').classList.toggle('act',name==='guide');
+  document.getElementById('tab-est').classList.toggle('act',name==='est');
+  document.getElementById('panel-guide').style.display=name==='guide'?'block':'none';
+  document.getElementById('panel-est').style.display=name==='est'?'block':'none';
+}
+
+// ═══════════════════════════════════════
+// 이력
+// ═══════════════════════════════════════
+function renderHist(){
+  var w=document.getElementById('hist-wrap'),l=document.getElementById('hist-list');
+  if(!ST.records.length){w.style.display='none';return}
+  w.style.display='block';
+  l.innerHTML=ST.records.slice(0,3).map(function(r,i){var m=RM[r.calcResult.result];return'<div class="hist-tile" onclick="viewRec('+i+')">'+'<div class="hist-icon" style="background:'+hexA(m.color,.12)+'">'+m.icon+'</div>'+'<div style="flex:1;min-width:0"><div class="hist-name" style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.siteInfo.siteName+'</div>'+'<div style="font-size:10px;color:#6b7280">'+r.siteInfo.buildingPart+' · <span style="color:'+m.color+';font-weight:700">'+m.label+'</span></div></div><span style="color:#9ca3af;font-size:18px">›</span></div>'}).join('');
+  document.getElementById('bar-btn').textContent='이력 '+ST.records.length+'건';
+}
+function viewRec(i){renderResult(ST.records[i]);showPg('result')}
+
+// ═══════════════════════════════════════
+// 종합 소견
+// ═══════════════════════════════════════
+function buildOpinion(calc,part){
+  var dp2=calc.dewPoint,t=calc.tdr.toFixed(4);
+  switch(calc.result){
+    case'both':return'상기 "'+part+'" 부위는 TDR 값('+t+')이 국토교통부 기준치('+TDR_THR+')를 초과하여 단열재 결손이 강력히 의심되며, 동시에 실내 표면 온도가 이슬점(Td '+dp2+'°C) 이하로 결로가 진행 중인 것으로 판단된다. 즉각적인 단열 보강 및 방습 조치와 전문업체 정밀 조사를 권고한다.';
+    case'condensation':return'상기 "'+part+'" 부위의 표면 온도가 이슬점(Td '+dp2+'°C) 이하로 결로가 진행 중이거나 직전 상태임이 확인되었다. 방습 페인트 처리 및 환기 개선을 즉시 시행하고, 반복 시 단열재 점검을 권고한다.';
+    case'insulation':return'상기 "'+part+'" 부위 TDR 값('+t+')이 기준치('+TDR_THR+')를 초과하여 단열재 결손·공극·열교 현상이 의심된다. 열화상 정밀 진단 후 단열재 재시공을 권고한다.';
+    default:return'상기 "'+part+'" 부위는 이슬점(Td '+dp2+'°C) 및 TDR('+t+') 모두 기준 범위 내에 있어 현 시점 결로 및 단열 하자 징후가 관찰되지 않는다. 계절 변동에 따른 정기 모니터링을 권고한다.';
+  }
+}
+
+// ═══════════════════════════════════════
+// PDF 오버레이
+// ═══════════════════════════════════════
+function openPdf(mode){
+  if(!CUR)return;
+  PDF_MODE=mode;
+  var r=CUR,c=r.calcResult,inp=r.input,s=r.siteInfo;
+  var meta=RM[c.result],isD=c.result!=='normal';
+  var docNo='HJD-'+fmtDocNo(r.createdAt)+'-'+(Math.floor(Math.random()*9000)+1000);
+  window._DIAG_DOCNO=docNo;
+  var dateStr=fmtD(r.createdAt),op=buildOpinion(c,s.buildingPart);
+  var oClr=isD?'#DC2626':'#16A34A';
+  var condOk=!c.cond,insOk=!c.ins;
+  var html='';
+
+  if(mode==='diag'){
+    document.getElementById('pdf-tb-title').textContent='📄 하자 판정 보고서';
+    html='<div class="ah"><div><div class="at">결로 및 단열 성능 현장 조사 보고서</div><div class="as">On-Site Investigation Report — Condensation &amp; Thermal Insulation</div></div><div class="ad"><div>문서번호: '+docNo+'</div><div style="margin-top:2px">작성: '+dateStr+'</div></div></div>'
+      +'<div class="stitle">1. 현장 개요</div><table><tr><td class="lbl">점검 일시</td><td>'+dateStr+'</td></tr><tr><td class="lbl">현장명</td><td>'+s.siteName+'</td></tr><tr><td class="lbl">점검 부위</td><td>'+s.buildingPart+'</td></tr><tr><td class="lbl">조사자</td><td>'+s.inspector+'</td></tr></table>'
+      +'<div class="stitle">2. 측정 데이터</div><table><tr><th>외기온도 To(°C)</th><th>실내온도 Ti(°C)</th><th>상대습도 RH(%)</th><th>표면온도 Tsi(°C)</th></tr><tr><td class="cen" style="font-weight:700">'+inp.to+'</td><td class="cen" style="font-weight:700">'+inp.ti+'</td><td class="cen" style="font-weight:700">'+inp.rh+'</td><td class="cen" style="font-weight:700">'+inp.tsi+'</td></tr></table>'
+      +'<div class="stitle">3. 시각 자료</div><div class="img-box"><div style="font-size:18px">📷</div><div>열화상 카메라 촬영 이미지 첨부 영역</div><div style="font-size:6.5px;color:#94a3b8">Thermal Infrared Camera Image — To be attached on-site</div></div>'
+      +'<div class="stitle">4. 판정 결과</div><table><tr><th>항목</th><th>산출값</th><th>기준값</th><th>판정</th></tr>'
+      +'<tr><td>이슬점 온도 (Td)</td><td class="cen" style="font-weight:700">'+c.dewPoint+' °C</td><td class="cen">Tsi&gt;Td 이면 안전</td><td class="cen"><span class="'+(condOk?'v-ok':'v-ng')+'">'+(condOk?'적합':'부적합')+'</span></td></tr>'
+      +'<tr><td>TDR (온도차비율)</td><td class="cen" style="font-weight:700">'+c.tdr.toFixed(4)+'</td><td class="cen">≤ '+TDR_THR+' (국토부)</td><td class="cen"><span class="'+(insOk?'v-ok':'v-ng')+'">'+(insOk?'적합':'부적합')+'</span></td></tr>'
+      +'<tr style="background:'+(isD?'#fef2f2':'#f0fdf4')+'"><td style="font-weight:700">종합 판정</td><td colspan="3" class="cen" style="font-weight:800;font-size:10px;color:'+oClr+'">'+meta.icon+' '+meta.label+'</td></tr></table>'
+      +'<div class="op-box"><div class="op-head" style="background:'+(isD?'#fee2e2':'#dcfce7')+';color:'+oClr+'"><span style="display:inline-block;width:3px;height:10px;background:'+oClr+';border-radius:2px;vertical-align:middle;margin-right:5px"></span>종합 소견</div><div class="op-body">'+op+'</div><div class="op-note">※ 본 보고서는 실측 데이터 기반 1차 판정 결과이며, 최종 판정은 전문가 검토 후 확정됩니다.</div></div>'
+      +'<div class="sign-g"><div class="sg"><div class="sl">현장 조사관 (인)</div><div class="sline"></div></div><div class="sg"><div class="sl">현장 대리인 (인)</div><div class="sline"></div></div><div class="sg"><div class="sl">감리 책임자 (인)</div><div class="sline"></div></div></div>'
+      +'<div class="footer"><span>하자 진단 시스템 MVP v3.0</span><span>Doc.'+docNo+' | '+dateStr+'</span></div>';
+  } else {
+    document.getElementById('pdf-tb-title').textContent='📋 견적 의뢰서';
+    var items=EST_ITEMS[c.result]||[];
+    var total=items.reduce(function(s,x){return s+x.qty*x.uprice},0);
+    var estDocNo=window._EST_DOCNO||('EST-'+fmtDocNo(r.createdAt)+'-'+(Math.floor(Math.random()*9000)+1000));
+    var noteVal=(document.getElementById('est-note')?document.getElementById('est-note').value:'') ||'(없음)';
+    var rows=items.map(function(x){return'<tr><td>'+x.name+'</td><td class="cen">'+x.unit+'</td><td class="cen">'+x.qty+'</td><td class="cen">'+x.uprice.toLocaleString()+'</td><td class="cen">'+(x.qty*x.uprice).toLocaleString()+'</td></tr>'}).join('');
+    html='<div class="rep-head"><div style="font-size:12px;font-weight:800;color:#fff">시공 견적 의뢰서</div><div style="font-size:7px;color:rgba(255,255,255,.65);margin-top:2px">Construction Estimate Request — 하자 진단 시스템 v3.0 자동 생성</div></div>'
+      +'<div class="stitle">의뢰 기본 정보</div>'
+      +'<div class="rep-row"><span class="rk">문서 번호</span><span style="font-weight:600">'+estDocNo+'</span></div>'
+      +'<div class="rep-row"><span class="rk">작성 일시</span><span style="font-weight:600">'+dateStr+'</span></div>'
+      +'<div class="rep-row"><span class="rk">현장명</span><span style="font-weight:600">'+s.siteName+'</span></div>'
+      +'<div class="rep-row"><span class="rk">점검 부위</span><span style="font-weight:600">'+s.buildingPart+'</span></div>'
+      +'<div class="rep-row"><span class="rk">의뢰인 (감리자)</span><span style="font-weight:600">'+s.inspector+'</span></div>'
+      +'<div class="rep-row"><span class="rk">하자 판정 결과</span><span style="font-weight:700;color:'+oClr+'">'+meta.label+'</span></div>'
+      +'<div class="stitle" style="margin-top:8px">견적 요청 항목</div>'
+      +'<table><tr><th>공종/품목</th><th>단위</th><th>수량</th><th>단가(원)</th><th>금액(원)</th></tr>'+rows+'</table>'
+      +'<div class="rep-total"><span>합계 (VAT 별도)</span><span style="font-size:11px;font-weight:800">'+total.toLocaleString()+' 원</span></div>'
+      +'<div class="stitle" style="margin-top:8px">추가 요청 사항</div>'
+      +'<div style="border:0.5px solid #cbd5e1;border-radius:2px;padding:7px 9px;font-size:7.5px;min-height:36px;color:#374151;margin-bottom:8px">'+noteVal+'</div>'
+      +'<div class="sign-g"><div class="sg"><div class="sl">의뢰인 (인)<br>Requestor</div><div class="sline"></div></div><div class="sg"><div class="sl">수신 업체 (인)<br>Contractor</div><div class="sline"></div></div></div>'
+      +'<div class="footer"><span>하자 진단 시스템 MVP v3.0</span><span>Doc.'+estDocNo+' | '+dateStr+'</span></div>';
+  }
+  document.getElementById('a4-content').innerHTML=html;
+  document.getElementById('pdf-ov').classList.add('on');
+}
+function closePdf(){document.getElementById('pdf-ov').classList.remove('on')}
+
+// ═══════════════════════════════════════
+// jsPDF 다운로드
+// ═══════════════════════════════════════
+function dlPdf(){
+  if(!CUR)return;
+  var r=CUR,c=r.calcResult,inp=r.input,s=r.siteInfo,meta=RM[c.result],isD=c.result!=='normal';
+  var dateStr=fmtD(r.createdAt),op=buildOpinion(c,s.buildingPart);
+  var jsPDF=window.jspdf.jsPDF,doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  var W=210,L=15,R=195,Y=18,oClr=isD?[220,38,38]:[22,163,74];
+  var docNo=PDF_MODE==='diag'?(window._DIAG_DOCNO||'HJD-'+fmtDocNo(r.createdAt)+'-0000'):(window._EST_DOCNO||'EST-'+fmtDocNo(r.createdAt)+'-0000');
+
+  // 헤더
+  doc.setFillColor(26,58,92);doc.roundedRect(L,Y,W-30,26,2,2,'F');
+  doc.setFillColor(44,111,172);doc.roundedRect(L+90,Y,W-30-90,26,2,2,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(PDF_MODE==='diag'?12:11);doc.setFont('helvetica','bold');
+  doc.text(PDF_MODE==='diag'?'Condensation & Thermal Insulation Report':'Construction Estimate Request',L+4,Y+8);
+  doc.setFontSize(7);doc.setFont('helvetica','normal');
+  doc.text(PDF_MODE==='diag'?'On-Site Defect Diagnosis — Haja Diagnosis System v3.0':'Haja Diagnosis System v3.0 — Auto-Generated',L+4,Y+13);
+  doc.text('Doc: '+docNo,L+4,Y+19);doc.text('Date: '+dateStr,L+4,Y+23);
+  Y+=30;
+
+  function stitle(txt){doc.setFillColor(232,238,245);doc.rect(L,Y,W-30,5.5,'F');doc.setDrawColor(26,58,92);doc.setLineWidth(0.8);doc.line(L,Y,L,Y+5.5);doc.setTextColor(26,58,92);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text(txt,L+3,Y+3.8);doc.setLineWidth(0.3);Y+=7}
+  function trow(lbl,val,shade){if(shade){doc.setFillColor(248,250,252);doc.rect(L,Y,W-30,5.5,'F')}doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.rect(L,Y,50,5.5);doc.rect(L+50,Y,W-30-50,5.5);doc.setTextColor(26,58,92);doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.text(lbl,L+2,Y+3.7);doc.setTextColor(30,41,59);doc.setFont('helvetica','normal');doc.text(String(val),L+52,Y+3.7);Y+=5.5}
+
+  if(PDF_MODE==='diag'){
+    stitle('1. Site Overview');trow('Inspection Date',dateStr,false);trow('Site Name',s.siteName,true);trow('Zone',s.buildingPart,false);trow('Inspector',s.inspector,true);Y+=3;
+    stitle('2. Measurement Data');
+    var cw2=(W-30)/4;['To(°C)','Ti(°C)','RH(%)','Tsi(°C)'].forEach(function(h,i){doc.setFillColor(232,238,245);doc.rect(L+i*cw2,Y,cw2,5.5,'F');doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.rect(L+i*cw2,Y,cw2,5.5);doc.setTextColor(26,58,92);doc.setFontSize(7);doc.setFont('helvetica','bold');doc.text(h,L+i*cw2+cw2/2,Y+3.8,{align:'center'})});Y+=5.5;
+    [inp.to+'°C',inp.ti+'°C',inp.rh+'%',inp.tsi+'°C'].forEach(function(v,i){doc.rect(L+i*cw2,Y,cw2,6.5);doc.setTextColor(30,41,59);doc.setFontSize(9);doc.setFont('helvetica','bold');doc.text(v,L+i*cw2+cw2/2,Y+4.5,{align:'center'})});Y+=10;
+    stitle('3. Visual Data');doc.setFillColor(238,242,247);doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.roundedRect(L,Y,W-30,20,1,1,'FD');doc.setTextColor(100,116,139);doc.setFontSize(8);doc.setFont('helvetica','normal');doc.text('[Thermal IR Image — To be attached]',L+(W-30)/2,Y+8,{align:'center'});doc.text('열화상 카메라 촬영 이미지 첨부 영역',L+(W-30)/2,Y+13,{align:'center'});Y+=24;
+    stitle('4. Diagnosis Result');
+    var hw4=[(W-30)*.32,(W-30)*.18,(W-30)*.28,(W-30)*.22];
+    ['Item','Value','Standard','Verdict'].forEach(function(h,i){var cx=L+hw4.slice(0,i).reduce(function(a,b){return a+b},0);doc.setFillColor(232,238,245);doc.rect(cx,Y,hw4[i],5.5,'F');doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.rect(cx,Y,hw4[i],5.5);doc.setTextColor(26,58,92);doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.text(h,cx+hw4[i]/2,Y+3.8,{align:'center'})});Y+=5.5;
+    function rrow(item,val,std,ok,verdict){var cx=L;[item,val,std,verdict].forEach(function(t,i){doc.setFillColor(255,255,255);doc.rect(cx,Y,hw4[i],6.5,'F');doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.rect(cx,Y,hw4[i],6.5);if(i===3){doc.setFillColor(ok?220:254,ok?252:226,ok?231:226);doc.roundedRect(cx+1,Y+.8,hw4[i]-2,4.8,1,1,'F');doc.setTextColor(ok?22:220,ok?163:38,ok?74:38);doc.setFont('helvetica','bold')}else{doc.setTextColor(30,41,59);doc.setFont('helvetica','normal')}doc.setFontSize(7);doc.text(String(t),cx+hw4[i]/2,Y+4.2,{align:'center'});cx+=hw4[i]});Y+=6.5}
+    rrow('Dew Point (Td)',c.dewPoint+' °C','Tsi>Td=Safe',!c.cond,!c.cond?'PASS':'FAIL');
+    rrow('TDR',c.tdr.toFixed(4),'<='+TDR_THR,!c.ins,!c.ins?'PASS':'FAIL');
+    doc.setFillColor(isD?254:240,isD?242:253,isD?242:228);doc.rect(L,Y,W-30,7,'F');doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.rect(L,Y,W-30,7);doc.setTextColor(oClr[0],oClr[1],oClr[2]);doc.setFontSize(10);doc.setFont('helvetica','bold');doc.text('Overall: '+meta.label,L+(W-30)/2,Y+5,{align:'center'});Y+=11;
+    doc.setFillColor(isD?254:240,isD?226:253,isD?226:228);doc.rect(L,Y,W-30,4.5,'F');doc.setDrawColor(oClr[0],oClr[1],oClr[2]);doc.setLineWidth(0.8);doc.line(L,Y,L,Y+4.5);doc.setLineWidth(0.3);doc.rect(L,Y,W-30,4.5);doc.setTextColor(oClr[0],oClr[1],oClr[2]);doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.text('General Opinion',L+4,Y+3.2);Y+=4.5;
+    doc.setFillColor(255,255,255);doc.setDrawColor(203,213,225);doc.rect(L,Y,W-30,20,'F');doc.setTextColor(30,41,59);doc.setFontSize(6.8);doc.setFont('helvetica','normal');doc.text(doc.splitTextToSize(op,W-30-8),L+3,Y+4);Y+=22;
+    doc.setFontSize(6);doc.setTextColor(148,163,184);doc.text('* This is an automated first assessment. Final judgment requires expert review.',L+2,Y+2);Y+=8;
+    doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.rect(L,Y,W-30,15);var sw=(W-30)/3;['Field Inspector','Site Representative','Chief Supervisor'].forEach(function(sg,i){if(i>0)doc.line(L+i*sw,Y,L+i*sw,Y+15);doc.setTextColor(100,116,139);doc.setFontSize(6.8);doc.setFont('helvetica','normal');doc.text(sg,L+i*sw+2,Y+4);doc.line(L+i*sw+2,Y+12,L+i*sw+sw-2,Y+12)});Y+=19;
+  } else {
+    var items=EST_ITEMS[c.result]||[];var total=items.reduce(function(s,x){return s+x.qty*x.uprice},0);
+    stitle('Basic Information');trow('Doc No.',docNo,false);trow('Date',dateStr,true);trow('Site',s.siteName,false);trow('Zone',s.buildingPart,true);trow('Inspector',s.inspector,false);trow('Defect Result',meta.label,true);Y+=3;
+    stitle('Estimate Items');
+    var hw5=[(W-30)*.38,(W-30)*.1,(W-30)*.1,(W-30)*.21,(W-30)*.21];
+    ['Item','Unit','Qty','Unit Price','Amount'].forEach(function(h,i){var cx=L+hw5.slice(0,i).reduce(function(a,b){return a+b},0);doc.setFillColor(232,238,245);doc.rect(cx,Y,hw5[i],5.5,'F');doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.rect(cx,Y,hw5[i],5.5);doc.setTextColor(26,58,92);doc.setFontSize(7);doc.setFont('helvetica','bold');doc.text(h,cx+hw5[i]/2,Y+3.8,{align:'center'})});Y+=5.5;
+    items.forEach(function(x,idx){var cx=L;[x.name,x.unit,String(x.qty),x.uprice.toLocaleString(),(x.qty*x.uprice).toLocaleString()].forEach(function(v,i){if(idx%2===1){doc.setFillColor(249,250,251)}else{doc.setFillColor(255,255,255)}doc.rect(cx,Y,hw5[i],6,'F');doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.rect(cx,Y,hw5[i],6);doc.setTextColor(30,41,59);doc.setFontSize(i===0?6.5:7);doc.setFont('helvetica','normal');if(i===0){doc.text(v,cx+2,Y+3.9)}else{doc.text(v,cx+hw5[i]/2,Y+3.9,{align:'center'})}cx+=hw5[i]});Y+=6});
+    doc.setFillColor(26,58,92);doc.rect(L,Y,W-30,8,'F');doc.setTextColor(255,255,255);doc.setFontSize(7.5);doc.setFont('helvetica','bold');doc.text('Total (excl. VAT)',L+4,Y+5);doc.text(total.toLocaleString()+' KRW',R,Y+5,{align:'right'});Y+=12;
+    stitle('Special Requests');doc.setFillColor(255,255,255);doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.rect(L,Y,W-30,18,'F');doc.setTextColor(100,116,139);doc.setFontSize(7);doc.setFont('helvetica','normal');doc.text('(No additional requests)',L+3,Y+5);Y+=21;
+    doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.rect(L,Y,W-30,14);var sw2=(W-30)/2;['Requestor (Seal)','Contractor (Seal)'].forEach(function(sg,i){if(i>0)doc.line(L+i*sw2,Y,L+i*sw2,Y+14);doc.setTextColor(100,116,139);doc.setFontSize(7);doc.setFont('helvetica','normal');doc.text(sg,L+i*sw2+3,Y+4);doc.line(L+i*sw2+3,Y+11,L+i*sw2+sw2-3,Y+11)});Y+=18;
+  }
+  doc.setDrawColor(203,213,225);doc.setLineWidth(0.3);doc.line(L,Y,R,Y);Y+=3;doc.setTextColor(148,163,184);doc.setFontSize(6);doc.setFont('helvetica','normal');doc.text('Haja Diagnosis System MVP v3.0',L,Y+2);doc.text(docNo+' | '+dateStr,R,Y+2,{align:'right'});
+  doc.save('하자진단_'+(PDF_MODE==='diag'?'보고서':'견적의뢰서')+'_'+s.siteName+'_'+docNo+'.pdf');
+}
+
+function printPdf(){var c=document.getElementById('a4-content').innerHTML,w=window.open('','_blank','width=680,height=900');w.document.write('<html><head><title>하자 진단</title><style>body{margin:16px;font-family:"Malgun Gothic",sans-serif}'+document.querySelector('style').textContent+'</style></head><body>'+c+'</body></html>');w.document.close();setTimeout(function(){w.print()},400)}
+
+// ═══════════════════════════════════════
+// 유틸
+// ═══════════════════════════════════════
+function fmtD(d){function p(n){return String(n).padStart(2,'0')}return d.getFullYear()+'.'+p(d.getMonth()+1)+'.'+p(d.getDate())+'  '+p(d.getHours())+':'+p(d.getMinutes())}
+function fmtDocNo(d){function p(n){return String(n).padStart(2,'0')}return''+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())}
+function hexA(hex,a){var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return'rgba('+r+','+g+','+b+','+a+')'}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closePdf()});
+</script>
+</body>
+</html>
