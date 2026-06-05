@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TFRS 방화설계 정밀 컨설팅 앱 (Phase 7.6.3 시각적 인동간격 분석)</title>
+   
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <style>
+        #map { min-height: 380px !important; height: 380px !important; width: 100% !important; border-radius: 0.75rem; z-index: 10; display: block; }
+        .leaflet-container { background-color: #e2e8f0; font-family: 'Malgun Gothic', sans-serif; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .solution-list li { margin-bottom: 0.75rem; }
+        /* Smooth scale-up animation for virtual markers */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .hazard-pulse { animation: pulse-ring 2s infinite ease-in-out; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen p-4 md:p-8 font-sans">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <header class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                <span class="text-red-500">🏢 TFRS</span> 맞춤형 방화설계 등급 컨설턴트
+                <span class="text-sm bg-blue-100 text-blue-700 px-2 py-0.5 rounded ml-2 font-bold">Phase 7.6.3</span>
+            </h1>
+            <p class="text-slate-500 mt-2 text-sm">공식 OSM API 및 Overpass 미러 듀얼 엔진 도입. 외벽 최단 거리 반경 50m 분석 필터 적용.</p>
+        </header>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+           
+            <!-- 왼쪽 패널: 위치 및 폼 -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-4">
+                <h2 class="text-lg font-semibold text-slate-800 border-b pb-2">1. 위치 지정 및 건물 정보 입력</h2>
+               
+                <div class="flex gap-2">
+                    <input type="text" id="address-input" placeholder="주소 검색 (예: 강남역, 명동)"
+                           class="flex-1 p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
+                           onkeypress="if(event.key === 'Enter') searchAddress()">
+                    <button onclick="searchAddress()" id="search-btn" class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition">
+                        검색
+                    </button>
+                </div>
+                <div class="border border-slate-300 rounded-xl overflow-hidden shadow-inner relative w-full">
+                    <div id="map"></div>
+                </div>
+               
+                <div class="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    📍 <span id="coord-display" class="font-mono text-blue-600 font-bold">지도에서 위치를 클릭하거나 주소를 검색하세요</span>
+                </div>
+                <!-- 3번 인동간격 분석 (실시간 수동 조절/추가 컨트롤) -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-slate-700">🏠 인동간격 분석 (반경 50m 내 건물 밀집도)</label>
+                        <span id="building-count-badge" class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-mono font-bold">0 개</span>
+                    </div>
+                   
+                    <div class="flex items-center gap-3">
+                        <button onclick="adjustBuildingCount(-1)" type="button" class="w-8 h-8 bg-white border border-slate-300 hover:bg-slate-100 rounded flex items-center justify-center font-bold text-slate-700 shadow-sm transition">
+                            -
+                        </button>
+                        <input type="range" id="building-slider" min="0" max="30" value="0" oninput="onSliderChange(this.value)"
+                               class="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-red-600">
+                        <button onclick="adjustBuildingCount(1)" type="button" class="w-8 h-8 bg-white border border-slate-300 hover:bg-slate-100 rounded flex items-center justify-center font-bold text-slate-700 shadow-sm transition">
+                            +
+                        </button>
+                    </div>
+                   
+                    <div class="flex flex-col md:flex-row md:items-center justify-between text-[11px] gap-2 pt-2 border-t border-slate-200">
+                        <span class="text-slate-500 font-medium" id="analysis-status">지도 위를 탭하여 검출 기준점을 지정하세요.</span>
+                        <button id="manual-mode-btn" onclick="toggleManualEditMode()" type="button" class="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 transition self-end">
+                            ✏️ 지도 직접 추가: 끄기
+                        </button>
+                    </div>
+                </div>
+                <div class="space-y-4 mt-2">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-bold text-slate-700 mb-1">건축물 주 용도</label>
+                            <select id="b-usage" class="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none text-sm font-medium">
+                                <option value="residential">주거용 (단독/다세대 주택)</option>
+                                <option value="commercial">상업용 (상가, 복합시설 - 대피혼선)</option>
+                                <option value="school">교육/노유자 시설 (학교, 요양원 - 피난약자)</option>
+                                <option value="industrial_general">일반 산업용 (일반 공장, 물류 창고)</option>
+                                <option value="industrial_hazard" class="text-red-600 font-bold">특수 산업용 (위험물/화학물질 취급 공장)</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="block text-sm font-bold text-slate-700 mb-1">지상 층수 (층)</label>
+                            <input type="number" id="b-floors" value="4" min="1" max="150" class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:outline-none text-sm font-medium">
+                        </div>
+                    </div>
+                   
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3">
+                        <label class="block text-sm font-bold text-slate-800 border-b border-slate-200 pb-1">🏗️ 주요 구조부 및 특수 구조 여부</label>
+                       
+                        <div class="mb-3">
+                            <label class="block text-xs font-bold text-slate-700 mb-1">주요 구조부 (건축물 뼈대)</label>
+                            <select id="b-structure" class="w-full p-2 bg-white border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm font-medium">
+                                <option value="rc_standard">일반 철근콘크리트조 (RC) - 내화성능 양호</option>
+                                <option value="steel">일반 철골조 (Steel) - 고온 구조내력 상실 취약</option>
+                                <option value="pebc">PEB 철골조 (공장/창고용 얇은 강판) - 열변형 초고위험</option>
+                                <option value="rc_high_strength">고강도 콘크리트조 - 폭렬현상(Spalling) 위험</option>
+                                <option value="wood">대형 목구조 (Timber) - 화재하중 기여 위험</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-600 mb-1">하층부 개방형 구조</label>
+                                <select id="b-piloti" class="w-full p-2 bg-white border border-slate-300 rounded focus:ring-2 focus:ring-red-500 focus:outline-none text-sm">
+                                    <option value="no">필로티 없음 (일반)</option>
+                                    <option value="yes">1층 필로티 주차장/하역장 있음</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-600 mb-1">수직 관통형 구조</label>
+                                <select id="b-atrium" class="w-full p-2 bg-white border border-slate-300 rounded focus:ring-2 focus:ring-red-500 focus:outline-none text-sm">
+                                    <option value="no">수직 보이드/중정 없음</option>
+                                    <option value="yes">수직 보이드(컨베이어 등) 있음</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button id="run-btn" onclick="runAnalysis()" class="w-full mt-2 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-colors flex justify-center items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
+                    <span>TFRS 실시간 GIS 정밀 분석 실행</span>
+                </button>
+            </div>
+            <!-- 오른쪽 패널 1: 대기 화면 (등급표) -->
+            <div id="waiting-panel" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full overflow-y-auto custom-scroll">
+               
+                <div class="mb-5 bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm">
+                    <h3 class="font-bold text-slate-800 mb-3 text-sm flex items-center gap-2">
+                        <span>🎯</span> TFRS 방화설계 등급 분류 체계
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] md:text-xs">
+                        <div class="bg-red-50 border border-red-200 p-2.5 rounded-lg">
+                            <span class="font-bold text-red-700 text-sm">A등급 (120점 이상)</span><br>
+                            <span class="text-slate-700 mt-1 block"><b>고위험 (성능위주설계 필수)</b><br>법정 기준을 초과하는 최고 수준의 방화구획 및 특수 소화설비 요구.</span>
+                        </div>
+                        <div class="bg-amber-50 border border-amber-200 p-2.5 rounded-lg">
+                            <span class="font-bold text-amber-700 text-sm">B등급 (80~119점)</span><br>
+                            <span class="text-slate-700 mt-1 block"><b>중위험 (보완 설계 요망)</b><br>준불연 이상 단열재 채택 및 주요 구조부 내화뿜칠 등 법정 기준 상회 보완 필요.</span>
+                        </div>
+                        <div class="bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg">
+                            <span class="font-bold text-emerald-700 text-sm">C등급 (40~79점)</span><br>
+                            <span class="text-slate-700 mt-1 block"><b>저위험 (표준 설계 적용)</b><br>건축법 최소 기준(Code-Compliant) 충족으로 충분한 최적화 구간.</span>
+                        </div>
+                        <div class="bg-slate-100 border border-slate-300 p-2.5 rounded-lg">
+                            <span class="font-bold text-slate-700 text-sm">D등급 (40점 미만)</span><br>
+                            <span class="text-slate-700 mt-1 block"><b>안전 (경제적 설계 가능)</b><br>화재 하중이 극히 낮고 연소 확대 위험이 없어 경제적 설계 가능.</span>
+                        </div>
+                    </div>
+                </div>
+                <h2 class="text-base font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3 flex items-center gap-2">
+                    <span>📋</span> 8대 평가 요인 세부 지표
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm transition hover:shadow-md">
+                        <div class="font-bold text-slate-700 text-xs md:text-sm mb-1">1. 건축용도 (화재하중)</div>
+                        <div class="text-slate-500 text-[11px] md:text-xs leading-normal">가연물 및 위험물 취급 여부.</div>
+                    </div>
+                    <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm transition hover:shadow-md">
+                        <div class="font-bold text-slate-700 text-xs md:text-sm mb-1">2. 내부취약 (대피능력)</div>
+                        <div class="text-slate-500 text-[11px] md:text-xs leading-normal">유독가스 확산 및 피난 지연.</div>
+                    </div>
+                    <div class="bg-emerald-50 p-3 rounded-lg border border-emerald-200 shadow-sm transition hover:shadow-md">
+                        <div class="font-bold text-emerald-800 text-xs md:text-sm mb-1">3. 외부위험 (인동간격)</div>
+                        <div class="text-emerald-700 text-[11px] md:text-xs leading-normal">주변 시설물 밀집도 기반 연소 확대.</div>
+                    </div>
+                    <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm transition hover:shadow-md">
+                        <div class="font-bold text-slate-700 text-xs md:text-sm mb-1">4. 자연지형 (풍속/고도)</div>
+                        <div class="text-slate-500 text-[11px] md:text-xs leading-normal">불티 비산(Flying Sparks) 예측.</div>
+                    </div>
+                    <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm transition hover:shadow-md">
+                        <div class="font-bold text-slate-700 text-xs md:text-sm mb-1">5. 구조위험 (내화/붕괴)</div>
+                        <div class="text-slate-500 text-[11px] md:text-xs leading-normal">열변형 및 폭렬(Spalling) 저항성.</div>
+                    </div>
+                    <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm transition hover:shadow-md">
+                        <div class="font-bold text-slate-700 text-xs md:text-sm mb-1">6. 특수구조 (연돌효과)</div>
+                        <div class="text-slate-500 text-[11px] md:text-xs leading-normal">보이드/필로티 층간 방화구획 무력화.</div>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-200 shadow-sm transition hover:shadow-md">
+                        <div class="font-bold text-blue-800 text-xs md:text-sm mb-1">7. 교통혼잡 (진입로)</div>
+                        <div class="text-blue-700 text-[11px] md:text-xs leading-normal">진입 도로 폭 및 장애물 기반의 소방차 접근성.</div>
+                    </div>
+                    <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm transition hover:shadow-md">
+                        <div class="font-bold text-slate-700 text-xs md:text-sm mb-1">8. 초기진압 (라우팅)</div>
+                        <div class="text-slate-500 text-[11px] md:text-xs leading-normal">관할 소방서 OSRM 주행 시간.</div>
+                    </div>
+                </div>
+            </div>
+            <!-- 오른쪽 패널 2: 결과 -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col hidden h-full" id="result-panel">
+                <h2 class="text-lg font-semibold text-slate-800 border-b pb-2 mb-4">2. TFRS 종합 컨설팅 리포트</h2>
+               
+                <div id="grade-badge" class="w-full py-4 rounded-xl text-center text-white font-bold text-2xl shadow-inner mb-4 transition-colors"></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div class="w-full h-[320px] flex justify-center items-center bg-slate-50 rounded-xl border border-slate-100 p-2">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                    <div class="bg-slate-50 rounded-xl border border-slate-200 p-4 h-[320px] overflow-y-auto custom-scroll text-sm">
+                        <h4 class="font-bold text-slate-700 mb-3 text-center border-b pb-2">📊 TFRS 상세 산출 근거 (공학 소견)</h4>
+                        <ul id="score-details" class="space-y-4 text-[13px] text-slate-600 leading-relaxed">
+                            <!-- JS 주입 -->
+                        </ul>
+                    </div>
+                </div>
+                <div class="bg-slate-100 border border-slate-200 rounded-xl p-4 flex-grow overflow-y-auto custom-scroll max-h-[350px]">
+                    <h3 class="font-bold text-slate-800 mb-3 flex items-center gap-2 border-b border-slate-300 pb-2">
+                        <span>🛠️</span> <span id="guide-title">등급별 맞춤 방화설계 가이드</span>
+                    </h3>
+                    <div id="guide-content" class="text-[13px] text-slate-700 leading-relaxed"></div>
+                </div>
+               
+                <button onclick="resetApp()" class="mt-4 w-full bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold py-3 px-4 rounded-xl transition-colors text-sm shadow-sm">
+                    뒤로 가기 (다른 위치/조건 분석하기)
+                </button>
+            </div>
+        </div>
+    </div>
+<script>
+    // 상태 및 맵 관련 글로벌 변수
+    let selectedLat = null; let selectedLng = null;
+    let map = null; let marker = null; let chartInstance = null;
+   
+    // 인동간격 분석용 상태 변수 (반경 50m로 조정)
+    let buildingCount = 0;
+    let apiBuildingCountWithin = 0;
+    let buildingLayers = [];
+    let manualBuildings = [];
+    let analysisCircle = null;
+    let manualEditMode = false;
+   
+    // API 분석 백업 변수
+    let latestFireStationData = null;
+    let latestSiteContext = {
+        roadLevel: 99,
+        closestRoad: {
+            name: "알 수 없는 도로",
+            highway: "unknown",
+            distance: 999,
+            width: null,
+            lanes: null
+        }
+    };
+    function setupMapSafely() {
+        if (map) return;
+        const mapContainer = document.getElementById('map');
+        if (mapContainer && mapContainer.offsetWidth > 0) {
+            try {
+                const startLat = 37.5665; const startLng = 126.9780;
+                map = L.map('map').setView([startLat, startLng], 14);
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap', maxZoom: 19
+                }).addTo(map);
+               
+                setTimeout(() => { map.invalidateSize(); }, 300);
+               
+                map.on('click', function(e) {
+                    if (manualEditMode) {
+                        addManualBuilding(e.latlng.lat, e.latlng.lng);
+                    } else {
+                        updateMarker(e.latlng.lat, e.latlng.lng, "지도 클릭 위치");
+                    }
+                });
+            } catch(e) { console.error("Map init error:", e); }
+        } else { setTimeout(setupMapSafely, 100); }
+    }
+    document.addEventListener("DOMContentLoaded", setupMapSafely);
+    window.addEventListener("load", setupMapSafely);
+    setTimeout(setupMapSafely, 300);
+    function updateMarker(lat, lng, message) {
+        selectedLat = lat; selectedLng = lng;
+        if (marker) marker.setLatLng([lat, lng]);
+        else marker = L.marker([lat, lng]).addTo(map);
+        document.getElementById('coord-display').innerText = `${message} (Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)})`;
+        // 50m 분석영역 원 그리기/업데이트 (붉은 점선 서클)
+        if (analysisCircle) {
+            analysisCircle.setLatLng([lat, lng]);
+            analysisCircle.setRadius(50);
+        } else {
+            analysisCircle = L.circle([lat, lng], {
+                radius: 50,
+                color: '#dc2626',
+                fillColor: '#fee2e2',
+                fillOpacity: 0.15,
+                weight: 1.5,
+                dashArray: '5, 5'
+            }).addTo(map);
+        }
+        // 마커 재설정 시 기존 분석 레이어들 초기화
+        clearBuildingLayers();
+        clearManualBuildings();
+        recalculateBuildingCount();
+       
+        document.getElementById('analysis-status').innerHTML = `위치를 설정했습니다. '정밀 분석 실행' 버튼을 누르면 주변 건물을 조회합니다.`;
+    }
+    // 건물 폴리곤 및 수동 마커 제거
+    function clearBuildingLayers() {
+        buildingLayers.forEach(layer => map.removeLayer(layer));
+        buildingLayers = [];
+        apiBuildingCountWithin = 0;
+    }
+    function clearManualBuildings() {
+        manualBuildings.forEach(b => map.removeLayer(b.layer));
+        manualBuildings = [];
+    }
+    // 슬라이더 및 수동 조작 이벤트 처리
+    function adjustBuildingCount(val) {
+        let currentVal = parseInt(document.getElementById('building-slider').value);
+        let newVal = currentVal + val;
+        if (newVal < 0) newVal = 0;
+        if (newVal > 30) newVal = 30;
+        document.getElementById('building-slider').value = newVal;
+        onSliderChange(newVal);
+    }
+    function onSliderChange(value) {
+        buildingCount = parseInt(value);
+        document.getElementById('building-count-badge').innerText = `${buildingCount} 개`;
+       
+        // 슬라이더를 직접 변경했을 시 가이드 텍스트 출력
+        document.getElementById('analysis-status').innerHTML = `
+            <span class="text-amber-600 font-bold">⚠️ 사용자 임의 설정 값 (수치 강제 보정 적용 중)</span>
+        `;
+       
+        // 결과창 활성화 상태일 시 실시간 리포트 업데이트
+        if (!document.getElementById('result-panel').classList.contains('hidden')) {
+            updateReport();
+        }
+    }
+    // 지도 상에 수동으로 건물 마커 추가 모드 제어
+    function toggleManualEditMode() {
+        manualEditMode = !manualEditMode;
+        const btn = document.getElementById('manual-mode-btn');
+        const statusEl = document.getElementById('analysis-status');
+       
+        if (manualEditMode) {
+            btn.innerHTML = `✏️ 지도 직접 추가: 켜짐`;
+            btn.className = `text-emerald-600 hover:text-emerald-800 font-bold flex items-center gap-1 transition`;
+            statusEl.innerHTML = `<span class="text-emerald-600 font-bold">지도에서 50m 원 내부를 클릭하면 가상의 인접 건물이 생성됩니다.</span>`;
+            if (map) {
+                map.getContainer().style.cursor = 'crosshair';
+            }
+        } else {
+            btn.innerHTML = `✏️ 지도 직접 추가: 끄기`;
+            btn.className = `text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 transition`;
+            statusEl.innerText = `지도 클릭 시 반경 50m 원이 표시됩니다.`;
+            if (map) {
+                map.getContainer().style.cursor = '';
+            }
+        }
+    }
+    // 마우스 클릭 위치에 가상 건물 레이어 추가 (50m 이내 판정)
+    function addManualBuilding(lat, lng) {
+        if (!selectedLat || !selectedLng) {
+            alert("지도의 검출 기준점을 먼저 설정(클릭 또는 검색)하세요.");
+            return;
+        }
+       
+        const dist = calculateDistance(selectedLat, selectedLng, lat, lng);
+        const isWithin = dist <= 0.05; // 50m
+       
+        // 분석 대상(원 안)이면 적색, 원 밖이면 회색 마커
+        const color = isWithin ? '#dc2626' : '#94a3b8';
+        const fillColor = isWithin ? '#ef4444' : '#cbd5e1';
+       
+        const virtualMarker = L.circleMarker([lat, lng], {
+            radius: 8,
+            color: color,
+            fillColor: fillColor,
+            fillOpacity: 0.85,
+            weight: 2
+        }).addTo(map);
+       
+        const distMeters = (dist * 1000).toFixed(0);
+        virtualMarker.bindPopup(`<b>수동 배치 건물</b><br>거리: ${distMeters}m ${isWithin ? '[50m 분석 포함]' : '[분석 제외]'}<br><span class="text-xs text-red-500 font-bold">클릭 시 삭제됩니다.</span>`);
+       
+        const id = Date.now() + "_" + Math.random().toString().substring(2, 6);
+       
+        virtualMarker.on('click', function(e) {
+            L.DomEvent.stopPropagation(e); // 지도 클릭 전이 방지
+            map.removeLayer(virtualMarker);
+            manualBuildings = manualBuildings.filter(b => b.id !== id);
+            recalculateBuildingCount();
+        });
+       
+        manualBuildings.push({
+            id: id,
+            lat: lat,
+            lng: lng,
+            layer: virtualMarker,
+            isWithin: isWithin
+        });
+       
+        recalculateBuildingCount();
+    }
+    // API 데이터 수와 수동 마커 수 결합하여 건물 총수 계산
+    function recalculateBuildingCount() {
+        const manualCountWithin = manualBuildings.filter(b => b.isWithin).length;
+        buildingCount = apiBuildingCountWithin + manualCountWithin;
+       
+        document.getElementById('building-slider').value = buildingCount;
+        document.getElementById('building-count-badge').innerText = `${buildingCount} 개`;
+       
+        document.getElementById('analysis-status').innerHTML = `
+            <span>OSM 검출: <b>${apiBuildingCountWithin}개</b> + 수동 추가: <b>${manualCountWithin}개</b> = 총 <b>${buildingCount}개</b></span>
+        `;
+       
+        if (!document.getElementById('result-panel').classList.contains('hidden')) {
+            updateReport();
+        }
+    }
+    async function searchAddress() {
+        const query = document.getElementById('address-input').value;
+        const btn = document.getElementById('search-btn');
+        if (!query.trim()) { alert("주소를 입력해주세요."); return; }
+        btn.innerText = "검색 중...";
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+            const data = await response.json();
+            if (data && data.length > 0) {
+                const lat = parseFloat(data[0].lat); const lon = parseFloat(data[0].lon);
+                map.setView([lat, lon], 16); updateMarker(lat, lon, "검색된 위치");
+            } else alert("검색 결과가 없습니다.");
+        } catch (error) { alert("통신 오류가 발생했습니다."); } finally { btn.innerText = "검색"; }
+    }
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    }
+    async function getRoutingData(lat1, lon1, lat2, lon2) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 1500);
+            const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=false`, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            const data = await response.json();
+            if (data.routes && data.routes.length > 0) return { distance: (data.routes[0].distance / 1000).toFixed(2), duration: Math.ceil(data.routes[0].duration / 60) };
+        } catch(e) {}
+        return null;
+    }
+    // 1. 공식 OSM XML API 호출 함수 (CORS 지원 우수, 극도로 우수한 신뢰도)
+    async function fetchOSMData(lat, lng) {
+        // 반경 50m 분석을 위한 최적 크기의 bbox 설정 (속도 극대화)
+        const latMin = lat - 0.0008; const latMax = lat + 0.0008;
+        const lngMin = lng - 0.001; const lngMax = lng + 0.001;
+       
+        const url = `https://api.openstreetmap.org/api/0.6/map?bbox=${lngMin},${latMin},${lngMax},${latMax}`;
+       
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5초 타임아웃
+           
+            const response = await fetch(url, {
+                method: 'GET',
+                signal: controller.signal
+            });
+           
+            clearTimeout(timeoutId);
+           
+            if (response.ok) {
+                const xmlText = await response.text();
+                return parseOSMXML(xmlText);
+            } else {
+                console.warn(`OSM API failed with status ${response.status}`);
+            }
+        } catch (e) {
+            console.error("OSM API fetch failed, falling back to Overpass:", e);
+        }
+        return null;
+    }
+    // OSM XML 파서 (DOM 파서를 이용해 JSON 형식으로 변환)
+    function parseOSMXML(xmlString) {
+        try {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+           
+            // 노드 맵핑 (nodeId -> {lat, lon})
+            const nodes = new Map();
+            const nodeEls = xmlDoc.getElementsByTagName("node");
+            for (let i = 0; i < nodeEls.length; i++) {
+                const el = nodeEls[i];
+                nodes.set(el.getAttribute("id"), {
+                    lat: parseFloat(el.getAttribute("lat")),
+                    lon: parseFloat(el.getAttribute("lon"))
+                });
+            }
+           
+            // 길(Way) 맵핑
+            const elements = [];
+            const wayEls = xmlDoc.getElementsByTagName("way");
+            for (let i = 0; i < wayEls.length; i++) {
+                const wayEl = wayEls[i];
+                const tags = {};
+                const tagEls = wayEl.getElementsByTagName("tag");
+                for (let j = 0; j < tagEls.length; j++) {
+                    const tagEl = tagEls[j];
+                    tags[tagEl.getAttribute("k")] = tagEl.getAttribute("v");
+                }
+               
+                // 노드 레퍼런스를 좌표 정보로 복원 (out geom 대체)
+                const geometry = [];
+                const ndEls = wayEl.getElementsByTagName("nd");
+                for (let j = 0; j < ndEls.length; j++) {
+                    const ref = ndEls[j].getAttribute("ref");
+                    const node = nodes.get(ref);
+                    if (node) {
+                        geometry.push(node);
+                    }
+                }
+               
+                elements.push({
+                    type: "way",
+                    id: wayEl.getAttribute("id"),
+                    tags: tags,
+                    geometry: geometry
+                });
+            }
+           
+            return { elements: elements };
+        } catch (err) {
+            console.error("OSM XML Parsing Error:", err);
+            return null;
+        }
+    }
+    // 2. 백업용 Overpass API 순차 미러 요청 함수
+    async function fetchOverpassAny(query) {
+        const servers = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.nchc.org.tw/api/interpreter',
+            'https://lz4.overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter'
+        ];
+       
+        for (const url of servers) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3500);
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: "data=" + encodeURIComponent(query),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.elements) {
+                        return data;
+                    }
+                }
+            } catch (error) {
+                console.warn(`Overpass mirror ${url} failed, trying next:`, error);
+            }
+        }
+        // 마지막 백업으로 GET 방식 요청 전송
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4000);
+            const backupUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+            const response = await fetch(backupUrl, { method: 'GET', signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (response.ok) return await response.json();
+        } catch (e) {}
+        console.error("Overpass API 모든 채널 순차 스캔 실패");
+        return null;
+    }
+    // OSM에서 획득한 건물 데이터를 파싱하여 지도에 직접 폴리곤 드로잉 (외벽 최단거리 기준 판정)
+    function drawOSMBuildings(elements, centerLat, centerLng) {
+        clearBuildingLayers();
+        apiBuildingCountWithin = 0;
+       
+        elements.forEach(el => {
+            if (el.type === 'way' && el.geometry && el.geometry.length > 0) {
+                // 외벽(Geometry의 각 노드) 기준 가장 인접한 곳과의 최단거리를 구하여 판정 (기존 중심점 기준 오류 수정)
+                let minDist = Infinity;
+                el.geometry.forEach(node => {
+                    const d = calculateDistance(node.lat, node.lon, centerLat, centerLng);
+                    if (d < minDist) minDist = d;
+                });
+               
+                const dist = minDist;
+                const isWithin = dist <= 0.05; // 최단거리 기준 50m 판정
+               
+                const coords = el.geometry.map(node => [node.lat, node.lon]);
+               
+                // 스타일에 차등 적용하여 50m 내부 밀집 위협 표시
+                const color = isWithin ? '#dc2626' : '#94a3b8';
+                const fillColor = isWithin ? '#f87171' : '#cbd5e1';
+                const fillOpacity = isWithin ? 0.45 : 0.15;
+                const weight = isWithin ? 2 : 1;
+               
+                const polygon = L.polygon(coords, {
+                    color: color,
+                    fillColor: fillColor,
+                    fillOpacity: fillOpacity,
+                    weight: weight
+                }).addTo(map);
+               
+                const distMeters = (dist * 1000).toFixed(0);
+                polygon.bindPopup(`<b>OSM 빌딩 요소</b><br>기준점과의 최단거리: ${distMeters}m ${isWithin ? '[50m 분석 포함]' : '[분석 제외]'}`);
+               
+                buildingLayers.push(polygon);
+               
+                if (isWithin) {
+                    apiBuildingCountWithin++;
+                }
+            }
+        });
+       
+        recalculateBuildingCount();
+    }
+    async function fetchSiteContextData(lat, lng) {
+        let context = {
+            buildingCount: -1,
+            roadLevel: 99,
+            closestRoad: {
+                name: "알 수 없는 도로",
+                highway: "unknown",
+                distance: 999,
+                width: null,
+                lanes: null
+            }
+        };
+       
+        // 1. 공식 OSM XML API 우선 조회 (CORS 오류 완전 해결)
+        let data = await fetchOSMData(lat, lng);
+       
+        // 2. 공식 API 실패 시 백업용 Overpass API 미러 순차 스캔
+        if (!data) {
+            console.log("공식 OSM API 실패로 인한 Overpass 미러 스캔 백업 가동");
+            const latMin = lat - 0.0015; const latMax = lat + 0.0015;
+            const lngMin = lng - 0.0015; const lngMax = lng + 0.0015;
+            const bbox = `${latMin},${lngMin},${latMax},${lngMax}`;
+            const query = `[out:json][timeout:8];
+            (
+              way["building"](${bbox});
+              relation["building"](${bbox});
+              way["highway"](${bbox});
+            );
+            out geom;`;
+            data = await fetchOverpassAny(query);
+        }
+        if (data && data.elements) {
+            context.buildingCount = 0;
+           
+            // 건물과 도로 분리
+            const buildings = [];
+            data.elements.forEach(el => {
+                if (el.tags && el.tags.building) {
+                    buildings.push(el);
+                }
+                if (el.tags && el.tags.highway) {
+                    const hw = el.tags.highway;
+                    let level = 99;
+                    if (['primary', 'secondary', 'tertiary', 'trunk'].includes(hw)) level = 1;
+                    else if (['unclassified', 'residential'].includes(hw)) level = 2;
+                    else if (['service', 'pedestrian', 'path', 'track', 'footway', 'steps', 'living_street'].includes(hw)) level = 3;
+                    if (level < context.roadLevel) context.roadLevel = level;
+                   
+                    // 도로 중 가장 인접한 도로 산출 (소방차 진입 편의성 세부 계산용)
+                    if (el.geometry && el.geometry.length > 0) {
+                        let minDist = Infinity;
+                        el.geometry.forEach(node => {
+                            const d = calculateDistance(lat, lng, node.lat, node.lon);
+                            if (d < minDist) minDist = d;
+                        });
+                       
+                        if (minDist < context.closestRoad.distance) {
+                            context.closestRoad = {
+                                name: el.tags.name || el.tags['name:ko'] || `${hw} 도로`,
+                                highway: hw,
+                                distance: minDist,
+                                width: el.tags.width ? parseFloat(el.tags.width) : null,
+                                lanes: el.tags.lanes ? parseInt(el.tags.lanes) : null
+                            };
+                        }
+                    }
+                }
+            });
+           
+            // 지도상 실시간 시각적 드로잉 및 거리 필터링 시작
+            drawOSMBuildings(buildings, lat, lng);
+            context.buildingCount = buildingCount; // recalculate에서 처리된 최종수 적용
+        }
+        // 도로 정보 백업 처리 및 상세 도로 유도
+        if (context.closestRoad.highway === "unknown") {
+            try {
+                const nomRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=17`);
+                const nomData = await nomRes.json();
+                if (nomData) {
+                    let hw = nomData.type || "unknown";
+                    let name = nomData.name || (nomData.address && nomData.address.road) || "주변 이면도로";
+                    let level = 3;
+                    if (['primary', 'secondary', 'tertiary', 'trunk'].includes(hw)) {
+                        level = 1;
+                    } else if (['unclassified', 'residential'].includes(hw)) {
+                        level = 2;
+                    }
+                    context.roadLevel = level;
+                    context.closestRoad = {
+                        name: name,
+                        highway: hw,
+                        distance: 0.02, // 20m 근방 가정
+                        width: null,
+                        lanes: null
+                    };
+                }
+            } catch(e) {}
+        }
+       
+        return context;
+    }
+    async function fetchNearestFireStation(lat, lng) {
+        const latMin = lat - 0.05; const latMax = lat + 0.05;
+        const lngMin = lng - 0.05; const lngMax = lng + 0.05;
+        const bbox = `${latMin},${lngMin},${latMax},${lngMax}`;
+       
+        const query = `[out:json][timeout:6];
+        (
+          node["amenity"="fire_station"](${bbox});
+          way["amenity"="fire_station"](${bbox});
+        );
+        out center;`;
+       
+        let nearest = null; let minStraightDist = Infinity;
+        const data = await fetchOverpassAny(query);
+       
+        if (data && data.elements) {
+            data.elements.forEach(st => {
+                const sLat = st.lat || st.center?.lat; const sLon = st.lon || st.center?.lon;
+                if(sLat && sLon) {
+                    const dist = calculateDistance(lat, lng, sLat, sLon);
+                    if(dist < minStraightDist) {
+                        minStraightDist = dist;
+                        nearest = { name: st.tags?.name || st.tags?.['name:ko'] || "관할 119 안전센터", lat: sLat, lng: sLon, straightDist: dist };
+                    }
+                }
+            });
+        }
+        if (!nearest) nearest = { name: "관할 소방서(인덱스 백업)", lat: 37.5710, lng: 126.9789, straightDist: 2.5 };
+        const routeData = await getRoutingData(lat, lng, nearest.lat, nearest.lng);
+       
+        if (routeData) return { found: true, name: nearest.name, method: 'OSRM', distance: routeData.distance, duration: routeData.duration };
+        return { found: true, name: nearest.name, method: 'Haversine', distance: nearest.straightDist.toFixed(1), duration: Math.ceil(nearest.straightDist / 0.5) };
+    }
+    async function runAnalysis() {
+        if (!selectedLat || !selectedLng) { alert("지도에 위치 핀을 설정해야 정확한 분석이 가능합니다."); return; }
+        const runBtn = document.getElementById('run-btn');
+        const originalBtnHTML = runBtn.innerHTML;
+        runBtn.innerHTML = `⚡ 다중 API 병렬 스캔 및 폴리곤 맵핑 중...`;
+        runBtn.disabled = true;
+        try {
+            const [fireStationData, siteContext] = await Promise.all([
+                fetchNearestFireStation(selectedLat, selectedLng),
+                fetchSiteContextData(selectedLat, selectedLng)
+            ]);
+           
+            latestFireStationData = fireStationData;
+            latestSiteContext = siteContext;
+           
+            // [버그 수정] 통신 결과 실패 상태(-1)를 유지하지 못하고 무조건 0개로 치환되던 덮어쓰기 로직 전면 수정
+            if (siteContext.buildingCount === -1) {
+                // 사용자가 사전에 수동 수치를 수정한 내역이 없다면 -1로 설정하여 통신 실패 에러창 출력 유도
+                if (buildingCount === 0) {
+                    buildingCount = -1;
+                }
+            } else {
+                buildingCount = siteContext.buildingCount;
+            }
+           
+            document.getElementById('waiting-panel').classList.add('hidden');
+            document.getElementById('result-panel').classList.remove('hidden');
+           
+            // 공학 평가 보고서 도출
+            updateReport();
+           
+            // 통신 실패 시 최종 안내 메시지 강제 표출
+            if (buildingCount === -1) {
+                document.getElementById('analysis-status').innerHTML = `
+                    <span class="text-red-500 font-bold">⚠️ 실시간 데이터 통신 실패. 지도를 탭해 건물을 추가하거나 슬라이더를 보정해주세요.</span>
+                `;
+            }
+           
+        } catch(err) {
+            console.error("Analysis process error: ", err);
+            alert("정밀 분석 수행 중 예기치 못한 에러가 발생했습니다. 수동 스캔/조절 모드를 권장합니다.");
+        } finally {
+            runBtn.innerHTML = originalBtnHTML;
+            runBtn.disabled = false;
+        }
+    }
+    // 결과 갱신 및 종합 공학 소견 계산
+    function updateReport() {
+        if (!latestSiteContext) return;
+       
+        const usage = document.getElementById('b-usage').value;
+        const structure = document.getElementById('b-structure').value;
+        const floors = parseInt(document.getElementById('b-floors').value) || 1;
+        const piloti = document.getElementById('b-piloti').value;
+        const atrium = document.getElementById('b-atrium').value;
+        let s_base = 0; let baseReason = "";
+        if(usage === 'industrial_hazard') { s_base = 50; baseReason = `<span class="text-red-600 font-bold">[최고위험]</span> 인화성 화학물질 취급. 폭발(Flashover) 위험 최고조.`; }
+        else if(usage === 'industrial_general') { s_base = 35; baseReason = `단위 면적당 화재하중 50kg/m² 이상. 심부화재 위험 상존.`; }
+        else if(usage === 'school') { s_base = 30; baseReason = `교육/노유자 시설: 피난 지연 시간(RSET) 증가 요인 극대화.`; }
+        else if(usage === 'commercial') { s_base = 20; baseReason = `상업시설: 불특정 다수 출입으로 피난 유도 동선 혼선 확률 높음.`; }
+        else { s_base = 10; baseReason = `주거구역: 표준 화재하중 적용. 자력 탈출 확률 양호.`; }
+       
+        let s_internal = 5; let internalReason = "";
+        if (usage === 'industrial_hazard') { s_internal = 40; internalReason = `<span class="text-red-600 font-bold">맹독성 가스/폭발로 허용피난시간 극히 짧음.</span> `; }
+        else if (usage === 'school' || usage === 'commercial') { s_internal = 30; internalReason = `다중이용 패닉 현상 우려. `; }
+        else { s_internal = 10; internalReason = `실 단위 구획으로 1차 연기 차단 양호. `; }
+       
+        if (floors >= 11) { s_internal += 10; internalReason += `<span class="text-amber-600 font-bold">고층부(11층 이상) 소방사다리 접근 한계.</span>`; }
+        else if (floors >= 5) { s_internal += 5; internalReason += `중층 건물로 수직 대피 시간 소요.`; }
+        let s_external = 0; let externalReason = "";
+        const count = buildingCount;
+       
+        if (count === -1) {
+            s_external = 10;
+            externalReason = `<span class="text-amber-600 font-bold">[데이터 응답 지연 (판독 불가)]</span> 실시간 통신 문제로 인접 건물 개수를 파악하지 못했습니다. 수동 마커 및 슬라이더 조절로 보강하십시오.`;
+        } else if (count >= 15) {
+            s_external = 30;
+            externalReason = `<span class="text-red-600 font-bold">50m 반경 내 시설 ${count}개 밀집.</span> 극도로 좁은 건물 동간 거리로 인한 복사열 수평 연소 확대 초고위험 구역.`;
+        } else if (count >= 5) {
+            s_external = 15;
+            externalReason = `50m 반경 내 시설 ${count}개 산재. 인접 건물로의 비산 및 화염 전이 주의 요망.`;
+        } else if (count > 0) {
+            s_external = 5;
+            externalReason = `<span class="text-emerald-600 font-bold">주변 인접 시설 ${count}개 (양호).</span> 적절한 이격거리가 확보되어 있어 연소 확대 위험이 비교적 낮음.`;
+        } else {
+            s_external = 0;
+            externalReason = `<span class="text-blue-600 font-bold">주변 인접 시설 0개 (최상).</span> 반경 50m 이내 타 건물이 없는 완전 독립 구역으로 수평 연소 전이 위험성 제로.`;
+        }
+       
+        let s_nature = 5; let natureReason = "평탄한 구역으로 지형적 이상 기류 없음.";
+        let s_structure = 0; let structureReason = "";
+        if (structure === 'pebc') { s_structure = 45; structureReason = `<span class="text-red-600 font-bold">PEB 철골조: 열변형 및 연쇄 붕괴 위험 극도로 높음.</span>`; }
+        else if (structure === 'steel') { s_structure = 35; structureReason = `<span class="text-amber-600 font-bold">일반 철골조: 600℃ 이상 노출 시 강재 항복강도 급감.</span>`; }
+        else if (structure === 'rc_high_strength') { s_structure = 25; structureReason = `<span class="text-amber-600 font-bold">고강도 콘크리트: 폭렬현상(Spalling) 위험 존재.</span>`; }
+        else if (structure === 'wood') { s_structure = 20; structureReason = `목구조: 구조체 자체가 가연물로 작용하여 화재하중 증가.`; }
+        else { s_structure = 5; structureReason = `<span class="text-emerald-600 font-bold">일반 철근콘크리트(RC): 자체 내화성능 우수. 안정적.</span>`; }
+        let s_special = 0; let specialReason = "";
+        if (piloti === 'yes') s_special += 15;
+        if (atrium === 'yes') s_special += 15;
+        if (s_special === 30) specialReason = "하역장 개방부 및 수직 관통부 동시 적용. 연돌효과 초고위험군.";
+        else if (piloti === 'yes') specialReason = "1층 하역장/주차장 개방. 상부층 확산 수직 연소(V-shaped Fire) 취약.";
+        else if (atrium === 'yes') specialReason = "수직 관통부 존재. 층간 방화구획 무력화 우려.";
+        else specialReason = "수직 개구부가 통제된 일반 구조. 층간 방화구획 양호.";
+       
+        // 7번 요인: 소방차 진입로 상세 계산 (근방 도로 폭, 종류, 거리를 활용한 정밀 평가)
+        let s_traffic = 0; let trafficReason = "";
+        const road = latestSiteContext.closestRoad;
+       
+        let roadWidthText = "";
+        let widthVal = road.width;
+        let lanesVal = road.lanes;
+       
+        // OSM 상에 폭 정보가 없는 경우 도로 카테고리에 기반한 보수적 근사치 지정
+        if (!widthVal) {
+            if (['primary', 'secondary', 'trunk'].includes(road.highway)) widthVal = 12; // 4차선 수준
+            else if (road.highway === 'tertiary') widthVal = 8; // 2차선
+            else if (['residential', 'unclassified'].includes(road.highway)) widthVal = 6; // 소배수 이면도로
+            else if (['service', 'living_street'].includes(road.highway)) widthVal = 3.5; // 골목길
+            else widthVal = 2; // 인도, 계단 등 차량 불가 구역
+        }
+       
+        roadWidthText = `폭 약 ${widthVal}m`;
+        if (lanesVal) {
+            roadWidthText += ` (왕복 ${lanesVal}차로)`;
+        }
+        const distMeters = (road.distance * 1000).toFixed(0);
+        if (['primary', 'secondary', 'tertiary', 'trunk'].includes(road.highway) || widthVal >= 8) {
+            s_traffic = 5;
+            trafficReason = `<span class="text-emerald-600 font-bold">[안전 - 대로 인접]</span> 주 진입 도로: <b>${road.name}</b> (${road.highway} 분류, ${roadWidthText}, 거리 ${distMeters}m)<br>
+                             - 왕복 2차선 이상의 충분한 도로폭 확보로 대형 소방차량(사다리차/화학차) 진입이 원활합니다.<br>
+                             - 사다리차 지지대(아웃트리거, 전개폭 약 6m 이상) 확보가 매우 용이하여 고층부 화재 진압 및 대피 유도 작전 수행이 수월합니다.`;
+        } else if (['residential', 'unclassified'].includes(road.highway) || (widthVal >= 4.5 && widthVal < 8)) {
+            s_traffic = 12;
+            trafficReason = `<span class="text-amber-600 font-bold">[주의 - 이면도로 진입]</span> 주 진입 도로: <b>${road.name}</b> (${road.highway} 분류, ${roadWidthText}, 거리 ${distMeters}m)<br>
+                             - 중소형 펌프차 및 물탱크 소방차량은 무리 없이 진입 가능합니다.<br>
+                             - 단, 도로변 불법 주정차 차량이 존재하거나 회전 반경이 좁을 경우, 전장 12m급의 대형 고가사다리차 진입에 일부 정체가 발생할 우려가 있으며, 아웃트리거 설치 전개 반경 확보가 제한될 수 있습니다.`;
+        } else if (['service', 'living_street'].includes(road.highway) || (widthVal >= 3.0 && widthVal < 4.5)) {
+            s_traffic = 18;
+            trafficReason = `<span class="text-red-500 font-bold">[경고 - 협소 골목길]</span> 주 진입 도로: <b>${road.name}</b> (생활도로/서비스로, ${roadWidthText}, 거리 ${distMeters}m)<br>
+                             - 도로폭이 소방펌프차 최소 통과 차로폭(3m) 한계치에 인접하여 소방 진입이 다소 어렵습니다.<br>
+                             - 불법 주차 차량이 단 1대만 있어도 소방차 진입이 완전히 마비되는 병목 구간입니다. 공공 소화전 인접 여부 확인 및 1층 연소 확대 방지책 마련이 중요합니다.`;
+        } else {
+            s_traffic = 20;
+            trafficReason = `<span class="text-red-700 font-extrabold">[위험 - 차량 통행 불가]</span> 주 진입 도로: <b>${road.name}</b> (보행로/계단/폐쇄로, ${roadWidthText}, 거리 ${distMeters}m)<br>
+                             - 인도, 계단(Steps) 또는 바리케이드로 인해 소방 펌프차 조차 진입이 원천 차단됩니다.<br>
+                             - 소방 작전 시 원거리에서 소방수관(호스)을 도보로 연장 전개(호스 1본당 15m)해야 하므로 초기 진압 골든타임(5분) 초과 위험이 극도로 큽니다. 스프링클러 및 소방용수 공급라인 설계 필수 보완.`;
+        }
+       
+        let s_infra = 0; let infraReason = "";
+        if (latestFireStationData && latestFireStationData.found) {
+            const duration = latestFireStationData.duration;
+            s_infra = (duration <= 5) ? 5 : (duration <= 10) ? 10 : 20;
+            infraReason = `📍 관할: <b>${latestFireStationData.name}</b><br>
+                           - <b>도착 예상 시간(ETA): ${duration}분</b> (OSRM 라우팅 기준)<br>
+                           ${duration <= 5 ? '<span class="text-emerald-600 font-bold">▶ 골든타임 내 도착 확률 최상.</span>' : '<span class="text-red-600 font-bold">▶ 출동 지연 우려.</span>'}`;
+        }
+        let total = s_base + s_internal + s_external + s_nature + s_structure + s_special + s_traffic + s_infra;
+        let gradeObj = getGradeInfo(total, usage, structure);
+        const badge = document.getElementById('grade-badge');
+        badge.innerHTML = `[등급 ${gradeObj.grade}] ${gradeObj.title} <span class="text-lg opacity-90">(총점: ${total}점)</span>`;
+        badge.className = `w-full py-4 rounded-xl text-center text-white font-bold text-2xl shadow-inner mb-4 ${gradeObj.bgColor}`;
+        document.getElementById('score-details').innerHTML = `
+            <li><b class="text-slate-800">1. 용도위험 (${s_base}점):</b> <span class="block mt-0.5 text-[12px]">${baseReason}</span></li>
+            <li><b class="text-slate-800">2. 대피취약 (${s_internal}점):</b> <span class="block mt-0.5 text-[12px]">${internalReason}</span></li>
+            <li class="bg-blue-50 p-2 rounded border border-blue-200"><b class="text-blue-800">3. 인동간격 (${s_external}점):</b> <span class="block mt-0.5 text-[12px]">${externalReason}</span></li>
+            <li><b class="text-slate-800">4. 지형풍속 (${s_nature}점):</b> <span class="block mt-0.5 text-[12px]">${natureReason}</span></li>
+            <li><b class="text-slate-800">5. 구조취약 (${s_structure}점):</b> <span class="block mt-0.5 text-[12px]">${structureReason}</span></li>
+            <li><b class="text-slate-800">6. 특수구조 (${s_special}점):</b> <span class="block mt-0.5 text-[12px]">${specialReason}</span></li>
+            <li class="bg-blue-50 p-2 rounded border border-blue-200"><b class="text-blue-800">7. 소방진입 (${s_traffic}점):</b> <span class="block mt-0.5 text-[12px]">${trafficReason}</span></li>
+            <li><b class="text-slate-800">8. 출동라우팅 (${s_infra}점):</b> <span class="block mt-0.5 text-[12px]">${infraReason}</span></li>
+        `;
+        document.getElementById('guide-title').innerText = `[${gradeObj.grade}등급] 맞춤형 자재/공법 솔루션`;
+        document.getElementById('guide-content').innerHTML = gradeObj.guideHTML;
+       
+        setTimeout(() => { drawChart([s_base, s_internal, s_external, s_nature, s_structure, s_special, s_traffic, s_infra], gradeObj.chartColor); }, 100);
+    }
+
+    // [전면 개편] 전문 건축법/소방법 및 맞춤형 공법 가이드라인 출력 로직
+    function getGradeInfo(score, usage, structure) {
+        let hazardExtra = '';
+        if (usage === 'industrial_hazard') {
+            hazardExtra = `
+                <div class="mb-3 text-purple-800 bg-purple-50 p-3 rounded-lg border border-purple-200">
+                    <div class="font-bold text-[13px] mb-1 flex items-center gap-1">☢️ [위험물 특수처방] 법정 최고위험군</div>
+                    <div class="text-[11px] leading-relaxed">
+                        <b>적용 법규:</b> 위험물안전관리법 제5조 및 동법 시행규칙 별표<br>
+                        <b>공학 소견:</b> 화학적 폭발(Flashover/BLEVE) 및 급격한 연소 확대 방지를 위한 PBD(성능위주설계) 0순위 대상입니다.
+                    </div>
+                </div>
+                <ul class="solution-list space-y-2 mt-2 mb-4">
+                    <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                        <span class="inline-block bg-purple-700 text-white text-[11px] px-2 py-0.5 rounded mb-1">방폭/바닥 공법</span><br>
+                        <span class="text-[12px] text-slate-700">내압방폭구조(Ex d) 또는 본질안전방폭구조(Ex i) 전기설비 시공 의무. 정전기 스파크 방지를 위한 전도성 에폭시(Conductive Epoxy) 라이닝 3mm 이상 타설.</span>
+                    </li>
+                    <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                        <span class="inline-block bg-purple-700 text-white text-[11px] px-2 py-0.5 rounded mb-1">특수소화 설비</span><br>
+                        <span class="text-[12px] text-slate-700">수계 소화설비 불가. 고팽창 포(Foam) 소화설비 또는 IG-541/Novec 1230 등 청정 가스계 소화설비 체적계산 후 전역방출방식 적용.</span>
+                    </li>
+                </ul>
+            `;
+        }
+
+        let structureExtra = '';
+        if (structure === 'steel' || structure === 'pebc') {
+            structureExtra = `
+                <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                    <span class="inline-block bg-indigo-600 text-white text-[11px] px-2 py-0.5 rounded mb-1">철골조 내화 피복 공법</span><br>
+                    <span class="text-[12px] text-slate-700"><b>법적 기준:</b> 건축물의 피난·방화구조 등의 기준에 관한 규칙 제3조 (내화구조)<br>
+                    <b>시공 방법:</b> 600℃에서 강재 항복강도가 50% 이하로 저하되는 것을 막기 위해, 주요 구조부에 <b>질석계/암면계 내화뿜칠(SFRM) 40mm 이상</b> 또는 <b>발포성 내화도료(Intumescent Paint) 2시간 내화용 두께</b>로 도장.</span>
+                </li>`;
+        } else if (structure === 'rc_high_strength') {
+            structureExtra = `
+                <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                    <span class="inline-block bg-indigo-600 text-white text-[11px] px-2 py-0.5 rounded mb-1">고강도 콘크리트 폭렬 방지</span><br>
+                    <span class="text-[12px] text-slate-700"><b>법적 기준:</b> 국토교통부 고시 (고강도 콘크리트 기둥·보 내화성능 관리기준)<br>
+                    <b>시공 방법:</b> 화재 시 내부 수분 팽창에 의한 폭렬(Spalling) 현상을 막기 위해, 콘크리트 배합 시 <b>폴리프로필렌(PP) 섬유 1.5kg/m³ 이상 혼입</b>하여 수증기 배출 기공을 형성하거나 메탈라스 보강 필수.</span>
+                </li>`;
+        } else if (structure === 'wood') {
+            structureExtra = `
+                <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                    <span class="inline-block bg-indigo-600 text-white text-[11px] px-2 py-0.5 rounded mb-1">목구조 탄화층 및 방염 공법</span><br>
+                    <span class="text-[12px] text-slate-700"><b>공학 소견:</b> 대형 목조(Mass Timber)는 표면 탄화층(Charring layer) 두께를 희생층으로 계산하는 내화설계 필요. 노출면에 KFI 인증 <b>방염/지연제(Fire Retardant) 진공 가압 함침 공법</b> 적용 요망.</span>
+                </li>`;
+        }
+
+        if (score >= 120) {
+            return {
+                grade: 'A', title: '고위험 (성능위주설계 필수)', bgColor: 'bg-red-600', chartColor: '#dc2626',
+                guideHTML: hazardExtra + `
+                    <div class="mb-3 text-red-800 bg-red-50 border border-red-200 p-3 rounded-lg text-xs leading-relaxed">
+                        <span class="font-bold block mb-1">■ Performance-Based Design (성능위주설계) 수준 격상 필요</span>
+                        법정 최소 기준(Prescriptive Code)을 초과하는 최고 수준의 능동/수동 방화조치가 요구됩니다.
+                    </div>
+                    <ul class="solution-list space-y-2">
+                        ${structureExtra}
+                        <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                            <span class="inline-block bg-red-700 text-white text-[11px] px-2 py-0.5 rounded mb-1">방화 구획 및 창호 (건축법 제50조)</span><br>
+                            <span class="text-[12px] text-slate-700"><b>60분+ 방화문 및 붕규산 방화유리(갑종)</b> 적용. 수직 관통부(샤프트/보이드) 주변은 차연성능이 확보된 <b>철재 2단 강하 방화셔터</b> (스크린 셔터 금지) 시공.</span>
+                        </li>
+                        <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                            <span class="inline-block bg-red-700 text-white text-[11px] px-2 py-0.5 rounded mb-1">외벽/단열재 공법 (건축법 제52조)</span><br>
+                            <span class="text-[12px] text-slate-700">수직 연소 방지를 위해 외벽 마감 및 단열재는 <b>100% 무기질계 불연재료(미네랄울/글라스울 패널 등)</b> 적용 강제. 가연성 심재 사용 전면 금지.</span>
+                        </li>
+                    </ul>`
+            };
+        }
+        if (score >= 80) {
+            return {
+                grade: 'B', title: '중위험 (보완 방화설계 요망)', bgColor: 'bg-amber-500', chartColor: '#f59e0b',
+                guideHTML: hazardExtra + `
+                    <div class="mb-3 text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs leading-relaxed">
+                        <span class="font-bold block mb-1">■ 법정 기준 상회 보완 (Code-Plus Design)</span>
+                        건축법 및 소방법 기준을 만족하되, 연소 확대 지연을 위해 자재 등급 1단계 상향을 권고합니다.
+                    </div>
+                    <ul class="solution-list space-y-2">
+                        ${structureExtra}
+                        <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                            <span class="inline-block bg-amber-600 text-white text-[11px] px-2 py-0.5 rounded mb-1">외벽/단열재 (건축법 제52조)</span><br>
+                            <span class="text-[12px] text-slate-700">최소 <b>준불연(2급) 성능 이상의 단열재 (심재준불연 EPS, PF보드 등)</b> 채택. 외단열 공법 적용 시 층간 화염 확산 방지대(Fire Barrier) 매 층마다 1.2m 높이로 밀실 시공.</span>
+                        </li>
+                        <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                            <span class="inline-block bg-amber-600 text-white text-[11px] px-2 py-0.5 rounded mb-1">관통부 내화충전구조 (Fire Stop)</span><br>
+                            <span class="text-[12px] text-slate-700">설비 배관 및 케이블 트레이 관통부에 <b>열팽창성 실리콘 실란트 및 방화 퍼티(Putty)</b> 적용. 화재 시 팽창하여 틈새를 완벽히 차단하도록 시공 (KFI 인증품).</span>
+                        </li>
+                    </ul>`
+            };
+        }
+        if (score >= 40) {
+            return {
+                grade: 'C', title: '저위험 (표준 방화설계 적용)', bgColor: 'bg-emerald-500', chartColor: '#10b981',
+                guideHTML: hazardExtra + `
+                    <div class="mb-3 text-emerald-800 bg-emerald-50 border border-emerald-200 p-3 rounded-lg text-xs leading-relaxed">
+                        <span class="font-bold block mb-1">■ 법정 최소 기준 충족 (Code-Compliant Design)</span>
+                        표준적인 화재하중을 가지며, 현행 건축/소방 관련 법령의 최소 기준을 충족하는 경제적 설계 구간입니다.
+                    </div>
+                    <ul class="solution-list space-y-2">
+                        ${structureExtra}
+                        <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                            <span class="inline-block bg-emerald-600 text-white text-[11px] px-2 py-0.5 rounded mb-1">내장재 규격 (건축법 제52조)</span><br>
+                            <span class="text-[12px] text-slate-700">거실 및 주요 동선 내부 마감재는 <b>난연재료(난연 3급) 이상의 석고보드(12.5mm 이상 2겹 취부)</b> 또는 난연 도료 적용.</span>
+                        </li>
+                        <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                            <span class="inline-block bg-emerald-600 text-white text-[11px] px-2 py-0.5 rounded mb-1">소방 설비 (소방시설법)</span><br>
+                            <span class="text-[12px] text-slate-700">면적 기준 충족 시 습식/준비작동식 스프링클러 설치. 피난 동선(복도/계단실)에 시각경보기 및 축광식 피난유도선 배치.</span>
+                        </li>
+                    </ul>`
+            };
+        }
+        return {
+            grade: 'D', title: '안전 (경제적 설계 가능)', bgColor: 'bg-slate-500', chartColor: '#64748b',
+            guideHTML: `
+                <div class="mb-3 text-slate-800 bg-slate-100 border border-slate-200 p-3 rounded-lg text-xs leading-relaxed">
+                    <span class="font-bold block mb-1">■ 방염 처리 중심의 경제적 설계 가이드</span>
+                    화재 하중이 현저히 낮고 연소 확대 위험이 통제된 구역입니다. 인테리어 마감재 위주의 방염 조치를 권장합니다.
+                </div>
+                <ul class="solution-list space-y-2">
+                    <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                        <span class="inline-block bg-slate-600 text-white text-[11px] px-2 py-0.5 rounded mb-1">실내 장식물 방염 (소방시설법 제12조)</span><br>
+                        <span class="text-[12px] text-slate-700">목재, 합판, 블라인드 등 가연성 마감재 표면에 <b>방염 도료(Paint) 도포 또는 KFI 인증 방염 필름(PVC)</b> 부착 시공 (잔염시간 10초 이내 성능).</span>
+                    </li>
+                    <li class="bg-white p-2 border border-slate-200 rounded shadow-sm">
+                        <span class="inline-block bg-slate-600 text-white text-[11px] px-2 py-0.5 rounded mb-1">피난 및 초기 대응</span><br>
+                        <span class="text-[12px] text-slate-700">소형(3.3kg) ABC 분말 소화기를 보행거리 20m 이내마다 비치. 연기 배출을 위한 자연환기구(자연배연창) 상시 개방 구조 확보.</span>
+                    </li>
+                </ul>`
+        };
+    }
+
+    function drawChart(dataArr, colorHex) {
+        const ctx = document.getElementById('radarChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['1.용도', '2.내부', '3.외부', '4.지형', '5.구조', '6.특수', '7.교통', '8.라우팅'],
+                datasets: [{
+                    label: '위험도(점수)', data: dataArr, backgroundColor: colorHex + '40', borderColor: colorHex, borderWidth: 2, pointBackgroundColor: colorHex
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { r: { min: 0, max: 50, ticks: { display: false, stepSize: 10 } } }, plugins: { legend: { display: false } } }
+        });
+    }
+    function resetApp() {
+        document.getElementById('result-panel').classList.add('hidden');
+        document.getElementById('waiting-panel').classList.remove('hidden');
+        setTimeout(() => { map.invalidateSize(); }, 100);
+    }
+</script>
+</body>
+</html>
