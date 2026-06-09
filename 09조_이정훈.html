@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Waterproofing Predictor v3.1</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+
+    <style>
+        :root {
+            --bg0: #0a1020;
+            --bg1: #0f172a;
+            --bg2: #111827;
+            --card: rgba(17, 24, 39, 0.78);
+            --card-strong: rgba(15, 23, 42, 0.92);
+            --line: rgba(255,255,255,0.08);
+            --text: #e8eefb;
+            --muted: #a3b2c8;
+            --primary: #67a7ff;
+            --primary2: #8b5cf6;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --shadow: 0 24px 80px rgba(0,0,0,0.38);
+        }
+
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", Arial, sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 15% 0%, rgba(103,167,255,0.18), transparent 28%),
+                radial-gradient(circle at 85% 10%, rgba(139,92,246,0.16), transparent 26%),
+                linear-gradient(180deg, var(--bg0), var(--bg1) 56%, var(--bg2));
+            min-height: 100vh;
+        }
+
+        .page-section {
+            min-height: 100vh;
+            padding: 56px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 10px 0 26px;
+        }
+
+        .hero h1 {
+            margin: 0;
+            font-size: clamp(32px, 4vw, 52px);
+            line-height: 1.08;
+            letter-spacing: -1.1px;
+            font-weight: 900;
+            background: linear-gradient(90deg, #ffffff 0%, #b8d7ff 45%, #d7c6ff 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .hero p {
+            margin: 14px auto 0;
+            max-width: 860px;
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        .badge-row {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--line);
+            backdrop-filter: blur(10px);
+            color: #f3f7ff;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .card {
+            background: linear-gradient(180deg, var(--card), var(--card-strong));
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            padding: 24px;
+            backdrop-filter: blur(18px);
+        }
+
+        .card h2 {
+            margin: 0 0 18px;
+            font-size: 20px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: -0.3px;
+        }
+
+        .subtle {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: -8px;
+            margin-bottom: 18px;
+        }
+
+        .quick-jump-bar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .jump-btn {
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.06);
+            color: var(--text);
+            padding: 9px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 800;
+            transition: 0.22s ease;
+        }
+
+        .jump-btn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(103,167,255,0.55);
+            box-shadow: 0 12px 24px rgba(103,167,255,0.12);
+        }
+
+        .jump-btn.active {
+            background: linear-gradient(135deg, rgba(103,167,255,0.95), rgba(139,92,246,0.95));
+            border-color: transparent;
+            color: #fff;
+        }
+
+        #map {
+            height: 380px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+            overflow: hidden;
+            margin-bottom: 18px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 13px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.05);
+            color: var(--text);
+            outline: none;
+            transition: 0.2s ease;
+        }
+
+        input:focus, select:focus {
+            border-color: rgba(103,167,255,0.75);
+            box-shadow: 0 0 0 4px rgba(103,167,255,0.10);
+        }
+
+        .weather-info, .recommend-box {
+            border-radius: 18px;
+            padding: 15px 16px;
+            margin-bottom: 14px;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+            line-height: 1.6;
+            font-size: 13px;
+        }
+
+        .recommend-box {
+            background: linear-gradient(180deg, rgba(245,158,11,0.10), rgba(255,255,255,0.04));
+        }
+
+        .result-grid {
+            display: grid;
+            gap: 10px;
+            margin: 10px 0 14px;
+        }
+
+        .result-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 11px 14px;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.07);
+            font-size: 14px;
+        }
+
+        .result-meta span:last-child {
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .highlight-val {
+            color: #b7d7ff !important;
+            font-size: 18px;
+        }
+
+        .rem-years-negative { color: #ef4444 !important; font-weight: 900; }
+        .rem-years-warning { color: #f59e0b !important; font-weight: 900; }
+        .rem-years-normal { color: #b7d7ff !important; font-weight: 900; }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 16px;
+            border-radius: 999px;
+            font-weight: 900;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .bg-success { background: linear-gradient(135deg, #16a34a, #22c55e); }
+        .bg-warning { background: linear-gradient(135deg, #d97706, #f59e0b); }
+        .bg-danger { background: linear-gradient(135deg, #dc2626, #ef4444); }
+
+        .btn-export {
+            width: 100%;
+            margin-top: 10px;
+            border: none;
+            border-radius: 14px;
+            padding: 13px 16px;
+            font-weight: 900;
+            color: white;
+            background: linear-gradient(135deg, rgba(103,167,255,0.95), rgba(139,92,246,0.95));
+            cursor: pointer;
+            transition: 0.25s ease;
+            box-shadow: 0 16px 32px rgba(103,167,255,0.18);
+        }
+
+        .btn-export:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.04);
+        }
+
+        .scroll-down {
+            text-align: center;
+            margin-top: 18px;
+            color: #c7d9f5;
+            font-weight: 800;
+            font-size: 14px;
+            cursor: pointer;
+            opacity: 0.92;
+        }
+
+        .method-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+        }
+
+        .method-table th {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            padding: 15px;
+            font-size: 14px;
+        }
+
+        .method-table td {
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            cursor: pointer;
+            transition: 0.2s ease;
+            font-size: 13.5px;
+            color: #e9f0fb;
+        }
+
+        .method-table tr:hover td {
+            background: rgba(103,167,255,0.08);
+        }
+
+        .method-table td.selected {
+            background: rgba(103,167,255,0.22) !important;
+            color: #fff;
+            font-weight: 800;
+        }
+
+        .method-table tr.hidden-row { display: none; }
+
+        .detail-card {
+            display: none;
+            margin-top: 18px;
+            padding: 22px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.10);
+        }
+
+        .detail-card h3 { margin: 0 0 8px; }
+
+        .tag-box {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 10px 0 12px;
+        }
+
+        .tag {
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 800;
+            background: rgba(139,92,246,0.14);
+            border: 1px solid rgba(139,92,246,0.24);
+            color: #e8d9ff;
+        }
+
+        .score-box {
+            margin-top: 12px;
+            padding: 14px;
+            border-radius: 18px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 7px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            font-size: 13px;
+        }
+
+        .score-row:last-child { border-bottom: none; }
+
+        .chart-container {
+            margin-top: 18px;
+            padding: 18px;
+            border-radius: 24px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: var(--shadow);
+        }
+
+        .chart-legend {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-color {
+            width: 13px;
+            height: 13px;
+            border-radius: 4px;
+        }
+
+        svg .grid-line { stroke: rgba(255,255,255,0.08); stroke-width: 1; }
+        svg text { fill: #b8c7dc; font-size: 11px; }
+        svg .line-liquid { stroke: #94a3b8; stroke-width: 2; fill: none; stroke-dasharray: 4; }
+        svg .line-urethane { stroke: #f59e0b; stroke-width: 3; fill: none; }
+        svg .line-composite { stroke: #60a5fa; stroke-width: 3; fill: none; }
+        svg .line-tpo { stroke: #14b8a6; stroke-width: 4; fill: none; display:none; }
+        svg .line-polyurea { stroke: #a855f7; stroke-width: 4; fill: none; display:none; }
+
+        @media (max-width: 1024px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<section class="page-section" id="dashboard-section">
+    <div class="container">
+        <div class="hero">
+            <h1>Smart Waterproofing Predictor</h1>
+            <p>GIS 기반 기후·오염·해안성 분석을 통해 방수 수명을 진단하고, 공법 추천과 생애주기비용(LCC)을 전문 리포트 형태로 제공합니다.</p>
+            <div class="badge-row">
+                <div class="chip">v3.1 Premium Refined</div>
+                <div class="chip">PDF / JSON Export</div>
+                <div class="chip">Method Scoring</div>
+                <div class="chip">Coastal Heuristic</div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>📍 분석 대상지 GIS 추출</h2>
+                <div class="subtle">주소 검색 또는 지도 클릭으로 위치를 지정하세요.</div>
+
+                <div class="quick-jump-bar">
+                    <button class="jump-btn active" onclick="jumpToCity(37.5665, 126.9780, 10, this)">서울</button>
+                    <button class="jump-btn" onclick="jumpToCity(35.1796, 129.0756, 10, this)">부산</button>
+                    <button class="jump-btn" onclick="let b=document.getElementById('pyeong'); b.value=500; updateAll(); jumpToCity(36.3504, 127.3848, 11, this)">대전 (500평)</button>
+                    <button class="jump-btn" onclick="jumpToCity(34.0522, -118.2437, 9, this)">미국 LA</button>
+                    <button class="jump-btn" onclick="jumpToCity(24.4539, 54.3773, 9, this)">아부다비</button>
+                </div>
+
+                <div id="map"></div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>기존 설치 방수 공법</label>
+                        <select id="baseMaterial" onchange="updateAll()">
+                            <option value="14.0">우레탄 도막 방수 (표준 기준 수명: 14년)</option>
+                            <option value="10.0">시멘트 액체 방수 (표준 기준 수명: 10년)</option>
+                            <option value="20.0">복합 시트 방수 (표준 기준 수명: 20년)</option>
+                            <option value="25.0">TPO / 폴리우레아 시트 (표준 기준 수명: 25년)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>대상 시공 면적</label>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <input type="number" id="pyeong" value="50" min="0" max="100000" step="1" oninput="updateAll()" />
+                            <span style="font-weight:800;">평</span>
+                            <span id="m2Label" style="font-size:13px; color:var(--muted); white-space:nowrap;">(165.3 m²)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top:16px;">
+                    <label>방수 경과 기간: <span id="ageVal" style="color:#b7d7ff; font-weight:800;">8</span>년</label>
+                    <input type="range" id="buildingAge" min="0" max="25" value="8" oninput="updateAll()" />
+                </div>
+            </div>
+
+            <div class="card" style="display:flex; flex-direction:column;">
+                <h2>📊 기후·오염 결합 지표</h2>
+                <div id="weatherInfo" class="weather-info">데이터 연동 중...</div>
+                <div id="recommendBox" class="recommend-box">계산 중...</div>
+
+                <div style="text-align:center;">
+                    <div id="statusBadge" class="status-badge bg-warning">데이터 수집 중</div>
+                </div>
+
+                <div class="result-grid">
+                    <div class="result-meta">좌표 <span id="coordsDisplay">37.56°N, 126.97°E</span></div>
+                    <div class="result-meta">UV 자외선 열화 지수 <span id="uvFactor">1.00</span></div>
+                    <div class="result-meta">해안 염해 지수 <span id="saltFactor">1.00</span></div>
+                    <div class="result-meta">산성비 화학 가중치 <span id="acidFactor">1.00</span></div>
+                    <div class="result-meta">미세먼지 마모 가중치 <span id="dustFactor">1.00</span></div>
+                    <div class="result-meta">잔여수명 <span id="remYears" class="highlight-val">0.0 년</span></div>
+                </div>
+
+                <div id="scoreBox" class="score-box"></div>
+
+                <button class="btn-export" onclick="exportDiagnosticReport()">JSON 진단 리포트 다운로드</button>
+                <button class="btn-export" onclick="exportPdfReport()">PDF 진단 리포트 다운로드</button>
+            </div>
+        </div>
+
+        <div class="scroll-down" onclick="document.getElementById('solution-section').scrollIntoView();">
+            실시간 추천 공법 확인 ▼
+        </div>
+    </div>
+</section>
+
+<section class="page-section" id="solution-section">
+    <div class="container">
+        <div class="hero">
+            <h1 style="font-size:clamp(26px, 3vw, 38px);">맞춤형 공법 및 추천 순위</h1>
+            <p>추천 점수, 경제성, 환경 저항성을 종합한 공법별 상세 분석입니다.</p>
+        </div>
+
+        <table class="method-table">
+            <thead>
+                <tr>
+                    <th>추천 공법</th>
+                    <th>경제성</th>
+                    <th>환경 저항성</th>
+                    <th>총 견적</th>
+                </tr>
+            </thead>
+            <tbody id="methodTableBody">
+                <tr id="row-liquid" onclick="showDetail('liquid', this)">
+                    <td><b>시멘트 액체 방수</b></td>
+                    <td style="color:#86efac; font-weight:800;">최상</td>
+                    <td>기온 크랙 취약</td>
+                    <td id="tablePriceLow">0 원</td>
+                </tr>
+                <tr id="row-urethane" onclick="showDetail('urethane', this)">
+                    <td><b>우레탄 도막 방수</b></td>
+                    <td style="color:#fcd34d; font-weight:800;">보통</td>
+                    <td>자외선 경화주의</td>
+                    <td id="tablePriceMid">0 원</td>
+                </tr>
+                <tr id="row-composite" onclick="showDetail('composite', this)">
+                    <td><b>복합 시트 방수</b></td>
+                    <td style="color:#fca5a5; font-weight:800;">낮음</td>
+                    <td>균열/염해 차단</td>
+                    <td id="tablePriceHigh">0 원</td>
+                </tr>
+                <tr id="row-tpo" class="hidden-row" onclick="showDetail('tpo', this)">
+                    <td><b style="color:#5eead4;">TPO 단층 시트 방수</b></td>
+                    <td style="color:#86efac; font-weight:800;">대면적 우수</td>
+                    <td style="color:#5eead4; font-weight:800;">자외선/내후성 강함</td>
+                    <td id="tablePriceTpo" style="font-weight:800; color:#5eead4;">0 원</td>
+                </tr>
+                <tr id="row-polyurea" class="hidden-row" onclick="showDetail('polyurea', this)">
+                    <td><b style="color:#d8b4fe;">폴리우레아 도막 방수</b></td>
+                    <td style="color:#fca5a5; font-weight:800;">매우 낮음</td>
+                    <td style="color:#d8b4fe; font-weight:800;">내열/초속경화 최강</td>
+                    <td id="tablePricePolyurea" style="font-weight:800; color:#d8b4fe;">0 원</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div id="detail-liquid" class="detail-card"><h3>시멘트 액체 방수</h3><div class="tag-box" id="tags-liquid"></div><p id="p-liquid"></p></div>
+        <div id="detail-urethane" class="detail-card"><h3>우레탄 도막 방수</h3><div class="tag-box" id="tags-urethane"></div><p id="p-urethane"></p></div>
+        <div id="detail-composite" class="detail-card"><h3>복합 시트 방수</h3><div class="tag-box" id="tags-composite"></div><p id="p-composite"></p></div>
+        <div id="detail-tpo" class="detail-card"><h3>TPO 단층 시트 방수</h3><div class="tag-box" id="tags-tpo"></div><p id="p-tpo"></p></div>
+        <div id="detail-polyurea" class="detail-card"><h3>폴리우레아 도막 방수</h3><div class="tag-box" id="tags-polyurea"></div><p id="p-polyurea"></p></div>
+    </div>
+</section>
+
+<section class="page-section" id="lcc-section">
+    <div class="container">
+        <div class="hero">
+            <h1 style="font-size:clamp(26px, 3vw, 38px);">30개년 생애주기비용(LCC)</h1>
+            <p>공법별 비용 곡선을 직관적으로 비교할 수 있는 장기 경제성 시뮬레이션입니다.</p>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-legend">
+                <div class="legend-item"><div class="legend-color" style="background:#94a3b8; border:1px dashed #475569;"></div>액체방수</div>
+                <div class="legend-item"><div class="legend-color" style="background:#f59e0b;"></div>우레탄</div>
+                <div class="legend-item"><div class="legend-color" style="background:#60a5fa;"></div>복합시트</div>
+                <div class="legend-item" id="legend-tpo" style="display:none;"><div class="legend-color" style="background:#14b8a6;"></div>TPO</div>
+                <div class="legend-item" id="legend-polyurea" style="display:none;"><div class="legend-color" style="background:#a855f7;"></div>폴리우레아</div>
+            </div>
+
+            <svg id="lccSvg" viewBox="0 0 1000 450" style="width:100%; height:auto;">
+                <line class="grid-line" x1="80" y1="50" x2="950" y2="50"></line>
+                <line class="grid-line" x1="80" y1="130" x2="950" y2="130"></line>
+                <line class="grid-line" x1="80" y1="210" x2="950" y2="210"></line>
+                <line class="grid-line" x1="80" y1="290" x2="950" y2="290"></line>
+                <line class="grid-line" x1="80" y1="370" x2="950" y2="370"></line>
+                <line x1="80" y1="370" x2="950" y2="370" style="stroke:#94a3b8; stroke-width:2;"></line>
+                <line x1="80" y1="50" x2="80" y2="370" style="stroke:#94a3b8; stroke-width:2;"></line>
+                <text x="30" y="55" font-weight="bold">비용 규모</text>
+                <text id="yLabel4" x="70" y="55" text-anchor="end">4.0억</text>
+                <text id="yLabel3" x="70" y="135" text-anchor="end">3.0억</text>
+                <text id="yLabel2" x="70" y="215" text-anchor="end">2.0억</text>
+                <text id="yLabel1" x="70" y="295" text-anchor="end">1.0억</text>
+                <text x="70" y="375" text-anchor="end">0</text>
+                <text x="80" y="400" text-anchor="middle">0년</text>
+                <text x="370" y="400" text-anchor="middle">10년 후</text>
+                <text x="660" y="400" text-anchor="middle">20년 후</text>
+                <text x="950" y="400" text-anchor="middle">30년 마감</text>
+                <polyline id="polyLiquid" class="line-liquid" points=""></polyline>
+                <polyline id="polyUrethane" class="line-urethane" points=""></polyline>
+                <polyline id="polyComposite" class="line-composite" points=""></polyline>
+                <polyline id="polyTpo" class="line-tpo" points=""></polyline>
+                <polyline id="polyPolyurea" class="line-polyurea" points=""></polyline>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<script>
+let map, marker;
+let currentLat = 37.5665, currentLon = 126.9780;
+let isCoastalGeo = false;
+let liveWeatherData = { active: false, temp: 22, humidity: 50, desc: "맑음", locationName: "서울" };
+const els = {};
+
+function cacheElements() {
+    ["coordsDisplay","weatherInfo","recommendBox","statusBadge","ageVal","m2Label","uvFactor","saltFactor","acidFactor","dustFactor","remYears","baseMaterial","buildingAge","pyeong","scoreBox"].forEach(id => els[id] = document.getElementById(id));
+}
+
+function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+
+function sanitizeInputs() {
+    let age = parseInt(els.buildingAge.value, 10);
+    let pyeong = parseFloat(els.pyeong.value);
+    if (Number.isNaN(age)) age = 0;
+    if (Number.isNaN(pyeong)) pyeong = 0;
+    age = clamp(age, 0, 25);
+    pyeong = clamp(pyeong, 0, 100000);
+    els.buildingAge.value = age;
+    els.pyeong.value = pyeong;
+    els.ageVal.innerText = age;
+    els.m2Label.innerText = `(${(pyeong * 3.3058).toFixed(1)} m²)`;
+    return { age, pyeong, areaM2: pyeong * 3.3058 };
+}
+
+function detectCoastalGeo(lat, lng, weather) {
+    const combined = `${(weather?.locationName || "").toLowerCase()} ${(weather?.desc || "").toLowerCase()}`;
+    const coastalKeywords = ["busan","부산","jeju","제주","incheon","인천","ulsan","울산","mokpo","목포","yeosu","여수","tongyeong","통영","sokcho","속초","coast","sea","beach","harbor","port"];
+    return coastalKeywords.some(k => combined.includes(k));
+}
+
+function calcEnvironmentalFactors(lat, lng, weather, coastalFlag) {
+    const temp = weather?.temp ?? 22;
+    const humidity = weather?.humidity ?? 50;
+    const name = (weather?.locationName || "").toLowerCase();
+    let uv = 1.0 + (40 - Math.abs(lat)) * 0.022;
+    uv += temp >= 30 ? 0.12 : 0.0;
+    uv += temp >= 35 ? 0.08 : 0.0;
+    uv -= humidity >= 75 ? 0.03 : 0.0;
+    uv = clamp(uv, 0.90, 1.55);
+    let salt = coastalFlag ? 1.22 : 1.00;
+    const metroKeywords = ["seoul","서울","incheon","인천","busan","부산","daegu","대구","gwangju","광주","daejeon","대전","ulsan","울산"];
+    const isMetro = metroKeywords.some(k => name.includes(k));
+    let acid = isMetro ? 1.10 : 1.00;
+    let dust = 1.00;
+    if (isMetro) dust += 0.08;
+    if (temp >= 30) dust += 0.04;
+    if (humidity <= 35) dust += 0.03;
+    dust = clamp(dust, 1.00, 1.18);
+    let erosion = clamp(uv * salt * acid * dust, 1.00, 1.80);
+    return { uv, salt, acid, dust, erosion };
+}
+
+function updateStatusBadge(erosion, remYears) {
+    if (remYears < 0) {
+        els.statusBadge.className = "status-badge bg-danger";
+        els.statusBadge.innerText = "교체 필요";
+    } else if (remYears <= 3) {
+        els.statusBadge.className = "status-badge bg-warning";
+        els.statusBadge.innerText = "긴급 점검 필요";
+    } else if (erosion >= 1.35) {
+        els.statusBadge.className = "status-badge bg-warning";
+        els.statusBadge.innerText = "주의 관찰 필요";
+    } else {
+        els.statusBadge.className = "status-badge bg-success";
+        els.statusBadge.innerText = "양호";
+    }
+}
+
+function setHiddenRow(rowId, show) {
+    const row = document.getElementById(rowId);
+    if (row) row.classList.toggle("hidden-row", !show);
+}
+
+function setLegend(id, show) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = show ? "flex" : "none";
+}
+
+function initMap() {
+    map = L.map('map').setView([currentLat, currentLon], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    marker = L.marker([currentLat, currentLon], { draggable: true }).addTo(map);
+    map.on('click', e => updateMarkerPosition(e.latlng.lat, e.latlng.lng));
+    marker.on('dragend', () => {
+        const pos = marker.getLatLng();
+        updateMarkerPosition(pos.lat, pos.lng);
+    });
+    L.Control.geocoder({
+        defaultMarkGeocode: false,
+        placeholder: "주소 또는 지명 검색"
+    }).on('markgeocode', function(e) {
+        const center = e.geocode.center;
+        map.setView(center, 14);
+        updateMarkerPosition(center.lat, center.lng);
+    }).addTo(map);
+    fetchWeatherData(currentLat, currentLon);
+}
+
+function jumpToCity(lat, lng, zoom, btn) {
+    document.querySelectorAll('.jump-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    map.flyTo([lat, lng], zoom);
+    updateMarkerPosition(lat, lng);
+}
+
+function updateMarkerPosition(lat, lng) {
+    currentLat = lat;
+    currentLon = lng;
+    marker.setLatLng([lat, lng]);
+    els.coordsDisplay.innerText = `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lng).toFixed(2)}°${lng >= 0 ? 'E' : 'W'}`;
+    fetchWeatherData(lat, lng);
+}
+
+async function fetchWeatherData(lat, lng) {
+    const apiKey = '';
+    try {
+        const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=metric&lang=kr`);
+        const json = await response.json();
+        if (response.ok) {
+            liveWeatherData = {
+                active: true,
+                temp: json.main?.temp ?? 22,
+                humidity: json.main?.humidity ?? 50,
+                desc: json.weather?.[0]?.description ?? "정보 없음",
+                locationName: json.name || "지정 구역"
+            };
+        }
+        els.weatherInfo.innerHTML = `🌍 <b>위치 권역: ${liveWeatherData.locationName}</b><br>🌡️ 온도: ${liveWeatherData.temp}°C | 💧 습도: ${liveWeatherData.humidity}% | ☁️ 상태: ${liveWeatherData.desc}`;
+    } catch (e) {
+        els.weatherInfo.innerHTML = "⚠️ 기상 데이터를 불러오지 못했습니다. 기본 추정값을 사용합니다.";
+    }
+    isCoastalGeo = detectCoastalGeo(lat, lng, liveWeatherData);
+    updateAll();
+}
+
+function scoreMethods(factors, areaM2, isLargeScale, isExtremeWeather) {
+    return {
+        liquid: 100 - (factors.erosion * 22) - (areaM2 > 2000 ? 10 : 0),
+        urethane: 100 - (factors.erosion * 14),
+        composite: 100 - (factors.erosion * 10) + (isCoastalGeo ? 6 : 0),
+        tpo: isLargeScale ? 100 - (factors.erosion * 8) + 10 : null,
+        polyurea: isExtremeWeather ? 100 - (factors.erosion * 6) + 12 : null
+    };
+}
+
+function renderScoreBox(scores) {
+    const labelMap = {
+        liquid: "시멘트 액체 방수",
+        urethane: "우레탄 도막 방수",
+        composite: "복합 시트 방수",
+        tpo: "TPO 단층 시트 방수",
+        polyurea: "폴리우레아 도막 방수"
+    };
+    const entries = Object.entries(scores).filter(([,v]) => v !== null).sort((a,b) => b[1] - a[1]);
+    els.scoreBox.innerHTML = "<b>추천 점수 순위</b>" + entries.map(([k,v], idx) => `<div class="score-row"><span>${idx+1}. ${labelMap[k]}</span><span>${v.toFixed(1)}점</span></div>`).join("");
+}
+
+function updateAll() {
+    const { age, pyeong, areaM2 } = sanitizeInputs();
+    const baseLifespan = parseFloat(els.baseMaterial.value) || 14.0;
+    const factors = calcEnvironmentalFactors(currentLat, currentLon, liveWeatherData, isCoastalGeo);
+    const expLife = baseLifespan / (factors.erosion * 1.02);
+    const remYears = expLife - age;
+
+    els.uvFactor.innerText = factors.uv.toFixed(2);
+    els.saltFactor.innerText = factors.salt.toFixed(2);
+    els.acidFactor.innerText = factors.acid.toFixed(2);
+    els.dustFactor.innerText = factors.dust.toFixed(2);
+
+    if (remYears < 0) {
+        els.remYears.className = "highlight-val rem-years-negative";
+        els.remYears.innerText = `${remYears.toFixed(1)} 년 (교체 시점 초과)`;
+    } else if (remYears <= 3) {
+        els.remYears.className = "highlight-val rem-years-warning";
+        els.remYears.innerText = `${remYears.toFixed(1)} 년`;
+    } else {
+        els.remYears.className = "highlight-val rem-years-normal";
+        els.remYears.innerText = `${remYears.toFixed(1)} 년`;
+    }
+
+    updateStatusBadge(factors.erosion, remYears);
+
+    const priceLow = Math.round(areaM2 * 20000);
+    const priceMid = Math.round(areaM2 * 45000);
+    const priceHigh = Math.round(areaM2 * 90000);
+    const isLargeScale = pyeong >= 300;
+    const isExtremeWeather = liveWeatherData.temp >= 30 || factors.uv >= 1.25;
+    const priceTpo = Math.round(areaM2 * 65000);
+    const pricePolyurea = Math.round(areaM2 * 130000);
+
+    document.getElementById('tablePriceLow').innerText = priceLow.toLocaleString() + " 원";
+    document.getElementById('tablePriceMid').innerText = priceMid.toLocaleString() + " 원";
+    document.getElementById('tablePriceHigh').innerText = priceHigh.toLocaleString() + " 원";
+    document.getElementById('tablePriceTpo').innerText = priceTpo.toLocaleString() + " 원";
+    document.getElementById('tablePricePolyurea').innerText = pricePolyurea.toLocaleString() + " 원";
+
+    setHiddenRow('row-tpo', isLargeScale);
+    setHiddenRow('row-polyurea', isExtremeWeather);
+    setLegend('legend-tpo', isLargeScale);
+    setLegend('legend-polyurea', isExtremeWeather);
+    document.getElementById('polyTpo').style.display = isLargeScale ? "block" : "none";
+    document.getElementById('polyPolyurea').style.display = isExtremeWeather ? "block" : "none";
+
+    els.recommendBox.innerHTML = [
+        `🌐 지형 특성: ${isCoastalGeo ? '해안 권역' : '내륙 권역'}`,
+        isLargeScale ? `🏭 300평 이상 면적이므로 TPO 공법이 자동 추천됩니다.` : "",
+        isExtremeWeather ? `🔥 고온/강UV 조건으로 폴리우레아 공법이 추천됩니다.` : ""
+    ].filter(Boolean).join("<br>");
+
+    const scores = scoreMethods(factors, areaM2, isLargeScale, isExtremeWeather);
+    renderScoreBox(scores);
+    bindStaticTexts();
+    simulateLccData(areaM2, priceLow, priceMid, priceHigh, priceTpo, pricePolyurea, isLargeScale, isExtremeWeather);
+}
+
+function bindStaticTexts() {
+    document.getElementById('p-liquid').innerText = "기온차 변형에 취약해 옥상 노출형으로는 권장되지 않습니다.";
+    document.getElementById('p-urethane').innerText = "가성비가 우수하지만 UV 상도 관리가 중요합니다.";
+    document.getElementById('p-composite').innerText = "균열 및 염해 차단 성능이 우수한 고급 공법입니다.";
+    document.getElementById('p-tpo').innerText = "대규모 물류창고형 지붕에 적합하며, 자외선과 내후성에 강합니다.";
+    document.getElementById('p-polyurea').innerText = "초속경화, 내열성, 방수 안정성이 매우 뛰어난 고성능 공법입니다.";
+    renderTags(document.getElementById('tags-liquid'), ["초저가", "내부전용", "크랙취약"]);
+    renderTags(document.getElementById('tags-urethane'), ["범용성", "주기관리필수", "황변주의"]);
+    renderTags(document.getElementById('tags-composite'), ["20년수명", "균열차단", "인기공법"]);
+    renderTags(document.getElementById('tags-tpo'), ["대면적특화", "경량지붕", "공기단축"]);
+    renderTags(document.getElementById('tags-polyurea'), ["초속경화", "고온면역", "고가장비필수"]);
+}
+
+function renderTags(container, arr) {
+    container.innerHTML = "";
+    arr.forEach(t => {
+        const span = document.createElement('span');
+        span.className = "tag";
+        span.innerText = t;
+        container.appendChild(span);
+    });
+}
+
+function showDetail(type, el) {
+    document.querySelectorAll('.detail-card').forEach(c => c.style.display = 'none');
+    document.getElementById('detail-' + type).style.display = 'block';
+    document.querySelectorAll('.method-table td').forEach(td => td.classList.remove('selected'));
+    el.querySelectorAll('td').forEach(td => td.classList.add('selected'));
+}
+
+function simulateLccData(areaM2, cLow, cMid, cHigh, cTpo, cPoly, showTpo, showPoly) {
+    let ptsLow = [], ptsMid = [], ptsHigh = [], ptsTpo = [], ptsPoly = [];
+    let curLow = cLow, curMid = cMid, curHigh = cHigh, curTpo = cTpo, curPoly = cPoly;
+    const maxScale = Math.max(cLow * 15, cMid * 6, cHigh * 3, cPoly * 2.5, 10000000);
+
+    document.getElementById('yLabel4').innerText = (maxScale / 100000000).toFixed(2) + "억";
+    document.getElementById('yLabel3').innerText = ((maxScale * 0.75) / 100000000).toFixed(2) + "억";
+    document.getElementById('yLabel2').innerText = ((maxScale * 0.5) / 100000000).toFixed(2) + "억";
+    document.getElementById('yLabel1').innerText = ((maxScale * 0.25) / 100000000).toFixed(2) + "억";
+
+    for (let yr = 0; yr <= 30; yr++) {
+        const x = 80 + (yr * (870 / 30));
+        if (yr > 0 && yr % 3 === 0) curLow += (cLow * 1.1);
+        if (yr > 0) {
+            if (yr % 10 === 0) curMid += (cMid * 1.2);
+            else if (yr % 4 === 0) curMid += (areaM2 * 12000);
+        }
+        if (yr === 20) curHigh += (areaM2 * 18000);
+        if (yr === 15) curTpo += (areaM2 * 10000);
+
+        ptsLow.push(`${x},${370 - (curLow / maxScale) * 320}`);
+        ptsMid.push(`${x},${370 - (curMid / maxScale) * 320}`);
+        ptsHigh.push(`${x},${370 - (curHigh / maxScale) * 320}`);
+        if (showTpo) ptsTpo.push(`${x},${370 - (curTpo / maxScale) * 320}`);
+        if (showPoly) ptsPoly.push(`${x},${370 - (curPoly / maxScale) * 320}`);
+    }
+
+    document.getElementById('polyLiquid').setAttribute('points', ptsLow.join(' '));
+    document.getElementById('polyUrethane').setAttribute('points', ptsMid.join(' '));
+    document.getElementById('polyComposite').setAttribute('points', ptsHigh.join(' '));
+    if (showTpo) document.getElementById('polyTpo').setAttribute('points', ptsTpo.join(' '));
+    if (showPoly) document.getElementById('polyPolyurea').setAttribute('points', ptsPoly.join(' '));
+}
+
+function buildDiagnosticReport() {
+    const { age, pyeong, areaM2 } = sanitizeInputs();
+    const factors = calcEnvironmentalFactors(currentLat, currentLon, liveWeatherData, isCoastalGeo);
+    const baseLifespan = parseFloat(els.baseMaterial.value) || 14.0;
+    const expLife = baseLifespan / (factors.erosion * 1.02);
+    const remYears = expLife - age;
+    return {
+        version: "v3.1",
+        generatedAt: new Date().toISOString(),
+        location: { lat: currentLat, lon: currentLon, label: liveWeatherData.locationName || "unknown" },
+        inputs: { ageYears: age, pyeong, areaM2, baseLifespanYears: baseLifespan },
+        weather: { temp: liveWeatherData.temp, humidity: liveWeatherData.humidity, desc: liveWeatherData.desc },
+        flags: { coastal: isCoastalGeo },
+        factors,
+        result: { expectedLifespanYears: Number(expLife.toFixed(2)), remainingYears: Number(remYears.toFixed(2)) }
+    };
+}
+
+function exportDiagnosticReport() {
+    const report = buildDiagnosticReport();
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `waterproofing_diagnostic_report_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+async function exportPdfReport() {
+    try {
+        if (typeof PDFLib === "undefined") {
+            alert("PDF 라이브러리가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.");
+            return;
+        }
+
+        const report = buildDiagnosticReport();
+        const { PDFDocument, StandardFonts, rgb } = PDFLib;
+
+        const pdfDoc = await PDFDocument.create();
+        const page = pdfDoc.addPage([595, 842]);
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+        let y = 790;
+        const drawText = (text, size = 12, bold = false, color = rgb(0, 0, 0), indent = 30) => {
+            page.drawText(String(text), { x: indent, y, size, font: bold ? fontBold : font, color });
+            y -= size + 7;
+        };
+
+        drawText("Smart Waterproofing Predictor - Diagnostic Report", 16, true, rgb(0.15, 0.4, 0.9));
+        y -= 10;
+        drawText(`Version: ${report.version}`);
+        drawText(`Generated: ${report.generatedAt}`);
+        drawText(`Location: ${report.location.label} (${report.location.lat.toFixed(4)}, ${report.location.lon.toFixed(4)})`);
+        drawText(`Weather: ${report.weather.temp}°C / Humidity ${report.weather.humidity}% / ${report.weather.desc}`);
+        drawText(`Coastal: ${report.flags.coastal ? "YES" : "NO"}`);
+
+        y -= 5;
+        drawText("Inputs", 13, true);
+        drawText(`Age: ${report.inputs.ageYears} years`);
+        drawText(`Area: ${report.inputs.pyeong} pyeong (${report.inputs.areaM2.toFixed(1)} m²)`);
+        drawText(`Base lifespan: ${report.inputs.baseLifespanYears} years`);
+
+        y -= 5;
+        drawText("Environmental Factors", 13, true);
+        drawText(`UV: ${report.factors.uv.toFixed(2)}`);
+        drawText(`Salt: ${report.factors.salt.toFixed(2)}`);
+        drawText(`Acid: ${report.factors.acid.toFixed(2)}`);
+        drawText(`Dust: ${report.factors.dust.toFixed(2)}`);
+        drawText(`Erosion: ${report.factors.erosion.toFixed(2)}`);
+
+        y -= 5;
+        drawText("Result", 13, true);
+        drawText(`Expected lifespan: ${report.result.expectedLifespanYears} years`);
+        drawText(`Remaining lifespan: ${report.result.remainingYears} years`, 12, true, rgb(0.8, 0.1, 0.1));
+
+        const bytes = await pdfDoc.save();
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `waterproofing_diagnostic_report_${Date.now()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch (err) {
+        console.error("PDF export failed:", err);
+        alert("PDF 생성 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
+    }
+}
+
+window.onload = () => {
+    cacheElements();
+    initMap();
+    showDetail('urethane', document.getElementById('row-urethane'));
+};
+</script>
+</body>
+</html>

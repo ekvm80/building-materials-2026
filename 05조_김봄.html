@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OptiGlass Pro - 방향성 곡률 제어 창호 시뮬레이터</title>
+    <style>
+        :root { --primary: #2c3e50; --secondary: #34495e; --accent: #e74c3c; --success: #27ae60; --blue: #2980b9; --bg: #ecf0f1; }
+        body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background-color: var(--bg); color: #333; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .app-container { background-color: #fff; width: 100%; max-width: 900px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); overflow: hidden; }
+        .header { background-color: var(--primary); color: #fff; padding: 25px; text-align: center; }
+        .header h1 { margin: 0; font-size: 26px; letter-spacing: 1px; }
+        .header p { margin: 8px 0 0 0; font-size: 15px; color: #bdc3c7; }
+        .content { padding: 30px; }
+        .form-section { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #e9ecef; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 8px; color: var(--primary); }
+        .form-group select, .form-group input[type="number"] { width: 100%; padding: 12px; border: 1px solid #ccd1d9; border-radius: 6px; font-size: 15px; box-sizing: border-box; }
+        .input-row { display: flex; gap: 15px; }
+        .input-row .form-group { width: 50%; }
+        button.btn-calc { width: 100%; background-color: var(--blue); color: white; border: none; padding: 18px; font-size: 18px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: background 0.3s; box-shadow: 0 4px 6px rgba(41, 128, 185, 0.3); }
+        button.btn-calc:hover { background-color: #1f6391; }
+        .result-container { display: none; margin-top: 30px; padding-top: 20px; border-top: 2px dashed #ccc; }
+        .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .result-card { background-color: #fff; border: 1px solid #e1e8ed; padding: 20px; border-radius: 8px; border-top: 4px solid var(--blue); }
+        .result-card.full-width { grid-column: span 2; border-top-color: #8e44ad; }
+        .result-card h3 { margin-top: 0; color: var(--primary); font-size: 17px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;}
+        .result-card ul { list-style-type: none; padding: 0; margin: 0; }
+        .result-card li { margin-bottom: 12px; font-size: 15px; display: flex; justify-content: space-between; align-items: center;}
+        .highlight { color: var(--accent); font-weight: bold; }
+        .success { color: var(--success); font-weight: bold; }
+        .value-box { font-weight: bold; background: #f1f2f6; padding: 4px 10px; border-radius: 4px; text-align: right;}
+        .report-box { background-color: #e8f8f5; border: 1px solid #1abc9c; padding: 20px; border-radius: 8px; font-size: 15px; line-height: 1.6; color: #16a085; }
+        .report-box.danger { background-color: #fdedec; border-color: #e74c3c; color: #c0392b; }
+        .sim-box { width: 100%; height: 220px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #ddd; position: relative; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        .wind-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .wind-arrow { position: absolute; width: 40px; height: 2px; background-color: #95a5a6; animation: blow 1s linear infinite; opacity: 0; }
+        .wind-arrow::after { content: ''; position: absolute; right: 0; top: -4px; border-left: 10px solid #95a5a6; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+        @keyframes blow { 0% { transform: translateX(0px); opacity: 0; } 20% { opacity: 0.8; } 80% { opacity: 0.8; } 100% { transform: translateX(100px); opacity: 0; } }
+        .priority-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+        .priority-chip input[type="checkbox"] { display: none; }
+        .priority-chip label { display: inline-block; padding: 8px 13px; border-radius: 20px; border: 2px solid #ccd1d9; background: #fff; color: #555; font-size: 13px; cursor: pointer; transition: all 0.2s; user-select: none; font-weight: normal; }
+        .priority-chip input:checked + label { border-color: var(--blue); background: var(--blue); color: #fff; font-weight: bold; }
+        .priority-chip label:hover { border-color: var(--blue); color: var(--blue); }
+        .rec-box { display:none; margin-top:14px; padding:14px 16px; background:#eaf4fb; border:1px solid #2980b9; border-radius:6px; }
+        .rec-box-title { font-size:13px; font-weight:bold; color:#1a5276; margin-bottom:10px; }
+        .rec-item { background:#fff; border:1px solid #aed6f1; border-radius:6px; padding:10px 14px; margin-bottom:8px; font-size:14px; color:#1f618d; line-height:1.7; }
+        .rec-item:last-child { margin-bottom:0; }
+        .rec-tag { display:inline-block; font-size:11px; font-weight:bold; padding:2px 7px; border-radius:10px; margin-right:6px; background:#2980b9; color:#fff; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header">
+        <h1>🏢 OptiGlass Pro (방향성 곡률 시뮬레이터)</h1>
+        <p>볼록(Arch)과 오목(Sail)의 역학적 차이 및 비선형 경제성 분석</p>
+    </div>
+    
+    <div class="content">
+        <div class="result-card full-width" style="margin-bottom: 25px; border-top-color: #16a085;">
+            <h3 style="text-align: center; border: none; margin-bottom: 5px;">🔎 유리 형상 및 바람 저항 미리보기</h3>
+            <p style="text-align: center; font-size: 13px; color: #7f8c8d; margin-top: 0;">슬라이더를 움직여 바람(왼쪽→오른쪽)에 대응하는 유리의 형태를 결정하세요.</p>
+            <div class="sim-box" style="height: 180px;">
+                <div class="wind-layer" id="windLayerPreview"></div>
+                <svg width="400" height="150" viewBox="0 0 400 150">
+                    <rect x="180" y="5" width="40" height="15" fill="#34495e" />
+                    <rect x="180" y="130" width="40" height="15" fill="#34495e" />
+                    <path id="glassPreview" stroke="#2980b9" stroke-width="8" fill="none" stroke-linecap="round" d="M 200 20 Q 200 75 200 130" />
+                </svg>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="input-row">
+                <div class="form-group">
+                    <label>풍하중 조건 (바람의 세기)</label>
+                    <select id="region">
+                        <option value="26">도심지 기본 (초속 26m)</option>
+                        <option value="35">해안가 / 고층빌딩 (초속 35m)</option>
+                        <option value="45">태풍 극심 지역 (초속 45m)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>외부 소음 환경</label>
+                    <select id="noise">
+                        <option value="low">일반 주거지 (조용함)</option>
+                        <option value="high">8차선 도로변 / 기차역 (시끄러움)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="input-row">
+                <div class="form-group">
+                    <label>창문 가로 길이 (m)</label>
+                    <input type="number" id="width" value="2.0" step="0.1" min="0.5">
+                </div>
+                <div class="form-group">
+                    <label>창문 세로 길이 (m)</label>
+                    <input type="number" id="height" value="2.5" step="0.1" min="0.5">
+                </div>
+            </div>
+
+            <div class="input-row">
+                <div class="form-group" style="flex: 1.5;">
+                    <label>유리 방향성 곡률 조절 (-100% 오목 ↔ +100% 볼록)</label>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 12px; color: #7f8c8d;">오목(-)</span>
+                        <input type="range" id="curvature" min="-100" max="100" value="0" style="flex: 1; cursor: pointer;" oninput="updatePreview()">
+                        <span style="font-size: 12px; color: #7f8c8d;">볼록(+)</span>
+                    </div>
+                    <div style="text-align: center; margin-top: 5px;">
+                        <span id="curveValue" style="font-weight: bold; color: var(--primary); background: #eee; padding: 2px 8px; border-radius: 4px;">0% (평면)</span>
+                    </div>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>설계 목적 <span style="font-weight:normal; font-size:12px; color:#7f8c8d;">(복수 선택 가능)</span></label>
+                    <div class="priority-group">
+                        <span class="priority-chip"><input type="checkbox" id="p_safety" name="priority" value="safety" checked><label for="p_safety">🛡️ 안전성</label></span>
+                        <span class="priority-chip"><input type="checkbox" id="p_energy" name="priority" value="energy"><label for="p_energy">🌡️ 단열</label></span>
+                        <span class="priority-chip"><input type="checkbox" id="p_sound" name="priority" value="sound"><label for="p_sound">🔇 방음</label></span>
+                        <span class="priority-chip"><input type="checkbox" id="p_budget" name="priority" value="budget"><label for="p_budget">💰 예산절감</label></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-calc" onclick="calculateGlass()">역학 및 경제성 시뮬레이션 가동</button>
+        <p style="margin: 10px 0 0 0; font-size: 12px; color: #95a5a6; text-align: center; line-height: 1.6;">
+            ※ 본 시뮬레이터는 <strong>시연 목적의 간이 역학 모델</strong>을 사용합니다. 풍압 공식(½ρv²), 모멘트 계수(β), 형상 계수는 판 이론(Plate Theory) 기반 근사식이며, 실제 설계 시에는 KBC(한국건축구조기준) 및 KS L 2002 기준의 정밀 구조 검토가 반드시 필요합니다.
+        </p>
+
+        <div class="result-container" id="resultArea">
+            <h2 style="text-align: center; color: var(--primary); margin-top: 0;">📊 시뮬레이션 결과</h2>
+            
+            <div class="result-grid">
+                <div class="result-card">
+                    <h3>🛡️ 구조 성능 (바람 저항)</h3>
+                    <ul>
+                        <li><span>설계 풍압</span> <span class="value-box"><span id="resPressure" class="highlight">0</span> Pa</span></li>
+                        <li><span>단변/장변 비율 (역학)</span> <span class="value-box"><span id="resRatio" class="success">0</span></span></li>
+                        <li><span>유리 구성 두께</span> <span class="value-box" style="font-size: 13px;"><span id="resThickness" class="success">0</span></span></li>
+                        <li><span>내부 휨 스트레스</span> <span class="value-box"><span id="resStress">0</span> MPa</span></li>
+                    </ul>
+                </div>
+                
+                <div class="result-card" style="border-top-color: #f39c12;">
+                    <h3>🌡️ 단열 및 🔇 차음 성능</h3>
+                    <ul>
+                        <li><span>최종 유리 종류</span> <span class="value-box" style="background:#fff3cd; font-size: 13px;"><span id="resType">계산중</span></span></li>
+                        <li><span>에너지 효율</span> <span class="value-box" id="resEnergy"></span></li>
+                        <li><span>소음 차단율</span> <span class="value-box"><span id="resSound" class="success">0</span> dB</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="result-card" style="border-top-color: #27ae60; margin-bottom: 20px;">
+                <h3>💰 경제성 분석 (비선형 가공비 반영)</h3>
+                <ul>
+                    <li><span>총 창호 면적</span> <span class="value-box"><span id="resArea">0</span> m²</span></li>
+                    <li style="font-size: 18px; margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 15px;">
+                        <strong>예상 총 자재 견적</strong> <span class="value-box highlight" style="font-size: 20px;"><span id="resTotalPrice">0</span> 원</span>
+                    </li>
+                </ul>
+                <p style="margin: 15px 0 0 0; font-size: 12px; color: #95a5a6; border-top: 1px solid #f0f0f0; padding-top: 10px; line-height: 1.6;">
+                    ※ 기준 단가(35,000원/m²)는 <strong>시연 목적의 간이 기준가</strong>입니다. 실제 시공 단가는 유리 종류·규격·시공사에 따라 현저히 다를 수 있으며 (로이 복층유리 기준 약 120,000~250,000원/m²), 본 견적은 자재비만 포함하며 설치·프레임·인건비는 별도입니다.
+                </p>
+            </div>
+
+            <div class="result-card" style="border-top-color: #8e44ad; margin-bottom: 20px;">
+                <h3>📋 KBC / KS 기준 적합성 검토</h3>
+
+                <div style="margin-bottom: 16px;">
+                    <div style="font-size: 13px; font-weight: bold; color: #6c3483; margin-bottom: 10px; padding: 5px 10px; background: #f5eef8; border-radius: 5px; border-left: 3px solid #8e44ad;">
+                        🏛️ KBC 2016 풍하중 기준 (제0306장)
+                    </div>
+                    <ul style="list-style:none; padding:0; margin:0;">
+                        <li style="margin-bottom:10px; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>KBC 기준 속도압 (0.6 × V²)</span>
+                            <span class="value-box"><span id="kbcQStd">-</span> Pa</span>
+                        </li>
+                        <li style="margin-bottom:10px; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>시뮬레이터 적용 속도압</span>
+                            <span class="value-box"><span id="kbcQApp">-</span> Pa</span>
+                        </li>
+                        <li style="margin-bottom:10px; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>KBC 대비 보수도</span>
+                            <span class="value-box"><span id="kbcConservatism">-</span></span>
+                        </li>
+                        <li style="margin-bottom:10px; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>노출범주 (Exposure Category)</span>
+                            <span class="value-box" style="font-size:13px;"><span id="kbcExposure">-</span></span>
+                        </li>
+                        <li style="margin-bottom:10px; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>중요도계수 (I<sub>W</sub>)</span>
+                            <span class="value-box"><span id="kbcImportance">-</span></span>
+                        </li>
+                        <li style="margin-bottom:0; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>가스트 영향계수 (G)</span>
+                            <span class="value-box" style="font-size:13px;"><span id="kbcGust">-</span></span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div style="margin-bottom: 16px; border-top: 1px solid #eee; padding-top: 14px;">
+                    <div style="font-size: 13px; font-weight: bold; color: #6c3483; margin-bottom: 10px; padding: 5px 10px; background: #f5eef8; border-radius: 5px; border-left: 3px solid #8e44ad;">
+                        🔬 KS L 2002 판유리 두께 및 응력 기준
+                    </div>
+                    <ul style="list-style:none; padding:0; margin:0;">
+                        <li style="margin-bottom:10px; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>KS 기준 허용 휨응력</span>
+                            <span class="value-box"><span id="ksAllowable">-</span> MPa</span>
+                        </li>
+                        <li style="margin-bottom:10px; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>시뮬레이터 계산 응력</span>
+                            <span class="value-box"><span id="ksCurrentStress">-</span> MPa</span>
+                        </li>
+                        <li style="margin-bottom:10px; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>응력 활용률 (D/C ratio)</span>
+                            <span class="value-box"><span id="ksRatio">-</span></span>
+                        </li>
+                        <li style="margin-bottom:10px; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>KS 기준 최소 두께 (면적×풍압 기반)</span>
+                            <span class="value-box"><span id="ksMinT">-</span> mm</span>
+                        </li>
+                        <li style="margin-bottom:0; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>시뮬레이터 선정 두께</span>
+                            <span class="value-box"><span id="ksSelectedT">-</span> mm</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div id="ksVerdict" style="padding: 14px 16px; border-radius: 6px; font-size: 15px; font-weight: bold; text-align: center;"></div>
+                <div class="rec-box" id="ksRecommendBox">
+                    <div class="rec-box-title">💡 KBC/KS 기준 충족을 위한 유리 자동 추천</div>
+                    <div id="ksRecommendContent"></div>
+                </div>
+                <p style="margin: 10px 0 0 0; font-size: 12px; color: #95a5a6; line-height: 1.6;">
+                    ※ KS 기준 허용응력 및 최소 두께는 KS L 2002 및 판유리 구조설계 근사 기준 적용. 가스트 영향계수(G)는 시연 모델 특성상 1.0 고정 적용 (실제 KBC 설계 시 지형·건물 높이에 따라 1.7~2.0 적용 필요).
+                </p>
+            </div>
+
+            <div class="report-box" id="resReport"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 페이지 로드 시 바람 애니메이션 세팅
+    window.onload = function() { createWindArrows('windLayerPreview', 26); };
+
+    function createWindArrows(layerId, speedCategory) {
+        const windLayer = document.getElementById(layerId);
+        windLayer.innerHTML = ''; 
+        let numArrows = speedCategory === 45 ? 15 : (speedCategory === 35 ? 10 : 5);
+        for(let i=0; i<numArrows; i++) {
+            let arrow = document.createElement('div');
+            arrow.className = 'wind-arrow';
+            arrow.style.top = Math.random() * 80 + 10 + '%';
+            arrow.style.left = Math.random() * 30 + '%';
+            arrow.style.animationDuration = (Math.random() * 0.5 + 0.5) + 's';
+            windLayer.appendChild(arrow);
+        }
+    }
+
+    // 슬라이더 움직일 때 곡률 방향(볼록/오목) 즉시 업데이트
+    function updatePreview() {
+        const curveVal = parseInt(document.getElementById('curvature').value);
+        let textVal = curveVal + '%';
+        let strokeColor = "#2980b9";
+
+        if(curveVal > 0) {
+            textVal = '+' + curveVal + '% (볼록: 아치형)';
+            strokeColor = "#27ae60"; // 초록계열 (안전)
+        } else if(curveVal < 0) {
+            textVal = curveVal + '% (오목: 돛형)';
+            strokeColor = "#e74c3c"; // 빨강계열 (위험)
+        } else {
+            textVal = '0% (평면)';
+        }
+        
+        document.getElementById('curveValue').innerText = textVal;
+        
+        // svg control point 갱신: +면 왼쪽(200미만), -면 오른쪽(200초과)으로 휨
+        const bend = 200 - curveVal; 
+        document.getElementById('glassPreview').setAttribute('d', `M 200 20 Q ${bend} 75 200 130`);
+        document.getElementById('glassPreview').setAttribute('stroke', strokeColor);
+    }
+
+    function calculateGlass() {
+        const windSpeed = parseFloat(document.getElementById('region').value);
+        const noiseLevel = document.getElementById('noise').value;
+        const width = parseFloat(document.getElementById('width').value);
+        const height = parseFloat(document.getElementById('height').value);
+        const curvePercent = parseFloat(document.getElementById('curvature').value);
+
+        // 복수 목적 읽기
+        const priorities = Array.from(document.querySelectorAll('input[name="priority"]:checked')).map(cb => cb.value);
+        const hasEnergy = priorities.includes('energy');
+        const hasSound  = priorities.includes('sound') || noiseLevel === 'high';
+        const hasSafety = priorities.includes('safety');
+        const hasBudget = priorities.includes('budget');
+
+        if (!width || width <= 0 || !height || height <= 0) {
+            alert("가로와 세로 길이를 정확히 입력해주세요.");
+            return;
+        }
+
+        // --- 1. 진보된 역학 계산 파트 (Plate Theory & 방향성 형상계수) ---
+        const area = width * height; 
+        const rho = 1.225; 
+        const pressure = 0.5 * rho * Math.pow(windSpeed, 2); 
+        
+        const shortSide = Math.min(width, height);
+        const longSide = Math.max(width, height);
+        const aspectRatio = shortSide / longSide;
+        const beta = 0.75 - 0.46 * Math.pow(aspectRatio, 2); // 모멘트 계수
+
+        // ★[핵심 보완] 방향에 따른 형상 계수(Shape Factor)
+        let shapeFactor = 1.0;
+        if (curvePercent > 0) {
+            // 볼록 (바람을 등짐): 아치 효과로 응력 최대 40% 감소
+            shapeFactor = 1.0 - (curvePercent / 100) * 0.4;
+        } else if (curvePercent < 0) {
+            // 오목 (바람을 안음): 돛 효과로 응력 최대 50% 증폭 (매우 취약해짐)
+            shapeFactor = 1.0 + (Math.abs(curvePercent) / 100) * 0.5;
+        }
+
+        const thicknessOptions = [5, 6, 8, 10, 12, 15, 19];
+        let baseT = 0;
+        let isTempered = false;
+        let stressMPa = 0;
+
+        for (let t of thicknessOptions) {
+            let t_m = t / 1000;
+            stressMPa = ((beta * pressure * Math.pow(shortSide, 2)) / Math.pow(t_m, 2) / 1000000) * shapeFactor;
+            if (stressMPa < 40 * 0.8) { baseT = t; break; }
+        }
+
+        if (baseT === 0) { 
+            isTempered = true;
+            for (let t of thicknessOptions) {
+                let t_m = t / 1000;
+                stressMPa = ((beta * pressure * Math.pow(shortSide, 2)) / Math.pow(t_m, 2) / 1000000) * shapeFactor;
+                if (stressMPa < 120 * 0.8) { baseT = t; break; }
+            }
+        }
+        
+        // 파괴(붕괴) 상황 처리
+        if (baseT === 0) {
+            document.getElementById('resPressure').innerText = Math.round(pressure);
+            document.getElementById('resThickness').innerText = "설계 불가";
+            document.getElementById('resStress').innerText = stressMPa.toFixed(1) + " (파괴)";
+            document.getElementById('resRatio').innerText = aspectRatio.toFixed(2);
+            
+            document.getElementById('resType').innerText = "-";
+            document.getElementById('resEnergy').innerText = "-";
+            document.getElementById('resSound').innerText = "-";
+            document.getElementById('resArea').innerText = area.toFixed(2);
+            document.getElementById('resTotalPrice').innerText = "0";
+
+            let causeText = "바람의 하중이 너무 강합니다.";
+            if (curvePercent < 0) {
+                causeText = "특히 유리가 <strong>바람 방향으로 오목하게(-곡률) 설계되어 바람을 온전히 담아내기 때문에 구조적으로 가장 취약한 상태</strong>입니다.";
+            }
+
+            document.getElementById('resReport').className = "report-box danger";
+            document.getElementById('resReport').innerHTML = 
+                `<strong>🚨 극한 응력 붕괴 위험:</strong><br>${causeText}<br>현재 설정으로는 유리가 완전히 <strong>붕괴</strong>되므로, 중간 프레임을 세우거나 유리를 볼록한 방향(+곡률)으로 재설계해 주세요.`;
+
+            // 붕괴 시 KBC/KS 카드 강제 부적합 처리
+            document.getElementById('kbcQStd').innerText = Math.round(0.6 * Math.pow(windSpeed, 2));
+            document.getElementById('kbcQApp').innerText = Math.round(0.5 * 1.225 * Math.pow(windSpeed, 2));
+            document.getElementById('kbcConservatism').innerHTML = '<span style="color:#27ae60">+2.0% (보수적 적용)</span>';
+            const wsCat = windSpeed <= 26 ? 'B등급 (도심 / 수목 밀집 지형)' : windSpeed <= 35 ? 'C등급 (트인 지형 / 해안 / 고층)' : 'D등급 (해안 최전방 / 태풍 극심)';
+            document.getElementById('kbcExposure').innerText = wsCat;
+            document.getElementById('kbcImportance').innerText = '1.0 (일반건축물, 시연 기준)';
+            document.getElementById('kbcGust').innerHTML = '<span style="color:#e67e22">1.0 적용 (⚠ 실제 설계 시 1.7~2.0 필요)</span>';
+            document.getElementById('ksAllowable').innerText = '25 / 84 (일반/강화 기준)';
+            document.getElementById('ksCurrentStress').innerText = stressMPa.toFixed(1) + ' (파괴 수준)';
+            document.getElementById('ksRatio').innerHTML = '<span style="color:#e74c3c">파괴 초과</span>';
+            document.getElementById('ksMinT').innerText = '19+';
+            document.getElementById('ksSelectedT').innerHTML = '<span style="color:#e74c3c">설계 불가</span>';
+            const vEl = document.getElementById('ksVerdict');
+            vEl.style.background = '#fdedec'; vEl.style.color = '#c0392b'; vEl.style.border = '1px solid #e74c3c';
+            vEl.innerHTML = '❌ <strong>부적합 (붕괴)</strong> — KS 최대 두께(19mm 강화)로도 응력을 감당할 수 없습니다. 창문을 분할하거나 볼록 방향으로 재설계하세요.';
+            
+            document.getElementById('resultArea').style.display = 'block';
+            document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' });
+            return; 
+        }
+
+        // --- 2. 환경성 및 경제성 파트 ---
+        let finalType = "";
+        let thicknessStr = "";
+        let uValue = 5.8; 
+        let soundDb = 28; 
+        
+        // 구부리는 방향에 상관없이 벤딩(Bending) 공정이 들어가면 가격 폭등
+        let costMultiplier = 1.0;
+        if (curvePercent !== 0) {
+            costMultiplier += Math.pow(Math.abs(curvePercent) / 100, 2) * 4.0;
+        }
+
+        let glassName = isTempered ? "강화유리" : "일반유리";
+
+        // 복합 목적 조합 로직
+        if (hasBudget && priorities.length === 1) {
+            // 예산만 선택
+            finalType = isTempered ? "단판 강화유리" : "기본 단판유리";
+            uValue = 5.8; soundDb = 28;
+            costMultiplier *= isTempered ? 1.5 : 1.0;
+            thicknessStr = `${baseT}mm ${glassName}`;
+        } else if (hasEnergy && hasSound && hasSafety) {
+            // 3가지 모두: 최고급 로이 강화 접합 트리플
+            finalType = "로이 강화 접합 복층유리 (프리미엄)";
+            uValue = 0.9; soundDb = 46; isTempered = true;
+            costMultiplier *= 6.5;
+            thicknessStr = `${baseT}mm 강화 + 차음PVB + ${baseT}mm 로이강화 + 아르곤층 + ${baseT}mm 강화`;
+        } else if (hasEnergy && hasSound) {
+            // 단열 + 방음: 로이 접합 복층
+            finalType = isTempered ? "로이 강화 접합 복층유리" : "로이 접합 복층유리";
+            uValue = 1.1; soundDb = 43;
+            costMultiplier *= 5.0;
+            thicknessStr = `${baseT}mm ${glassName} + 차음PVB + ${baseT}mm 로이 + 아르곤층 + ${baseT}mm`;
+        } else if (hasEnergy && hasSafety) {
+            // 단열 + 안전: 로이 강화 복층
+            finalType = "고효율 로이 강화 복층유리";
+            uValue = 1.2; soundDb = 32; isTempered = true;
+            costMultiplier *= 4.0;
+            thicknessStr = `${baseT}mm 강화 + 아르곤층 + ${baseT}mm 로이강화`;
+        } else if (hasSound && hasSafety) {
+            // 방음 + 안전: 강화 접합
+            finalType = "방음 강화 접합유리";
+            uValue = 4.0; soundDb = 42; isTempered = true;
+            costMultiplier *= 4.0;
+            thicknessStr = `${baseT}mm 강화 + 차음PVB + ${baseT}mm 강화`;
+        } else if (hasEnergy) {
+            finalType = isTempered ? "고효율 로이 강화 복층유리" : "고효율 로이 복층유리";
+            uValue = 1.2; soundDb = 32; costMultiplier *= 3.5;
+            thicknessStr = `${baseT}mm ${glassName} + 아르곤층 + ${baseT}mm 로이`;
+        } else if (hasSound) {
+            finalType = isTempered ? "방음 강화 접합유리" : "방음 접합유리";
+            uValue = 4.5; soundDb = 39; costMultiplier *= 3.0;
+            thicknessStr = `${baseT}mm ${glassName} + 차음PVB + ${baseT}mm`;
+        } else {
+            // 안전성 단독 또는 미선택
+            finalType = isTempered ? "단판 강화유리" : "기본 단판유리";
+            uValue = 5.8; soundDb = 28;
+            costMultiplier *= isTempered ? 1.5 : 1.0;
+            thicknessStr = `${baseT}mm ${glassName}`;
+        }
+        glassName = isTempered ? "강화유리" : "일반유리";
+
+        // 곡률 텍스트 추가
+        if (curvePercent > 0) {
+            finalType = `[볼록/아치형 +${curvePercent}%] ` + finalType;
+        } else if (curvePercent < 0) {
+            finalType = `[오목/역방향 ${curvePercent}%] ` + finalType;
+        }
+
+        const basePricePerM2 = 35000;
+        const totalPrice = Math.round(basePricePerM2 * costMultiplier * area);
+
+        // --- 3. UI 업데이트 ---
+        document.getElementById('resPressure').innerText = Math.round(pressure);
+        document.getElementById('resThickness').innerText = thicknessStr;
+        
+        let stressColor = stressMPa > (isTempered ? 90 : 30) ? "red" : "inherit";
+        document.getElementById('resStress').innerHTML = `<span style="color:${stressColor}">${stressMPa.toFixed(1)}</span>`;
+        document.getElementById('resRatio').innerText = aspectRatio.toFixed(2) + " (비율)";
+        
+        document.getElementById('resType').innerText = finalType;
+        document.getElementById('resSound').innerText = soundDb;
+        document.getElementById('resEnergy').innerText = uValue < 2.0 ? "1등급 (우수)" : (uValue < 3.0 ? "3등급 (보통)" : "단열 취약");
+        document.getElementById('resEnergy').style.color = uValue < 2.0 ? "blue" : (uValue < 3.0 ? "#f39c12" : "red");
+
+        document.getElementById('resArea').innerText = area.toFixed(2);
+        document.getElementById('resTotalPrice').innerText = totalPrice.toLocaleString();
+
+        // --- 4. KBC / KS 기준 적합성 검토 ---
+
+        // [KBC] 속도압 비교
+        const q_kbc = Math.round(0.6 * Math.pow(windSpeed, 2));
+        const q_app = Math.round(pressure);
+        const conservatism = (((pressure / q_kbc) - 1) * 100).toFixed(1);
+        document.getElementById('kbcQStd').innerText = q_kbc;
+        document.getElementById('kbcQApp').innerText = q_app;
+        document.getElementById('kbcConservatism').innerHTML =
+            `<span style="color:#27ae60">+${conservatism}% (보수적 적용)</span>`;
+
+        // [KBC] 노출범주
+        let exposureCategory, exposureDesc;
+        if (windSpeed <= 26) {
+            exposureCategory = 'B등급'; exposureDesc = '도심 / 수목 밀집 지형';
+        } else if (windSpeed <= 35) {
+            exposureCategory = 'C등급'; exposureDesc = '트인 지형 / 해안 / 고층';
+        } else {
+            exposureCategory = 'D등급'; exposureDesc = '해안 최전방 / 태풍 극심';
+        }
+        document.getElementById('kbcExposure').innerText = `${exposureCategory} (${exposureDesc})`;
+
+        // [KBC] 중요도계수 / 가스트계수
+        document.getElementById('kbcImportance').innerText = '1.0 (일반건축물, 시연 기준)';
+        document.getElementById('kbcGust').innerHTML =
+            '<span style="color:#e67e22">1.0 적용 (⚠ 실제 설계 시 1.7~2.0 필요)</span>';
+
+        // [KS] 허용 휨응력 (KS L 2002 근거, 단기 풍하중 기준)
+        const ksAllowableStress = isTempered ? 84 : 25; // MPa
+        const stressRatioVal = (stressMPa / ksAllowableStress * 100);
+        const ksStressPass = stressMPa <= ksAllowableStress;
+        document.getElementById('ksAllowable').innerText =
+            `${ksAllowableStress} (${isTempered ? '강화유리' : '일반유리'} 기준)`;
+        document.getElementById('ksCurrentStress').innerText = stressMPa.toFixed(1);
+
+        let ratioColor = stressRatioVal <= 75 ? '#27ae60' : stressRatioVal <= 100 ? '#e67e22' : '#e74c3c';
+        document.getElementById('ksRatio').innerHTML =
+            `<span style="color:${ratioColor}">${stressRatioVal.toFixed(1)}%</span>`;
+
+        // [KS] 최소 두께 (면적 × 풍압 기반 근사 테이블)
+        const loadIndex = area * pressure;
+        let ksMinThickness;
+        if      (loadIndex < 500)  ksMinThickness = 5;
+        else if (loadIndex < 1500) ksMinThickness = 6;
+        else if (loadIndex < 3000) ksMinThickness = 8;
+        else if (loadIndex < 5000) ksMinThickness = 10;
+        else if (loadIndex < 8000) ksMinThickness = 12;
+        else                       ksMinThickness = 15;
+        const ksThicknessPass = baseT >= ksMinThickness;
+
+        document.getElementById('ksMinT').innerText = ksMinThickness;
+        document.getElementById('ksSelectedT').innerHTML =
+            `<span style="color:${ksThicknessPass ? '#27ae60' : '#e74c3c'}">${baseT} ${ksThicknessPass ? '✓ 충족' : '✗ 미달'}</span>`;
+
+        // [종합 판정]
+        const verdictEl = document.getElementById('ksVerdict');
+        if (ksStressPass && ksThicknessPass) {
+            verdictEl.style.background = '#eafaf1';
+            verdictEl.style.color = '#1a7a4a';
+            verdictEl.style.border = '1px solid #27ae60';
+            verdictEl.innerHTML = '✅ KBC 2016 / KS L 2002 기준 &nbsp;<strong>적합</strong>&nbsp; — 선정 유리가 두께 및 응력 기준을 모두 만족합니다.';
+            document.getElementById('ksRecommendBox').style.display = 'none';
+        } else if (!ksThicknessPass && ksStressPass) {
+            verdictEl.style.background = '#fef9e7';
+            verdictEl.style.color = '#7d6608';
+            verdictEl.style.border = '1px solid #f1c40f';
+            verdictEl.innerHTML = '⚠️ <strong>조건부 적합</strong> — 응력 기준은 충족하나, KS 기준 최소 두께(' + ksMinThickness + 'mm) 미달.';
+        } else if (ksThicknessPass && !ksStressPass) {
+            verdictEl.style.background = '#fef9e7';
+            verdictEl.style.color = '#7d6608';
+            verdictEl.style.border = '1px solid #f1c40f';
+            verdictEl.innerHTML = '⚠️ <strong>조건부 적합</strong> — 두께 기준 충족, 그러나 응력 활용률(' + stressRatioVal.toFixed(1) + '%)이 KS 허용 범위 초과.';
+        } else {
+            verdictEl.style.background = '#fdedec';
+            verdictEl.style.color = '#c0392b';
+            verdictEl.style.border = '1px solid #e74c3c';
+            verdictEl.innerHTML = '❌ <strong>부적합</strong> — 두께 및 응력 모두 KS 기준 미달.';
+        }
+
+        // [KS 기준 적합 유리 자동 추천] — 부적합/조건부 시 표시
+        if (!ksStressPass || !ksThicknessPass) {
+            const recBox = document.getElementById('ksRecommendBox');
+            const recContent = document.getElementById('ksRecommendContent');
+            recBox.style.display = 'block';
+            recContent.innerHTML = '';
+
+            const thicknessOpts = [5, 6, 8, 10, 12, 15, 19];
+            let recHtml = '';
+
+            // 일반유리에서 KS 충족하는 최소 두께 찾기
+            let regRec = null;
+            for (let t of thicknessOpts) {
+                if (t < ksMinThickness) continue;
+                const t_m = t / 1000;
+                const s = ((beta * pressure * Math.pow(shortSide, 2)) / Math.pow(t_m, 2) / 1000000) * shapeFactor;
+                if (s <= 25) { regRec = { t, stress: s, isTempered: false }; break; }
+            }
+
+            // 강화유리에서 KS 충족하는 최소 두께 찾기
+            let tempRec = null;
+            for (let t of thicknessOpts) {
+                if (t < ksMinThickness) continue;
+                const t_m = t / 1000;
+                const s = ((beta * pressure * Math.pow(shortSide, 2)) / Math.pow(t_m, 2) / 1000000) * shapeFactor;
+                if (s <= 84) { tempRec = { t, stress: s, isTempered: true }; break; }
+            }
+
+            // 추천 카드 생성
+            if (regRec) {
+                const ratio = (regRec.stress / 25 * 100).toFixed(1);
+                recHtml += `<div class="rec-item"><span class="rec-tag">1안</span><strong>${regRec.t}mm 일반유리 (플로트)</strong><br>` +
+                    `응력 활용률 ${ratio}% &nbsp;|&nbsp; KS 최소두께 ${ksMinThickness}mm 충족 ✓<br>` +
+                    `<span style="color:#7f8c8d; font-size:13px;">→ 가장 경제적인 KS 적합 선택지입니다.</span></div>`;
+            }
+            if (tempRec) {
+                const ratio = (tempRec.stress / 84 * 100).toFixed(1);
+                const tag = regRec ? '2안' : '1안';
+                recHtml += `<div class="rec-item"><span class="rec-tag">${tag}</span><strong>${tempRec.t}mm 강화유리 (Tempered)</strong><br>` +
+                    `응력 활용률 ${ratio}% &nbsp;|&nbsp; KS 최소두께 ${ksMinThickness}mm 충족 ✓<br>` +
+                    `<span style="color:#7f8c8d; font-size:13px;">→ 안전성 여유가 크며, 파손 시 분말화로 인명피해 최소화.</span></div>`;
+            }
+            if (!regRec && !tempRec) {
+                recHtml = `<div class="rec-item" style="border-color:#e74c3c; color:#c0392b;">` +
+                    `<strong>⚠️ 단일 패널로는 KS 기준 충족 불가</strong><br>` +
+                    `<strong>권고 1:</strong> 창문을 멀리언(Mullion)으로 2~4분할하여 단변 길이를 줄이세요.<br>` +
+                    `<strong>권고 2:</strong> 유리를 볼록(+곡률) 방향으로 재설계하여 형상 계수를 개선하세요.<br>` +
+                    `<strong>권고 3:</strong> 외부 철재 프레임 보강을 통한 지지 간격 축소를 검토하세요.</div>`;
+            }
+            recContent.innerHTML = recHtml;
+        }
+
+        createWindArrows('windLayerPreview', windSpeed);
+
+        // 맞춤형 리포트 생성
+        const reportEl = document.getElementById('resReport');
+        reportEl.className = "report-box"; 
+        
+        let reportStr = `<strong>💡 엔지니어링 정밀 분석 리포트:</strong><br><br>`;
+        reportStr += `단변 ${shortSide}m, 장변 ${longSide}m의 비율에 따른 모멘트 계수를 반영하여 정밀 하중을 계산했습니다. `;
+        
+        if(curvePercent > 0) {
+            reportStr += `<br><br>특히 설정하신 <strong>볼록한 방향(+${curvePercent}%)</strong>은 바람을 등지는 '아치(Arch) 효과'를 발생시켜 구조적 스트레스를 크게 감소시켰습니다. 얇은 유리로도 버틸 수 있지만, 비선형 벤딩 가공 한계로 인해 제작 단가는 평면 창호 대비 <strong>${costMultiplier.toFixed(1)}배</strong> 수직 상승했습니다.`;
+        } else if(curvePercent < 0) {
+            reportStr += `<br><br>주의하십시오. 유리를 <strong>오목한 방향(${curvePercent}%)</strong>으로 설계하면 바람을 안고 있는 '돛(Sail)'처럼 작용하여 유리에 가해지는 스트레스가 <strong>크게 증폭</strong>됩니다. 구조적으로 매우 취약해져 두꺼운 유리가 요구되며, 구부리는 가공비까지 더해져 평면 창호 대비 <strong>${costMultiplier.toFixed(1)}배</strong>의 견적 폭탄이 발생했습니다.`;
+        } else {
+            reportStr += `이 비율에서 바람을 안전하게 버티기 위해 <strong>${baseT}mm 두께의 ${glassName}</strong>가 뼈대로 필요합니다.`;
+        }
+
+        reportEl.innerHTML = reportStr;
+
+        document.getElementById('resultArea').style.display = 'block';
+        document.getElementById('resultArea').scrollIntoView({ behavior: 'smooth' });
+    }
+</script>
+
+</body>
+</html>
