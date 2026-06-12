@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 미장 로봇 경제성 분석기</title>
+<style>
+  /* ===== 전역 스타일 ===== */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --primary: #0891b2;      /* 청록 포인트 컬러 */
+    --primary-dark: #0e7490;
+    --accent: #2563eb;       /* 파란 포인트 컬러 */
+    --bg: #f1f5f9;           /* 밝은 회색 배경 */
+    --card-bg: #ffffff;
+    --text: #1e293b;
+    --text-light: #64748b;
+    --border: #e2e8f0;
+    --good: #059669;
+    --bad: #dc2626;
+  }
+  body {
+    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 24px;
+  }
+  /* ===== 헤더 ===== */
+  header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  header h1 {
+    font-size: 28px;
+    background: linear-gradient(90deg, var(--accent), var(--primary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  header p { color: var(--text-light); margin-top: 6px; font-size: 14px; }
+
+  /* ===== 레이아웃: 좌측 입력 / 우측 결과 ===== */
+  .container {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) {
+    .container { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+  }
+  .panel h2 {
+    font-size: 18px;
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--primary);
+    color: var(--primary-dark);
+  }
+
+  /* ===== 입력 필드 ===== */
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: var(--text);
+  }
+  .field input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .field input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(8,145,178,0.15);
+  }
+  .section-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--accent);
+    margin: 18px 0 10px;
+  }
+  .section-label:first-of-type { margin-top: 0; }
+
+  /* ===== 결과 카드 ===== */
+  .verdict {
+    padding: 16px 20px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .verdict.good { background: #ecfdf5; color: var(--good); border: 1px solid #a7f3d0; }
+  .verdict.bad  { background: #fef2f2; color: var(--bad);  border: 1px solid #fecaca; }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .card {
+    background: linear-gradient(135deg, #f8fafc, #eef2ff);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .card .card-title { font-size: 12px; color: var(--text-light); margin-bottom: 6px; }
+  .card .card-value { font-size: 26px; font-weight: 800; color: var(--primary-dark); }
+  .card .card-value.pos { color: var(--good); }
+  .card .card-value.neg { color: var(--bad); }
+
+  /* ===== 비용 요약 테이블 ===== */
+  .summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .cost-box {
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid var(--border);
+  }
+  .cost-box.legacy { background: #fafafa; }
+  .cost-box.robot  { background: #ecfeff; border-color: #a5f3fc; }
+  .cost-box h3 { font-size: 14px; margin-bottom: 10px; }
+  .cost-box.legacy h3 { color: var(--text-light); }
+  .cost-box.robot h3  { color: var(--primary-dark); }
+  .cost-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .cost-row:last-child { border-bottom: none; }
+  .cost-row.total { font-weight: 800; font-size: 15px; margin-top: 6px; padding-top: 8px; border-top: 2px solid var(--border); border-bottom: none; }
+
+  /* ===== 막대 그래프 (순수 CSS/JS) ===== */
+  .chart { margin-bottom: 22px; }
+  .chart h3 { font-size: 14px; margin-bottom: 12px; color: var(--text); }
+  .bar-group { margin-bottom: 14px; }
+  .bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 4px;
+    color: var(--text-light);
+  }
+  .bar-track {
+    background: #f1f5f9;
+    border-radius: 8px;
+    height: 28px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 8px;
+    transition: width .4s ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .bar-fill.legacy { background: linear-gradient(90deg, #94a3b8, #64748b); }
+  .bar-fill.robot  { background: linear-gradient(90deg, var(--accent), var(--primary)); }
+
+  /* ===== 안내 메시지 ===== */
+  .notes {
+    background: #f8fafc;
+    border-left: 4px solid var(--primary);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--text-light);
+  }
+  .notes p { margin-bottom: 6px; }
+  .notes p:last-child { margin-bottom: 0; }
+  .notes strong { color: var(--text); }
+
+  /* 입력 단위 힌트 */
+  .unit-hint { font-weight: 400; color: var(--text-light); font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AI 미장 로봇 경제성 분석기</h1>
+  <p>기존 인력 시공과 AI 자동 미장 로봇 시공의 비용·공사 기간을 실시간으로 비교 분석합니다</p>
+</header>
+
+<div class="container">
+
+  <!-- ===== 좌측: 입력 패널 ===== -->
+  <div class="panel">
+    <h2>입력값</h2>
+    <p style="font-size:12px; color:var(--text-light); margin-bottom:16px;">
+      💡 모든 <strong>금액은 천원(千원) 단위</strong>로 입력합니다. 예) 8 → 8,000원
+    </p>
+
+    <div class="section-label">공통 조건</div>
+    <div class="field">
+      <label>시공 면적 (m²)</label>
+      <input type="number" id="area" value="300" step="10" min="0">
+    </div>
+    <div class="field">
+      <label>자재 단가 <span class="unit-hint">(천원/m²)</span></label>
+      <input type="number" id="matPrice" value="8" step="1" min="0">
+    </div>
+
+    <div class="section-label">기존 인력 시공</div>
+    <div class="field">
+      <label>자재 로스율 (%)</label>
+      <input type="number" id="legacyLoss" value="10" step="1" min="0">
+    </div>
+    <div class="field">
+      <label>작업자 1인 일당 <span class="unit-hint">(천원/일)</span></label>
+      <input type="number" id="workerWage" value="180" step="10" min="0">
+    </div>
+    <div class="field">
+      <label>작업자 수 (명)</label>
+      <input type="number" id="workerCount" value="3" step="1" min="0">
+    </div>
+    <div class="field">
+      <label>기존 시공 속도 (m²/일)</label>
+      <input type="number" id="legacySpeed" value="40" step="5" min="0">
+    </div>
+    <div class="field">
+      <label>기존 시공 재작업률 (%)</label>
+      <input type="number" id="legacyRework" value="8" step="1" min="0">
+    </div>
+
+    <div class="section-label">AI 로봇 시공</div>
+    <div class="field">
+      <label>자재 로스율 (%)</label>
+      <input type="number" id="robotLoss" value="5" step="1" min="0">
+    </div>
+    <div class="field">
+      <label>AI 로봇 일일 이용료 <span class="unit-hint">(천원/일)</span></label>
+      <input type="number" id="robotDaily" value="500" step="10" min="0">
+    </div>
+    <div class="field">
+      <label>AI 로봇 초기 세팅비 <span class="unit-hint">(천원)</span></label>
+      <input type="number" id="robotSetup" value="300" step="50" min="0">
+    </div>
+    <div class="field">
+      <label>로봇 관리 인원 수 (명)</label>
+      <input type="number" id="mgrCount" value="1" step="1" min="0">
+    </div>
+    <div class="field">
+      <label>로봇 관리 인원 1인 일당 <span class="unit-hint">(천원/일)</span></label>
+      <input type="number" id="mgrWage" value="180" step="10" min="0">
+    </div>
+    <div class="field">
+      <label>AI 로봇 시공 속도 (m²/일)</label>
+      <input type="number" id="robotSpeed" value="120" step="5" min="0">
+    </div>
+    <div class="field">
+      <label>AI 로봇 시공 재작업률 (%)</label>
+      <input type="number" id="robotRework" value="3" step="1" min="0">
+    </div>
+  </div>
+
+  <!-- ===== 우측: 결과 패널 ===== -->
+  <div class="panel">
+    <h2>분석 결과</h2>
+
+    <div id="verdict" class="verdict good">—</div>
+
+    <!-- 강조 카드: 비용 절감률 / 공기 단축률 -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-title">비용 절감률</div>
+        <div class="card-value" id="costSaveRate">—</div>
+      </div>
+      <div class="card">
+        <div class="card-title">공기 단축률</div>
+        <div class="card-value" id="timeSaveRate">—</div>
+      </div>
+    </div>
+
+    <!-- 비용 상세 요약 -->
+    <div class="summary">
+      <div class="cost-box legacy">
+        <h3>기존 인력 시공</h3>
+        <div class="cost-row"><span>자재비</span><span id="L_mat">—</span></div>
+        <div class="cost-row"><span>인력비</span><span id="L_labor">—</span></div>
+        <div class="cost-row"><span>재작업 비용</span><span id="L_rework">—</span></div>
+        <div class="cost-row total"><span>총비용</span><span id="L_total">—</span></div>
+      </div>
+      <div class="cost-box robot">
+        <h3>AI 로봇 시공</h3>
+        <div class="cost-row"><span>자재비</span><span id="R_mat">—</span></div>
+        <div class="cost-row"><span>로봇 운영비</span><span id="R_op">—</span></div>
+        <div class="cost-row"><span>관리 인건비</span><span id="R_mgr">—</span></div>
+        <div class="cost-row"><span>재작업 비용</span><span id="R_rework">—</span></div>
+        <div class="cost-row"><span>초기 세팅비</span><span id="R_setup">—</span></div>
+        <div class="cost-row total"><span>총비용</span><span id="R_total">—</span></div>
+      </div>
+    </div>
+
+    <!-- 총비용 비교 막대그래프 -->
+    <div class="chart">
+      <h3>총비용 비교</h3>
+      <div class="bar-group">
+        <div class="bar-label"><span>기존 인력 시공</span><span id="barCostLegacyTxt">—</span></div>
+        <div class="bar-track"><div class="bar-fill legacy" id="barCostLegacy"></div></div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-label"><span>AI 로봇 시공</span><span id="barCostRobotTxt">—</span></div>
+        <div class="bar-track"><div class="bar-fill robot" id="barCostRobot"></div></div>
+      </div>
+    </div>
+
+    <!-- 공사 기간 비교 막대그래프 -->
+    <div class="chart">
+      <h3>공사 기간 비교</h3>
+      <div class="bar-group">
+        <div class="bar-label"><span>기존 인력 시공</span><span id="barTimeLegacyTxt">—</span></div>
+        <div class="bar-track"><div class="bar-fill legacy" id="barTimeLegacy"></div></div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-label"><span>AI 로봇 시공</span><span id="barTimeRobotTxt">—</span></div>
+        <div class="bar-track"><div class="bar-fill robot" id="barTimeRobot"></div></div>
+      </div>
+    </div>
+
+    <!-- 손익분기 & 해설 -->
+    <div class="notes" id="notes"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   AI 미장 로봇 경제성 분석기 - 계산 로직
+   입력값이 바뀔 때마다 calculate() 가 실행되어 실시간 갱신
+
+   ※ 금액 입력은 모두 '천원' 단위 → 계산 시 ×1000 하여 '원'으로 변환
+   ※ 자재 로스율은 기존/로봇 각각 별도로 입력받음
+   ========================================================= */
+
+// 천원 → 원 변환 상수
+const K = 1000;
+
+// 숫자를 원 단위 천단위 쉼표 형식으로 변환 (예: 1234567 -> "1,234,567원")
+function won(n) {
+  return Math.round(n).toLocaleString('ko-KR') + '원';
+}
+// 퍼센트 표시 (소수점 1자리)
+function pct(n) {
+  return n.toFixed(1) + '%';
+}
+// 입력 필드 값을 숫자로 읽기 (빈값이면 0)
+function val(id) {
+  const v = parseFloat(document.getElementById(id).value);
+  return isNaN(v) ? 0 : v;
+}
+// 천원 단위 입력 필드를 '원'으로 읽기
+function wonVal(id) {
+  return val(id) * K;
+}
+
+function calculate() {
+  // ----- 입력값 읽기 -----
+  const area        = val('area');           // 시공 면적(m²)
+  const matPrice    = wonVal('matPrice');    // 자재 단가(원/m²) ← 천원 입력
+
+  // 기존 인력 시공
+  const legacyLoss  = val('legacyLoss');     // 기존 자재 로스율(%)
+  const workerWage  = wonVal('workerWage');  // 기존 작업자 1인 일당(원/일) ← 천원 입력
+  const workerCount = val('workerCount');    // 기존 작업자 수(명)
+  const legacySpeed = val('legacySpeed');    // 기존 시공 속도(m²/일)
+  const legacyRework= val('legacyRework');   // 기존 시공 재작업률(%)
+
+  // AI 로봇 시공
+  const robotLoss   = val('robotLoss');      // 로봇 자재 로스율(%)
+  const robotDaily  = wonVal('robotDaily');  // AI 로봇 일일 이용료(원/일) ← 천원 입력
+  const robotSetup  = wonVal('robotSetup');  // AI 로봇 초기 세팅비(원) ← 천원 입력
+  const mgrCount    = val('mgrCount');       // 로봇 관리 인원 수(명)
+  const mgrWage     = wonVal('mgrWage');     // 로봇 관리 인원 1인 일당(원/일) ← 천원 입력
+  const robotSpeed  = val('robotSpeed');     // AI 로봇 시공 속도(m²/일)
+  const robotRework = val('robotRework');    // AI 로봇 시공 재작업률(%)
+
+  // ----- 공사 기간 계산 -----
+  // 1. 기존 시공 기간 = 시공 면적 / 기존 시공 속도
+  const legacyDays = legacySpeed > 0 ? area / legacySpeed : 0;
+  // 2. AI 로봇 시공 기간 = 시공 면적 / AI 로봇 시공 속도
+  const robotDays  = robotSpeed  > 0 ? area / robotSpeed  : 0;
+
+  // ----- 자재비 (로스율이 방식별로 다르므로 각각 계산) -----
+  // 3. 자재비 = 면적 × 단가 × (1 + 로스율/100)
+  const legacyMatCost = area * matPrice * (1 + legacyLoss / 100); // 기존 방식 자재비
+  const robotMatCost  = area * matPrice * (1 + robotLoss  / 100); // 로봇 방식 자재비
+
+  // ----- 기존 인력 시공 비용 -----
+  // 4. 기존 인력비 = 기간 × 작업자 수 × 1인 일당
+  const legacyLabor  = legacyDays * workerCount * workerWage;
+  // 7. 기존 재작업 비용 = 기존 자재비 × 기존 재작업률/100
+  const legacyReworkCost = legacyMatCost * legacyRework / 100;
+  // 9. 기존 총비용 = 자재비 + 인력비 + 재작업 비용
+  const legacyTotal  = legacyMatCost + legacyLabor + legacyReworkCost;
+
+  // ----- AI 로봇 시공 비용 -----
+  // 5. 로봇 운영비 = 기간 × 일일 이용료
+  const robotOp    = robotDays * robotDaily;
+  // 6. 로봇 관리 인건비 = 기간 × 관리 인원 수 × 1인 일당
+  const robotMgr   = robotDays * mgrCount * mgrWage;
+  // 8. AI 로봇 재작업 비용 = 로봇 자재비 × 로봇 재작업률/100
+  const robotReworkCost = robotMatCost * robotRework / 100;
+  // 10. AI 로봇 총비용 = 자재비 + 운영비 + 관리비 + 재작업비 + 초기 세팅비
+  const robotTotal = robotMatCost + robotOp + robotMgr + robotReworkCost + robotSetup;
+
+  // ----- 절감 지표 -----
+  // 11. 비용 절감액 = 기존 총비용 - 로봇 총비용
+  const costSave    = legacyTotal - robotTotal;
+  // 12. 비용 절감률 = 절감액 / 기존 총비용 × 100
+  const costSaveRate= legacyTotal > 0 ? costSave / legacyTotal * 100 : 0;
+  // 13. 공기 단축률 = (기존 기간 - 로봇 기간) / 기존 기간 × 100
+  const timeSaveRate= legacyDays > 0 ? (legacyDays - robotDays) / legacyDays * 100 : 0;
+
+  /* ===== 손익분기 면적 추정 =====
+     면적에 따라 변하는 '단위면적당 비용(원/m²)'을 비교한다.
+     - 자재비/인력비/운영비/재작업비는 면적에 비례 → 단위면적당 일정.
+     - 로봇 방식의 '초기 세팅비'는 면적과 무관한 고정비 → 면적이 커질수록 단위비용이 낮아진다.
+     세팅비를 제외한 '면적 비례 단위비용'을 양쪽에서 구해 비교한 뒤,
+     세팅비를 회수할 수 있는 손익분기 면적을 구한다.
+
+     단위면적당(고정비 제외) 비용:
+       기존: legacyPerArea = 자재단가×(1+기존로스율/100)×(1+기존재작업률/100) + (인원×일당)/속도
+       로봇: robotPerArea  = 자재단가×(1+로봇로스율/100)×(1+로봇재작업률/100) + (일일이용료+관리인원×일당)/로봇속도
+     손익분기 면적 = 세팅비 / (기존단위비용 - 로봇단위비용)   (분모가 양수일 때만 유효) */
+  const legacyPerArea = matPrice * (1 + legacyLoss/100) * (1 + legacyRework/100)
+                      + (legacySpeed > 0 ? (workerCount * workerWage) / legacySpeed : 0);
+  const robotPerArea  = matPrice * (1 + robotLoss/100) * (1 + robotRework/100)
+                      + (robotSpeed  > 0 ? (robotDaily + mgrCount * mgrWage) / robotSpeed : 0);
+  const perAreaDiff = legacyPerArea - robotPerArea; // 1m²당 로봇이 절약하는 금액
+  let breakEvenText;
+  if (perAreaDiff > 0) {
+    const breakEvenArea = robotSetup / perAreaDiff;
+    breakEvenText = '약 <strong>' + Math.ceil(breakEvenArea).toLocaleString('ko-KR')
+                  + ' m²</strong> 이상이면 AI 로봇 도입이 경제적입니다. '
+                  + '(1m²당 약 ' + won(perAreaDiff) + ' 절감)';
+  } else {
+    breakEvenText = '현재 조건에서는 손익분기 면적 산정이 어렵습니다. '
+                  + '(단위면적당 로봇 시공 비용이 기존 방식보다 높습니다)';
+  }
+
+  // ===== 화면 출력 =====
+  // 종합 판정
+  const verdict = document.getElementById('verdict');
+  if (robotTotal < legacyTotal) {
+    verdict.className = 'verdict good';
+    verdict.innerHTML = '✅ AI 로봇 도입이 경제적입니다';
+  } else {
+    verdict.className = 'verdict bad';
+    verdict.innerHTML = '⚠️ 현재 조건에서는 기존 인력 시공이 더 경제적입니다';
+  }
+
+  // 강조 카드
+  const csr = document.getElementById('costSaveRate');
+  csr.textContent = pct(costSaveRate);
+  csr.className = 'card-value ' + (costSaveRate >= 0 ? 'pos' : 'neg');
+
+  const tsr = document.getElementById('timeSaveRate');
+  tsr.textContent = pct(timeSaveRate);
+  tsr.className = 'card-value ' + (timeSaveRate >= 0 ? 'pos' : 'neg');
+
+  // 기존 시공 비용 상세
+  document.getElementById('L_mat').textContent    = won(legacyMatCost);
+  document.getElementById('L_labor').textContent  = won(legacyLabor);
+  document.getElementById('L_rework').textContent = won(legacyReworkCost);
+  document.getElementById('L_total').textContent  = won(legacyTotal);
+
+  // AI 로봇 시공 비용 상세
+  document.getElementById('R_mat').textContent    = won(robotMatCost);
+  document.getElementById('R_op').textContent     = won(robotOp);
+  document.getElementById('R_mgr').textContent    = won(robotMgr);
+  document.getElementById('R_rework').textContent = won(robotReworkCost);
+  document.getElementById('R_setup').textContent  = won(robotSetup);
+  document.getElementById('R_total').textContent  = won(robotTotal);
+
+  // ----- 총비용 막대그래프 -----
+  const maxCost = Math.max(legacyTotal, robotTotal, 1);
+  document.getElementById('barCostLegacy').style.width = (legacyTotal / maxCost * 100) + '%';
+  document.getElementById('barCostRobot').style.width  = (robotTotal  / maxCost * 100) + '%';
+  document.getElementById('barCostLegacyTxt').textContent = won(legacyTotal);
+  document.getElementById('barCostRobotTxt').textContent  = won(robotTotal);
+
+  // ----- 공사 기간 막대그래프 -----
+  const maxDays = Math.max(legacyDays, robotDays, 0.1);
+  document.getElementById('barTimeLegacy').style.width = (legacyDays / maxDays * 100) + '%';
+  document.getElementById('barTimeRobot').style.width  = (robotDays  / maxDays * 100) + '%';
+  document.getElementById('barTimeLegacyTxt').textContent = legacyDays.toFixed(1) + '일';
+  document.getElementById('barTimeRobotTxt').textContent  = robotDays.toFixed(1) + '일';
+
+  // ----- 해설 메시지 -----
+  let notes = '';
+  // 공기 단축 안내
+  if (timeSaveRate > 0) {
+    notes += '<p>⏱️ <strong>AI 로봇 사용 시 공사 기간이 단축됩니다.</strong> '
+           + '약 ' + (legacyDays - robotDays).toFixed(1) + '일 단축 효과가 있습니다.</p>';
+  } else {
+    notes += '<p>⏱️ 현재 조건에서는 AI 로봇의 공기 단축 효과가 없습니다.</p>';
+  }
+  // 자재 로스율 비교 안내
+  if (robotLoss < legacyLoss) {
+    notes += '<p>♻️ AI 로봇이 기존 대비 자재 로스율을 <strong>'
+           + (legacyLoss - robotLoss).toFixed(0) + '%p</strong> 낮춰 자재비를 절감합니다.</p>';
+  }
+  // 손익분기 면적
+  notes += '<p>📐 <strong>손익분기 면적:</strong> ' + breakEvenText + '</p>';
+  // 면적-세팅비 관계 설명
+  notes += '<p>🔻 시공 면적이 <strong>작을수록</strong> 초기 세팅비('
+         + won(robotSetup) + ')의 부담이 커져 AI 로봇이 불리해질 수 있습니다.</p>';
+  notes += '<p>🔺 시공 면적이 <strong>커질수록</strong> 초기 세팅비가 분산되고 '
+         + '빠른 시공 속도의 이점이 커져 AI 로봇의 경제성이 높아집니다.</p>';
+  document.getElementById('notes').innerHTML = notes;
+}
+
+// ===== 모든 입력 필드에 실시간 이벤트 연결 =====
+document.querySelectorAll('input').forEach(function(inp) {
+  inp.addEventListener('input', calculate);
+});
+
+// 최초 1회 계산 실행
+calculate();
+</script>
+
+</body>
+</html>
+...

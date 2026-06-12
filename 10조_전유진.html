@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>환기량 & 에너지 비용 통합 시뮬레이터</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+        }
+
+        body {
+            background-color: #f4f7f6;
+            color: #333;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .dashboard-container {
+            display: flex;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .input-panel, .output-panel {
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        /* 왼쪽 입력부 */
+        .input-panel {
+            flex: 0 0 35%; 
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            background-color: #f9fbfb;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+
+        h2 { margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h3 { font-size: 16px; margin-bottom: 15px; color: #2980b9; }
+
+        label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+            align-items: center;
+        }
+
+        input {
+            width: 80px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: right;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover { background-color: #1a252f; }
+
+        /* 오른쪽 출력부 */
+        .output-panel {
+            flex: 1; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        .summary-cards {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .card {
+            flex: 1;
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .card h4 { color: #7f8c8d; margin-bottom: 10px; font-size: 14px; }
+        .card p { font-size: 24px; font-weight: bold; color: #27ae60; }
+
+        .card.alert p { color: #e74c3c; } 
+
+        .chart-container {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            min-height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>실내 환기 및 난방 에너지 시뮬레이터</h1>
+        <p>환기에 따른 CO2 농도 감소와 열손실 비용의 상관관계를 분석합니다.</p>
+    </header>
+
+    <main class="dashboard-container">
+        <section class="input-panel">
+            <h2>조건 입력</h2>
+            
+            <div class="input-group">
+                <h3>1. 공간 체적 (Volume)</h3>
+                <label>가로 (m): <input type="number" id="width" value="5"></label>
+                <label>세로 (m): <input type="number" id="length" value="4"></label>
+                <label>높이 (m): <input type="number" id="height" value="2.8"></label>
+            </div>
+
+            <div class="input-group">
+                <h3>2. 환경 변수</h3>
+                <label>초기 실내 CO2 (ppm): <input type="number" id="co2-in" value="2000"></label>
+                <label>환기 횟수 (ACH): <input type="number" id="ach" value="1.5" step="0.1"></label>
+                <label>실내외 온도차 (ΔT, °C): <input type="number" id="temp-diff" value="20"></label>
+            </div>
+
+            <button id="calculate-btn">시뮬레이션 실행</button>
+        </section>
+
+        <section class="output-panel">
+            <h2>분석 결과</h2>
+            
+            <div class="summary-cards">
+                <div class="card">
+                    <h4>안전 농도 도달 시간</h4>
+                    <p id="safe-time-result">-- 분</p>
+                </div>
+                <div class="card alert">
+                    <h4>추가 난방 요구량 (비용)</h4>
+                    <p id="energy-cost-result">-- 원/일</p>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="co2Chart"></canvas>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let co2ChartInstance = null;
+
+        function runSimulation() {
+            const width = parseFloat(document.getElementById('width').value);
+            const length = parseFloat(document.getElementById('length').value);
+            const height = parseFloat(document.getElementById('height').value);
+            
+            const co2In = parseFloat(document.getElementById('co2-in').value);
+            const ach = parseFloat(document.getElementById('ach').value);
+            const tempDiff = parseFloat(document.getElementById('temp-diff').value);
+
+            const volume = width * length * height;
+            const targetCo2 = 1000; // 안전 농도 기준
+            const outCo2 = 400; // 외부 기본 농도
+
+            // 1. 안전 농도 도달 시간 계산 (C_in > targetCo2 일 때)
+            let safeTimeMin = 0;
+            if (co2In > targetCo2 && ach > 0) {
+                const ratio = (targetCo2 - outCo2) / (co2In - outCo2);
+                if (ratio > 0) {
+                    const hours = -Math.log(ratio) / ach;
+                    safeTimeMin = Math.round(hours * 60);
+                }
+            }
+            
+            const safeTimeEl = document.getElementById('safe-time-result');
+            if (safeTimeMin > 0) {
+                safeTimeEl.innerText = `${safeTimeMin} 분`;
+            } else if (co2In <= targetCo2) {
+                safeTimeEl.innerText = '이미 안전 수준';
+            } else {
+                safeTimeEl.innerText = '환기 필요';
+            }
+
+            // 2. 추가 난방 요구량 (비용) 계산
+            // Q = c * rho * V * delta(T)
+            const c = 1.006; // 공기의 비열 (kJ/kg.℃)
+            const rho = 1.2; // 공기의 밀도 (kg/m3)
+            const vPerHour = volume * ach; // V: 환기량 (m3/h)
+            
+            // 시간당 필요 열량 (kJ/h)
+            const qKjPerHour = c * rho * vPerHour * tempDiff;
+            
+            // 일일 에너지 요구량 (kWh/일) - 1kWh = 3600kJ
+            const energyKwhPerDay = (qKjPerHour * 24) / 3600;
+            
+            const costPerKwh = 100; // 임의 가정 단가: 100원/kWh
+            const dailyCost = Math.round(energyKwhPerDay * costPerKwh);
+
+            document.getElementById('energy-cost-result').innerText = `${dailyCost.toLocaleString()} 원/일`;
+
+            // 3. 차트 그리기
+            drawChart(co2In, outCo2, ach);
+        }
+
+        function drawChart(initialCo2, outCo2, ach) {
+            const ctx = document.getElementById('co2Chart').getContext('2d');
+            
+            const timeLabels = [];
+            const dataPoints = [];
+            
+            for(let m = 0; m <= 120; m += 10) {
+                timeLabels.push(`${m}분`);
+                const hours = m / 60;
+                // C(t) = C_out + (C_in - C_out) * e^(-ACH * t)
+                const currentCo2 = outCo2 + (initialCo2 - outCo2) * Math.exp(-ach * hours);
+                dataPoints.push(Math.round(currentCo2));
+            }
+
+            if (co2ChartInstance) {
+                co2ChartInstance.destroy();
+            }
+
+            co2ChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timeLabels,
+                    datasets: [{
+                        label: '실내 CO2 농도 (ppm)',
+                        data: dataPoints,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3
+                    },
+                    {
+                        label: '권장 기준선 (1000ppm)',
+                        data: Array(timeLabels.length).fill(1000),
+                        borderColor: '#e74c3c',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        fill: false,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            suggestedMin: 400
+                        }
+                    }
+                }
+            });
+        }
+
+        document.getElementById('calculate-btn').addEventListener('click', runSimulation);
+        window.addEventListener('load', runSimulation);
+    </script>
+</body>
+</html>
