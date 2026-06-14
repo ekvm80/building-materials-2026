@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Glass Thermal Diagnostic Pro — 건축용 유리 열파손 정밀 진단 시뮬레이터</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: 'JetBrains Mono', 'Noto Sans KR', monospace; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: rgba(15,23,42,0.4); }
+  ::-webkit-scrollbar-thumb { background: rgba(71,85,105,0.6); border-radius: 4px; }
+  select option { background: #0f172a; color: #94a3b8; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+
+const { useState, useEffect, useRef } = React;
+
+// ─── INLINE ICONS (lucide-style, dependency-free) ──────────────
+function IconBase({ children, size = 14, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {children}
+    </svg>
+  );
+}
+const Layers = (p) => (
+  <IconBase {...p}>
+    <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+    <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
+    <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
+  </IconBase>
+);
+const Thermometer = (p) => (
+  <IconBase {...p}>
+    <path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z" />
+  </IconBase>
+);
+const AlertTriangle = (p) => (
+  <IconBase {...p}>
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+    <path d="M12 9v4" />
+    <path d="M12 17h.01" />
+  </IconBase>
+);
+const Activity = (p) => (
+  <IconBase {...p}>
+    <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
+  </IconBase>
+);
+const BarChart2 = (p) => (
+  <IconBase {...p}>
+    <path d="M3 3v18h18" />
+    <path d="M18 17V9" />
+    <path d="M13 17V5" />
+    <path d="M8 17v-3" />
+  </IconBase>
+);
+const Eye = (p) => (
+  <IconBase {...p}>
+    <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+    <circle cx="12" cy="12" r="3" />
+  </IconBase>
+);
+const Cpu = (p) => (
+  <IconBase {...p}>
+    <rect x="4" y="4" width="16" height="16" rx="2" />
+    <rect x="9" y="9" width="6" height="6" />
+    <path d="M15 2v2" /><path d="M15 20v2" />
+    <path d="M2 15h2" /><path d="M2 9h2" />
+    <path d="M20 15h2" /><path d="M20 9h2" />
+    <path d="M9 2v2" /><path d="M9 20v2" />
+  </IconBase>
+);
+const FileText = (p) => (
+  <IconBase {...p}>
+    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+    <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+    <path d="M10 9H8" />
+    <path d="M16 13H8" />
+    <path d="M16 17H8" />
+  </IconBase>
+);
+
+// ─── CONSTANTS ────────────────────────────────────────────────
+const GLASS_DB = {
+  annealed: {
+    name: "일반 판유리",
+    nameEn: "Annealed Glass",
+    strengthMult: 1.0,
+    thermalResist: 40,
+    surfaceCompression: 0,
+    edgeTension: 8,
+    breakType: "shard",
+    baseRisk: 62,
+    color: "#ef4444",
+    modulus: 70,
+    poisson: 0.23,
+    expansion: 8.5e-6,
+    desc: "취성 파괴, 날카로운 대형 파편 비산"
+  },
+  heat_strengthened: {
+    name: "배강도유리",
+    nameEn: "Heat-Strengthened Glass",
+    strengthMult: 2.0,
+    thermalResist: 100,
+    surfaceCompression: 35,
+    edgeTension: 5,
+    breakType: "radial",
+    baseRisk: 32,
+    color: "#f59e0b",
+    modulus: 70,
+    poisson: 0.23,
+    expansion: 8.5e-6,
+    desc: "방사형 균열, 큼직한 파편 유지"
+  },
+  tempered: {
+    name: "강화유리",
+    nameEn: "Tempered Glass",
+    strengthMult: 4.0,
+    thermalResist: 200,
+    surfaceCompression: 95,
+    edgeTension: 2,
+    breakType: "diced",
+    baseRisk: 14,
+    color: "#22c55e",
+    modulus: 70,
+    poisson: 0.23,
+    expansion: 8.5e-6,
+    desc: "둥근 입방형 소파편 분쇄, 비산 위험 낮음"
+  },
+  laminated: {
+    name: "접합유리",
+    nameEn: "Laminated Glass",
+    strengthMult: 1.5,
+    thermalResist: 60,
+    surfaceCompression: 0,
+    edgeTension: 7,
+    breakType: "laminated",
+    baseRisk: 28,
+    color: "#3b82f6",
+    modulus: 70,
+    poisson: 0.23,
+    expansion: 8.5e-6,
+    desc: "PVB 필름 결합, 파편 비산 방지"
+  }
+};
+
+const THICKNESS_DB = { 5: 1.0, 6: 0.92, 8: 0.78, 12: 0.62 };
+const COATING_DB = { none: 0, loe: -12 };
+const ORIENTATION_DB = { south: 28, north: 0 };
+const FRAME_DB = { aluminum: 18, plastic: 0 };
+
+// ─── BREAK PATTERN VISUALIZER ─────────────────────────────────
+function BreakPatternCanvas({ breakType }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+    bgGrad.addColorStop(0, "rgba(148,163,184,0.12)");
+    bgGrad.addColorStop(1, "rgba(100,116,139,0.06)");
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = "rgba(148,163,184,0.3)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+
+    if (breakType === "shard") {
+      ctx.strokeStyle = "rgba(239,68,68,0.85)";
+      ctx.lineWidth = 1.5;
+      const shards = [
+        [[20,10],[80,5],[95,60],[70,90],[15,85]],
+        [[80,5],[W-10,15],[W-15,70],[95,60]],
+        [[95,60],[W-15,70],[W-10,H-10],[80,H-5],[70,90]],
+        [[15,85],[70,90],[80,H-5],[10,H-10]],
+        [[70,90],[80,H-5],[W-10,H-10],[95,60]],
+      ];
+      shards.forEach(pts => {
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        pts.slice(1).forEach(p => ctx.lineTo(p[0], p[1]));
+        ctx.closePath();
+        ctx.fillStyle = "rgba(239,68,68,0.06)";
+        ctx.fill();
+        ctx.stroke();
+      });
+      ctx.strokeStyle = "rgba(239,68,68,0.6)";
+      ctx.lineWidth = 0.8;
+      [[20,30,85,75],[60,10,40,95],[15,60,95,45],[50,5,55,H-5]].forEach(([x1,y1,x2,y2]) => {
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      });
+    }
+
+    else if (breakType === "radial") {
+      const cx = W/2, cy = H/2;
+      ctx.strokeStyle = "rgba(245,158,11,0.8)";
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2 + 0.2;
+        const len = 35 + Math.random() * 25;
+        ctx.beginPath();
+        ctx.moveTo(cx + 4*Math.cos(angle), cy + 4*Math.sin(angle));
+        ctx.lineTo(cx + len*Math.cos(angle), cy + len*Math.sin(angle));
+        ctx.stroke();
+        if (i % 2 === 0) {
+          const bAngle = angle + 0.4;
+          ctx.beginPath();
+          ctx.moveTo(cx + 20*Math.cos(angle), cy + 20*Math.sin(angle));
+          ctx.lineTo(cx + 20*Math.cos(angle) + 15*Math.cos(bAngle), cy + 20*Math.sin(angle) + 15*Math.sin(bAngle));
+          ctx.stroke();
+        }
+      }
+      [18, 38].forEach(r => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(245,158,11,0.45)";
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      });
+      ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI*2);
+      ctx.fillStyle = "rgba(245,158,11,0.5)"; ctx.fill();
+    }
+
+    else if (breakType === "diced") {
+      const cellSize = 10;
+      for (let row = 0; row < Math.ceil(H/cellSize); row++) {
+        for (let col = 0; col < Math.ceil(W/cellSize); col++) {
+          const x = col * cellSize + (row % 2 === 0 ? 0 : cellSize/2);
+          const y = row * cellSize * 0.86;
+          const jitter = 1.5;
+          const rx = x + (Math.random()-0.5)*jitter;
+          const ry = y + (Math.random()-0.5)*jitter;
+          const sz = cellSize * (0.7 + Math.random()*0.25);
+          ctx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const a = (i/6)*Math.PI*2 - Math.PI/6;
+            const px = rx + sz/2*Math.cos(a), py = ry + sz/2*Math.sin(a);
+            i === 0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+          }
+          ctx.closePath();
+          ctx.fillStyle = `rgba(34,197,94,${0.05+Math.random()*0.08})`;
+          ctx.fill();
+          ctx.strokeStyle = "rgba(34,197,94,0.6)";
+          ctx.lineWidth = 0.6;
+          ctx.stroke();
+        }
+      }
+    }
+
+    else if (breakType === "laminated") {
+      ctx.strokeStyle = "rgba(59,130,246,0.7)";
+      ctx.lineWidth = 1;
+      const pts = [];
+      for (let i = 0; i < 12; i++) pts.push([15+Math.random()*(W-30), 15+Math.random()*(H-30)]);
+      pts.forEach((p,i) => {
+        if (i < pts.length - 1) {
+          ctx.beginPath(); ctx.moveTo(p[0],p[1]); ctx.lineTo(pts[i+1][0],pts[i+1][1]); ctx.stroke();
+        }
+        ctx.beginPath(); ctx.arc(p[0],p[1],2,0,Math.PI*2);
+        ctx.fillStyle = "rgba(59,130,246,0.5)"; ctx.fill();
+      });
+      const filmGrad = ctx.createLinearGradient(0,0,0,H);
+      filmGrad.addColorStop(0,"rgba(59,130,246,0.0)");
+      filmGrad.addColorStop(0.48,"rgba(59,130,246,0.08)");
+      filmGrad.addColorStop(0.52,"rgba(59,130,246,0.18)");
+      filmGrad.addColorStop(1,"rgba(59,130,246,0.0)");
+      ctx.fillStyle = filmGrad; ctx.fillRect(0,0,W,H);
+      ctx.fillStyle = "rgba(147,197,253,0.7)";
+      ctx.font = "8px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("PVB FILM", W/2, H/2+1);
+    }
+  }, [breakType]);
+
+  return <canvas ref={canvasRef} width={120} height={110} style={{ display:"block", borderRadius:6 }} />;
+}
+
+// ─── ANIMATED RISK GAUGE ──────────────────────────────────────
+function RiskGauge({ value }) {
+  const canvasRef = useRef(null);
+  const animRef = useRef(null);
+  const currentRef = useRef(0);
+
+  useEffect(() => {
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    const target = value;
+    const draw = () => {
+      const diff = target - currentRef.current;
+      if (Math.abs(diff) > 0.3) {
+        currentRef.current += diff * 0.08;
+        renderGauge(canvasRef.current, currentRef.current);
+        animRef.current = requestAnimationFrame(draw);
+      } else {
+        currentRef.current = target;
+        renderGauge(canvasRef.current, target);
+      }
+    };
+    animRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [value]);
+
+  return <canvas ref={canvasRef} width={260} height={160} style={{ display:"block", margin:"0 auto" }} />;
+}
+
+function renderGauge(canvas, val) {
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H * 0.72, R = 88;
+  ctx.clearRect(0,0,W,H);
+
+  ctx.beginPath(); ctx.arc(cx,cy,R+10,Math.PI,2*Math.PI);
+  ctx.strokeStyle = "rgba(51,65,85,0.6)"; ctx.lineWidth=2; ctx.stroke();
+
+  const segments = [
+    { from:0, to:0.33, c2:"#1e40af" },
+    { from:0.33, to:0.66, c2:"#d97706" },
+    { from:0.66, to:1.0, c2:"#ef4444" },
+  ];
+  segments.forEach(s => {
+    const a1 = Math.PI + s.from*Math.PI, a2 = Math.PI + s.to*Math.PI;
+    ctx.beginPath(); ctx.arc(cx,cy,R,a1,a2);
+    ctx.strokeStyle = s.c2 + "55"; ctx.lineWidth=20; ctx.lineCap="butt"; ctx.stroke();
+  });
+
+  const fillEnd = Math.PI + (val/100)*Math.PI;
+  const fillGrad = ctx.createLinearGradient(cx-R,cy,cx+R,cy);
+  fillGrad.addColorStop(0,"#3b82f6");
+  fillGrad.addColorStop(0.45,"#f59e0b");
+  fillGrad.addColorStop(1,"#ef4444");
+  if (val > 0) {
+    ctx.beginPath(); ctx.arc(cx,cy,R,Math.PI,fillEnd);
+    ctx.strokeStyle=fillGrad; ctx.lineWidth=20; ctx.lineCap="round"; ctx.stroke();
+  }
+
+  const needleAngle = Math.PI + (val/100)*Math.PI;
+  const nx = cx + R*Math.cos(needleAngle), ny = cy + R*Math.sin(needleAngle);
+  const glow = ctx.createRadialGradient(nx,ny,0,nx,ny,14);
+  glow.addColorStop(0, val > 66 ? "rgba(239,68,68,0.5)" : val > 33 ? "rgba(245,158,11,0.4)" : "rgba(59,130,246,0.4)");
+  glow.addColorStop(1,"transparent");
+  ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(nx,ny,14,0,Math.PI*2); ctx.fill();
+
+  for (let i=0; i<=10; i++) {
+    const a = Math.PI + (i/10)*Math.PI;
+    const isMaj = i%5===0;
+    const r1 = R - (isMaj?16:10), r2 = R + (isMaj?12:6);
+    ctx.beginPath();
+    ctx.moveTo(cx+r1*Math.cos(a), cy+r1*Math.sin(a));
+    ctx.lineTo(cx+r2*Math.cos(a), cy+r2*Math.sin(a));
+    ctx.strokeStyle = isMaj ? "rgba(148,163,184,0.9)" : "rgba(100,116,139,0.5)";
+    ctx.lineWidth = isMaj?1.5:0.8; ctx.stroke();
+  }
+  ["0","25","50","75","100"].forEach((lbl,i) => {
+    const a = Math.PI + (i/4)*Math.PI;
+    ctx.fillStyle="rgba(100,116,139,0.8)"; ctx.font="bold 9px monospace";
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(lbl, cx+(R+26)*Math.cos(a), cy+(R+26)*Math.sin(a));
+  });
+
+  ctx.save(); ctx.translate(cx,cy);
+  const na = (val/100)*Math.PI;
+  ctx.rotate(Math.PI + na);
+  const needleColor = val > 66 ? "#ef4444" : val > 33 ? "#f59e0b" : "#3b82f6";
+  ctx.beginPath();
+  ctx.moveTo(-5,0); ctx.lineTo(R-24,0);
+  ctx.strokeStyle=needleColor; ctx.lineWidth=2.5; ctx.lineCap="round"; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-5,0); ctx.lineTo(-12,0);
+  ctx.strokeStyle="rgba(100,116,139,0.5)"; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,7,0,Math.PI*2);
+  ctx.fillStyle="#1e293b"; ctx.fill();
+  ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2);
+  ctx.fillStyle=needleColor; ctx.fill();
+  ctx.restore();
+
+  const color = val>66?"#ef4444":val>33?"#f59e0b":"#3b82f6";
+  ctx.fillStyle=color; ctx.font="bold 28px monospace";
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText(`${Math.round(val)}%`, cx, cy-8);
+  ctx.fillStyle="rgba(148,163,184,0.7)"; ctx.font="10px monospace";
+  ctx.fillText("THERMAL RISK INDEX", cx, cy+10);
+}
+
+// ─── STRESS PROFILE ───────────────────────────────────────────
+function StressProfile({ glassData }) {
+  const { surfaceCompression, edgeTension } = glassData;
+  const maxComp = 95;
+  return (
+    <div style={{ fontFamily:"monospace" }}>
+      <div style={{ fontSize:10, color:"#64748b", marginBottom:8, letterSpacing:"0.08em" }}>RESIDUAL STRESS DISTRIBUTION</div>
+      <div style={{ position:"relative", height:40, borderRadius:4, overflow:"hidden", background:"rgba(15,23,42,0.6)", border:"1px solid rgba(51,65,85,0.5)", marginBottom:10 }}>
+        <div style={{ position:"absolute", left:0, top:0, width:`${(surfaceCompression/maxComp)*30}%`, height:"100%", background:"linear-gradient(90deg,rgba(59,130,246,0.15),rgba(59,130,246,0.55))", borderRight:"1px solid rgba(59,130,246,0.4)" }} />
+        <div style={{ position:"absolute", right:0, top:0, width:`${(surfaceCompression/maxComp)*30}%`, height:"100%", background:"linear-gradient(270deg,rgba(59,130,246,0.15),rgba(59,130,246,0.55))", borderLeft:"1px solid rgba(59,130,246,0.4)" }} />
+        <div style={{ position:"absolute", left:`${(surfaceCompression/maxComp)*30}%`, top:0, width:`${100-(surfaceCompression/maxComp)*60}%`, height:"100%", background:"linear-gradient(90deg,rgba(239,68,68,0.0),rgba(239,68,68,0.35),rgba(239,68,68,0.0))" }} />
+        <div style={{ position:"absolute", left:4, top:"50%", transform:"translateY(-50%)", fontSize:8, color:"rgba(147,197,253,0.8)", fontWeight:600 }}>C</div>
+        <div style={{ position:"absolute", right:4, top:"50%", transform:"translateY(-50%)", fontSize:8, color:"rgba(147,197,253,0.8)", fontWeight:600 }}>C</div>
+        <div style={{ position:"absolute", left:"50%", top:"50%", transform:"translate(-50%,-50%)", fontSize:8, color:"rgba(252,165,165,0.8)", fontWeight:600, whiteSpace:"nowrap" }}>T</div>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+        <MetricMini label="표면 압축응력" value={`${surfaceCompression} MPa`} color="#3b82f6" />
+        <MetricMini label="중앙 인장응력" value={`${edgeTension} MPa`} color="#ef4444" />
+      </div>
+    </div>
+  );
+}
+
+function MetricMini({ label, value, color }) {
+  return (
+    <div style={{ background:"rgba(15,23,42,0.5)", border:"1px solid rgba(51,65,85,0.4)", borderRadius:6, padding:"6px 8px" }}>
+      <div style={{ fontSize:9, color:"#475569", letterSpacing:"0.06em", marginBottom:2 }}>{label}</div>
+      <div style={{ fontSize:13, fontWeight:700, color, fontFamily:"monospace" }}>{value}</div>
+    </div>
+  );
+}
+
+// ─── FORMULA BLOCK ────────────────────────────────────────────
+function FormulaBlock({ label, formula, result, unit, color = "#38bdf8" }) {
+  return (
+    <div style={{ background:"rgba(15,23,42,0.6)", border:`1px solid ${color}30`, borderLeft:`2px solid ${color}`, borderRadius:"0 6px 6px 0", padding:"10px 12px", marginBottom:8 }}>
+      <div style={{ fontSize:9, color:"#64748b", letterSpacing:"0.1em", marginBottom:4 }}>{label}</div>
+      <div style={{ fontSize:11, color:"rgba(148,163,184,0.8)", fontFamily:"monospace", marginBottom:4 }}>{formula}</div>
+      <div style={{ fontSize:14, fontWeight:700, color, fontFamily:"monospace" }}>{result} <span style={{ fontSize:10, fontWeight:400, color:"#64748b" }}>{unit}</span></div>
+    </div>
+  );
+}
+
+// ─── CHECKBOX INPUT ───────────────────────────────────────────
+function EngineerCheckbox({ id, label, sublabel, checked, onChange }) {
+  return (
+    <label htmlFor={id} style={{ display:"flex", gap:10, alignItems:"flex-start", cursor:"pointer", padding:"8px 10px", borderRadius:6, background: checked ? "rgba(239,68,68,0.06)" : "transparent", border:`1px solid ${checked?"rgba(239,68,68,0.3)":"rgba(51,65,85,0.3)"}`, marginBottom:6, transition:"all 0.2s" }}>
+      <div style={{ position:"relative", width:16, height:16, marginTop:1, flexShrink:0 }}>
+        <input type="checkbox" id={id} checked={checked} onChange={onChange} style={{ opacity:0, position:"absolute", inset:0, width:"100%", height:"100%", cursor:"pointer", margin:0 }} />
+        <div style={{ width:16, height:16, borderRadius:3, border:`1.5px solid ${checked?"#ef4444":"rgba(71,85,105,0.7)"}`, background: checked?"#ef4444":"transparent", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.15s" }}>
+          {checked && <svg width="9" height="7" viewBox="0 0 9 7"><path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+        </div>
+      </div>
+      <div>
+        <div style={{ fontSize:12.5, color: checked?"#fca5a5":"#94a3b8", fontWeight: checked?600:400, transition:"color 0.2s" }}>{label}</div>
+        {sublabel && <div style={{ fontSize:10.5, color:"#475569", marginTop:2, lineHeight:1.5 }}>{sublabel}</div>}
+      </div>
+    </label>
+  );
+}
+
+// ─── SELECT ───────────────────────────────────────────────────
+function EngSelect({ label, value, onChange, options }) {
+  return (
+    <div style={{ marginBottom:12 }}>
+      <div style={{ fontSize:10, color:"#475569", letterSpacing:"0.1em", marginBottom:5, textTransform:"uppercase", fontFamily:"monospace" }}>{label}</div>
+      <select value={value} onChange={e=>onChange(e.target.value)}
+        style={{ width:"100%", padding:"8px 10px", background:"rgba(15,23,42,0.7)", border:"1px solid rgba(51,65,85,0.7)", borderRadius:6, color:"#94a3b8", fontSize:12.5, cursor:"pointer", outline:"none", fontFamily:"monospace", appearance:"none" }}>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// ─── SECTION CARD ─────────────────────────────────────────────
+function Card({ title, icon: Icon, accent = "#38bdf8", children, style = {} }) {
+  return (
+    <div style={{ background:"rgba(15,23,42,0.7)", backdropFilter:"blur(12px)", border:"1px solid rgba(51,65,85,0.5)", borderTop:`1px solid ${accent}40`, borderRadius:10, padding:"16px", position:"relative", overflow:"hidden", ...style }}>
+      <div style={{ position:"absolute", top:0, left:0, right:0, height:1, background:`linear-gradient(90deg,transparent,${accent}60,transparent)` }} />
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
+        {Icon && <div style={{ width:28, height:28, borderRadius:6, background:`${accent}18`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <Icon size={14} color={accent} />
+        </div>}
+        <span style={{ fontSize:10.5, fontWeight:700, color:accent, letterSpacing:"0.12em", textTransform:"uppercase", fontFamily:"monospace" }}>{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─── GUIDE ITEM ───────────────────────────────────────────────
+function GuideItem({ type, title, body }) {
+  const cfg = {
+    critical: { bg:"rgba(127,29,29,0.2)", border:"rgba(239,68,68,0.4)", icon:"🔴", tc:"#fca5a5" },
+    warning:  { bg:"rgba(120,53,15,0.2)", border:"rgba(245,158,11,0.35)", icon:"⚠️", tc:"#fde68a" },
+    info:     { bg:"rgba(30,58,138,0.2)", border:"rgba(59,130,246,0.35)", icon:"📌", tc:"#93c5fd" },
+    success:  { bg:"rgba(20,83,45,0.2)", border:"rgba(34,197,94,0.35)", icon:"✅", tc:"#86efac" },
+  };
+  const c = cfg[type] || cfg.info;
+  return (
+    <div style={{ background:c.bg, border:`1px solid ${c.border}`, borderRadius:8, padding:"10px 12px", marginBottom:8 }}>
+      <div style={{ display:"flex", gap:8, alignItems:"flex-start" }}>
+        <span style={{ fontSize:14, lineHeight:"1.4", flexShrink:0 }}>{c.icon}</span>
+        <div>
+          <div style={{ fontSize:11.5, fontWeight:700, color:c.tc, marginBottom:3, fontFamily:"monospace" }}>{title}</div>
+          <div style={{ fontSize:11, color:"#94a3b8", lineHeight:1.65 }}>{body}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────
+function App() {
+  const [glassType, setGlassType] = useState("annealed");
+  const [thickness, setThickness] = useState("6");
+  const [coating, setCoating] = useState("none");
+  const [orientation, setOrientation] = useState("south");
+  const [frame, setFrame] = useState("aluminum");
+  const [defEdge, setDefEdge] = useState(false);
+  const [defClearance, setDefClearance] = useState(false);
+  const [defBlock, setDefBlock] = useState(false);
+  const [animVal, setAnimVal] = useState(0);
+
+  const glass = GLASS_DB[glassType];
+
+  const rawRisk = (() => {
+    let r = glass.baseRisk;
+    r += ORIENTATION_DB[orientation] || 0;
+    r += FRAME_DB[frame] || 0;
+    r += COATING_DB[coating] || 0;
+    r += THICKNESS_DB[thickness] ? (THICKNESS_DB[thickness] - 0.78) * 15 : 0;
+    if (defEdge) r += 9;
+    if (defClearance) r += 11;
+    if (defBlock) r += 8;
+    return Math.max(0, Math.min(99, Math.round(r)));
+  })();
+
+  useEffect(() => {
+    let frame_;
+    const animate = () => {
+      setAnimVal(prev => {
+        const diff = rawRisk - prev;
+        if (Math.abs(diff) < 0.4) return rawRisk;
+        frame_ = requestAnimationFrame(animate);
+        return prev + diff * 0.09;
+      });
+    };
+    frame_ = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame_);
+  }, [rawRisk]);
+
+  const t = parseInt(thickness) * 1e-3;
+  const alpha = glass.expansion;
+  const E = glass.modulus * 1e9;
+  const nu = glass.poisson;
+  const dT_base = orientation === "south" ? 52 : 22;
+  const dT_frame = frame === "aluminum" ? 18 : 5;
+  const dT = dT_base + dT_frame + (defEdge?8:0);
+  const sigma = (E * alpha * dT) / (1 - nu) / 1e6;
+  const sigmaAllowable = glass.strengthMult * 7.0;
+  const utilizationRatio = (sigma / sigmaAllowable * 100).toFixed(1);
+
+  const riskLabel = rawRisk >= 75 ? "CRITICAL" : rawRisk >= 50 ? "HIGH" : rawRisk >= 30 ? "MODERATE" : "LOW";
+  const riskColor = rawRisk >= 75 ? "#ef4444" : rawRisk >= 50 ? "#f59e0b" : rawRisk >= 30 ? "#38bdf8" : "#22c55e";
+
+  const guides = [];
+  if (rawRisk >= 75) guides.push({ type:"critical", title:"열파손 고위험 경보 (Critical Risk)", body:`현재 조건(${glass.name} + ${orientation==="south"?"남향 일사":"북향"} + ${frame==="aluminum"?"알루미늄 프레임":"단열 프레임"})에서 열응력(σ ≈ ${sigma.toFixed(1)} MPa)이 허용강도 ${sigmaAllowable.toFixed(1)} MPa에 근접합니다. 즉각적인 유리 사양 재검토가 필요합니다.` });
+  if (glassType === "annealed") guides.push({ type:"critical", title:"일반 판유리 취성 파괴 경고", body:"일반 판유리는 열충격 저항 한계(ΔT ≤ 40°C)가 낮아 현재 온도 구배 추정값을 초과합니다. EN 14179-1 기준의 강화유리 또는 EN 14449 기준 접합유리로 교체를 강력 권고합니다." });
+  if (orientation === "south" && frame === "aluminum") guides.push({ type:"warning", title:"남향 + 알루미늄 프레임 복합 위험", body:"동절기 오전 일사에 의한 유리 중앙부 온도 상승(+38~52°C)과 알루미늄 프레임(λ = 160 W/m·K)의 빠른 열전도에 의한 엣지부 냉각이 복합 작용하여 ΔT가 최대 70°C에 달할 수 있습니다. 단열 바(Thermal Break) 삽입을 검토하십시오." });
+  if (defEdge) guides.push({ type:"warning", title:"에지 가공 불량 — 마이크로크랙 응력집중", body:"절단면의 마이크로크랙(Griffith 결함)은 열응력 작용 시 균열 선단 응력확대계수(KI)를 증폭시켜 취성 파괴를 유발합니다. KS L 2012에 따라 엣지 그라인딩(Seaming, Grinding) 또는 폴리싱 처리 후 품질 검수를 철저히 시행하십시오." });
+  if (defClearance) guides.push({ type:"warning", title:"Edge Clearance 부족 — 구속 열응력 발생", body:"엣지 클리어런스 부족 시 열팽창(δ = α·ΔT·L)을 프레임이 구속하여 면내 압축응력(σ_x)이 발생합니다. ASTM E2112 기준에 따라 최소 Edge Clearance 4~6mm 이상을 확보하고, 네오프렌 가스켓(Shore A 60~70)으로 탄성 완충 계면을 형성하십시오." });
+  if (defBlock) guides.push({ type:"warning", title:"세팅 블록 배치 불량 — 국부 응력집중", body:"세팅 블록(Setting Block)이 하단 코너로 편심 배치되면 유리 자중 하중이 하단 엣지에 집중되어 국부 굽힘 응력이 발생합니다. EPDM 또는 네오프렌 재질(Shore A 80~90) 세팅 블록을 유리 폭의 정확히 1/4 지점(L/4)에 재배치하여 국부 응력 집중을 완화하십시오." });
+  if (glassType === "laminated") guides.push({ type:"info", title:"접합유리 — PVB 필름 품질 관리", body:"PVB(Poly-vinyl Butyral) 필름의 자외선 열화 방지를 위해 UV 차단 코팅 유리와 조합하십시오. 엣지 실링(Edge Sealing) 처리로 수분 침투를 방지하고 EN 14449 기준의 접착력 시험(Peel Test) 결과를 확인하십시오." });
+  if (glassType === "tempered") guides.push({ type:"info", title:"강화유리 — NiS 자파(Spontaneous Breakage) 위험", body:"강화유리 내 니켈황화물(NiS) 개재물의 상전이에 의한 자파 위험이 있습니다. EN 14179-2 기준의 Heat Soak Test(HST, 290°C × 2hr)를 통해 잠재적 자파 위험 개체를 사전 제거하십시오." });
+  if (guides.length === 0) guides.push({ type:"success", title:"현재 입력 조건 양호", body:"선택된 사양과 시공 조건이 일반적인 안전 기준에 부합합니다. 시공 전 EN 12150 또는 KS L 2012 기준의 품질 인증서를 확인하고 설치 후 정기 점검 계획을 수립하십시오." });
+
+  const inputPanelStyle = {
+    display:"flex", flexDirection:"column", gap:10,
+    width:240, flexShrink:0
+  };
+
+  return (
+    <div style={{ fontFamily:"'JetBrains Mono','Fira Code',monospace", background:"#070d1a", minHeight:"100vh", color:"#e2e8f0", padding:0 }}>
+      <div style={{ position:"fixed", inset:0, backgroundImage:"linear-gradient(rgba(51,65,85,0.07) 1px,transparent 1px),linear-gradient(90deg,rgba(51,65,85,0.07) 1px,transparent 1px)", backgroundSize:"32px 32px", pointerEvents:"none", zIndex:0 }} />
+
+      <div style={{ position:"relative", zIndex:1, borderBottom:"1px solid rgba(51,65,85,0.5)", padding:"12px 20px", background:"rgba(7,13,26,0.95)", backdropFilter:"blur(10px)", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:8 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <div style={{ width:32, height:32, borderRadius:8, background:"linear-gradient(135deg,#1d4ed8,#0ea5e9)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <Layers size={16} color="#fff" />
+          </div>
+          <div>
+            <div style={{ fontSize:13, fontWeight:700, color:"#e2e8f0", letterSpacing:"0.05em" }}>GLASS THERMAL DIAGNOSTIC PRO</div>
+            <div style={{ fontSize:9, color:"#475569", letterSpacing:"0.15em" }}>STRUCTURAL SAFETY SIMULATION SYSTEM v3.1</div>
+          </div>
+        </div>
+        <div style={{ display:"flex", gap:16, alignItems:"center" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <div style={{ width:6, height:6, borderRadius:"50%", background:"#22c55e", boxShadow:"0 0 6px #22c55e" }} />
+            <span style={{ fontSize:9, color:"#64748b", letterSpacing:"0.1em" }}>LIVE SIM</span>
+          </div>
+          <div style={{ padding:"4px 10px", borderRadius:4, background:"rgba(51,65,85,0.3)", border:"1px solid rgba(51,65,85,0.5)", fontSize:9, color:"#64748b", letterSpacing:"0.1em" }}>
+            KS L 2012 · EN 12150 · ASTM E2112
+          </div>
+        </div>
+      </div>
+
+      <div style={{ position:"relative", zIndex:1, display:"flex", gap:12, padding:"12px 16px", alignItems:"flex-start", flexWrap:"wrap" }}>
+
+        <div style={inputPanelStyle}>
+
+          <Card title="유리 사양" icon={Layers} accent="#38bdf8">
+            <EngSelect label="유리 종류" value={glassType} onChange={setGlassType} options={[
+              {value:"annealed", label:"일반 판유리 (×1.0)"},
+              {value:"heat_strengthened", label:"배강도유리 (×2.0)"},
+              {value:"tempered", label:"강화유리 (×4.0)"},
+              {value:"laminated", label:"접합유리 (×1.5 PVB)"},
+            ]} />
+            <EngSelect label="유리 두께" value={thickness} onChange={setThickness} options={[
+              {value:"5", label:"5 mm"},{value:"6", label:"6 mm"},
+              {value:"8", label:"8 mm"},{value:"12", label:"12 mm"},
+            ]} />
+            <EngSelect label="표면 코팅" value={coating} onChange={setCoating} options={[
+              {value:"none", label:"없음 (Clear)"},
+              {value:"loe", label:"로이(Low-E) 코팅"},
+            ]} />
+            <div style={{ marginTop:6, padding:"8px 10px", borderRadius:6, background:"rgba(7,13,26,0.6)", border:`1px solid ${glass.color}30` }}>
+              <div style={{ fontSize:9, color:"#475569", marginBottom:3 }}>파손 특성</div>
+              <div style={{ fontSize:10.5, color:glass.color }}>{glass.desc}</div>
+              <div style={{ fontSize:9, color:"#475569", marginTop:4 }}>허용 ΔT: <span style={{ color:"#94a3b8" }}>{glass.thermalResist}°C</span></div>
+            </div>
+          </Card>
+
+          <Card title="환경 조건" icon={Thermometer} accent="#a78bfa">
+            <EngSelect label="창면 방위" value={orientation} onChange={setOrientation} options={[
+              {value:"south", label:"남향/남동향 (동절기 고위험)"},
+              {value:"north", label:"북향 (동절기 저위험)"},
+            ]} />
+            <EngSelect label="프레임 종류" value={frame} onChange={setFrame} options={[
+              {value:"aluminum", label:"알루미늄 메탈 프레임"},
+              {value:"plastic", label:"단열 플라스틱 프레임"},
+            ]} />
+            <div style={{ padding:"8px 10px", borderRadius:6, background:"rgba(7,13,26,0.6)", border:"1px solid rgba(167,139,250,0.2)" }}>
+              <div style={{ fontSize:9, color:"#64748b", marginBottom:4 }}>추정 온도 구배(ΔT)</div>
+              <div style={{ fontSize:18, fontWeight:700, color:"#a78bfa" }}>{dT}°C</div>
+              <div style={{ fontSize:9, color:"#475569" }}>중앙부 vs 프레임 엣지부</div>
+            </div>
+          </Card>
+
+          <Card title="시공 품질 팩터" icon={AlertTriangle} accent="#f59e0b">
+            <EngineerCheckbox id="defEdge" label="에지 불량 (Clean-Cut 미흡)" sublabel="마이크로크랙 → Griffith 결함 → 응력집중" checked={defEdge} onChange={e=>setDefEdge(e.target.checked)} />
+            <EngineerCheckbox id="defClearance" label="Clearance 부족" sublabel="열팽창 구속 → 면내 압축/인장응력 발생" checked={defClearance} onChange={e=>setDefClearance(e.target.checked)} />
+            <EngineerCheckbox id="defBlock" label="Setting Block 배치 불량" sublabel="L/4 이탈 → 국부 굽힘응력 집중" checked={defBlock} onChange={e=>setDefBlock(e.target.checked)} />
+            {(defEdge||defClearance||defBlock) && (
+              <div style={{ marginTop:6, padding:"6px 10px", borderRadius:5, background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.3)" }}>
+                <div style={{ fontSize:9, color:"#fca5a5" }}>
+                  결함 {[defEdge,defClearance,defBlock].filter(Boolean).length}개 감지 → 위험도 상승
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        <div style={{ flex:1, display:"flex", flexDirection:"column", gap:10, minWidth:320 }}>
+
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))", gap:10 }}>
+
+            <Card title="열파손 리스크 인덱스" icon={Activity} accent={riskColor}>
+              <RiskGauge value={animVal} />
+              <div style={{ textAlign:"center", marginTop:8 }}>
+                <span style={{ display:"inline-block", padding:"3px 14px", borderRadius:20, background:`${riskColor}18`, border:`1px solid ${riskColor}50`, fontSize:10, fontWeight:700, color:riskColor, letterSpacing:"0.1em" }}>
+                  {riskLabel}
+                </span>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginTop:10 }}>
+                <div style={{ background:"rgba(15,23,42,0.5)", borderRadius:6, padding:"6px 8px", border:"1px solid rgba(51,65,85,0.4)" }}>
+                  <div style={{ fontSize:8, color:"#475569" }}>강도 배수</div>
+                  <div style={{ fontSize:14, fontWeight:700, color:"#38bdf8", fontFamily:"monospace" }}>{glass.strengthMult}×</div>
+                </div>
+                <div style={{ background:"rgba(15,23,42,0.5)", borderRadius:6, padding:"6px 8px", border:"1px solid rgba(51,65,85,0.4)" }}>
+                  <div style={{ fontSize:8, color:"#475569" }}>응력 이용률</div>
+                  <div style={{ fontSize:14, fontWeight:700, color: parseFloat(utilizationRatio)>80?"#ef4444":parseFloat(utilizationRatio)>50?"#f59e0b":"#22c55e", fontFamily:"monospace" }}>{utilizationRatio}%</div>
+                </div>
+              </div>
+            </Card>
+
+            <Card title="잔류 응력 분포" icon={BarChart2} accent="#a78bfa">
+              <StressProfile glassData={glass} />
+              <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:5 }}>
+                {[
+                  { lbl:"굽힘 강도", val:glass.strengthMult*25, max:100, c:"#38bdf8" },
+                  { lbl:"열충격 저항", val:(glass.thermalResist/200)*100, max:100, c:"#a78bfa" },
+                  { lbl:"비산 방지", val:glassType==="laminated"?98:glassType==="tempered"?82:glassType==="heat_strengthened"?40:8, max:100, c:"#22c55e" },
+                ].map(b => (
+                  <div key={b.lbl}>
+                    <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
+                      <span style={{ fontSize:9, color:"#475569" }}>{b.lbl}</span>
+                      <span style={{ fontSize:9, color:b.c, fontFamily:"monospace" }}>{Math.round(b.val)}%</span>
+                    </div>
+                    <div style={{ height:5, background:"rgba(15,23,42,0.6)", borderRadius:3, overflow:"hidden" }}>
+                      <div style={{ height:"100%", width:`${b.val}%`, background:b.c, borderRadius:3, transition:"width 0.5s ease", opacity:0.85 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card title="파손 형태 프리뷰" icon={Eye} accent="#fb923c">
+              <div style={{ display:"flex", justifyContent:"center", marginBottom:10 }}>
+                <BreakPatternCanvas breakType={glass.breakType} key={glassType} />
+              </div>
+              <div style={{ fontSize:9, color:"#475569", marginBottom:4, letterSpacing:"0.08em" }}>파손 특성</div>
+              {[
+                { lbl:"비산 위험", val:glassType==="laminated"?5:glassType==="tempered"?20:glassType==="heat_strengthened"?55:90, c:"#ef4444" },
+                { lbl:"파편 크기", val:glassType==="tempered"?10:glassType==="laminated"?15:glassType==="heat_strengthened"?60:90, c:"#f59e0b" },
+              ].map(b => (
+                <div key={b.lbl} style={{ marginBottom:4 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}>
+                    <span style={{ fontSize:9, color:"#475569" }}>{b.lbl}</span>
+                    <span style={{ fontSize:9, color:b.c }}>{b.val}%</span>
+                  </div>
+                  <div style={{ height:4, background:"rgba(15,23,42,0.6)", borderRadius:2, overflow:"hidden" }}>
+                    <div style={{ height:"100%", width:`${b.val}%`, background:b.c, opacity:0.8, transition:"width 0.5s ease" }} />
+                  </div>
+                </div>
+              ))}
+              <div style={{ marginTop:8, fontSize:10, color:"#64748b", lineHeight:1.55, fontFamily:"sans-serif" }}>{glass.desc}</div>
+            </Card>
+          </div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(300px, 1fr))", gap:10 }}>
+
+            <Card title="온도 구배 및 열응력 계산" icon={Cpu} accent="#34d399">
+              <div style={{ marginBottom:10, padding:"8px 10px", borderRadius:6, background:"rgba(15,23,42,0.5)", border:"1px solid rgba(52,211,153,0.2)" }}>
+                <div style={{ fontSize:9, color:"#475569", marginBottom:3 }}>적용 공학 이론</div>
+                <div style={{ fontSize:10, color:"rgba(148,163,184,0.7)", lineHeight:1.6, fontFamily:"sans-serif" }}>
+                  Timoshenko 열응력 이론 기반 | 평면응력 가정(thin plate) | 선형 탄성 재료
+                </div>
+              </div>
+
+              <FormulaBlock
+                label="온도 구배 (Temperature Gradient)"
+                formula={`ΔT = T_center − T_edge = ${dT_base}°C (일사) + ${dT_frame}°C (프레임) + ${defEdge?8:0}°C (결함)`}
+                result={`${dT}`}
+                unit="°C"
+                color="#34d399"
+              />
+              <FormulaBlock
+                label="열응력 (Thermal Stress, Biaxial)"
+                formula={`σ_th = E·α·ΔT / (1−ν) = ${(glass.modulus)}GPa × ${alpha.toExponential(1)} × ${dT} / (1−${nu})`}
+                result={`${sigma.toFixed(2)}`}
+                unit="MPa"
+                color="#38bdf8"
+              />
+              <FormulaBlock
+                label="허용 휨강도 (Allowable Bending Strength)"
+                formula={`f_b = f_bk × k_m = 7.0 MPa × ${glass.strengthMult} (강도 배수)`}
+                result={`${sigmaAllowable.toFixed(1)}`}
+                unit="MPa"
+                color="#a78bfa"
+              />
+              <FormulaBlock
+                label="응력 이용률 (Stress Utilization Ratio)"
+                formula={`η = σ_th / f_b × 100% = ${sigma.toFixed(2)} / ${sigmaAllowable.toFixed(1)} × 100`}
+                result={`${utilizationRatio}`}
+                unit="% → 100% 초과시 파손"
+                color={parseFloat(utilizationRatio)>80?"#ef4444":parseFloat(utilizationRatio)>50?"#f59e0b":"#22c55e"}
+              />
+
+              <div style={{ marginTop:4, padding:"6px 10px", borderRadius:5, background:"rgba(15,23,42,0.4)", border:"1px solid rgba(51,65,85,0.3)" }}>
+                <div style={{ fontSize:9, color:"#475569", lineHeight:1.6 }}>
+                  E = 탄성계수(70 GPa) | α = 선팽창계수(8.5×10⁻⁶/°C) | ν = 포아송비(0.23)
+                </div>
+              </div>
+            </Card>
+
+            <Card title="AI 엔지니어 시공 가이드" icon={FileText} accent="#f472b6">
+              <div style={{ maxHeight:380, overflowY:"auto", paddingRight:2 }}>
+                {guides.map((g, i) => <GuideItem key={i} {...g} />)}
+
+                <div style={{ marginTop:10, padding:"10px 12px", borderRadius:8, background:"rgba(15,23,42,0.5)", border:"1px solid rgba(51,65,85,0.3)" }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:"#475569", letterSpacing:"0.1em", marginBottom:6 }}>적용 기준 및 규격</div>
+                  {[
+                    "KS L 2012 — 건축용 판유리 품질 기준",
+                    "EN 12150-1 — 건축용 열강화 안전유리",
+                    "EN 14449 — 건축용 접합 안전유리",
+                    "ASTM E2112 — 창호 설치 표준 시방서",
+                    "ISO 11485-3 — 접합유리 시험 기준",
+                  ].map(s => (
+                    <div key={s} style={{ display:"flex", gap:6, alignItems:"center", marginBottom:4 }}>
+                      <div style={{ width:4, height:4, borderRadius:"50%", background:"#334155", flexShrink:0 }} />
+                      <span style={{ fontSize:9.5, color:"#64748b", fontFamily:"sans-serif" }}>{s}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ position:"relative", zIndex:1, borderTop:"1px solid rgba(51,65,85,0.3)", padding:"8px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:4 }}>
+        <span style={{ fontSize:8.5, color:"#1e293b" }}>Glass Thermal Diagnostic Pro — 본 진단 결과는 참고용이며 실제 설계·시공 시 구조기술사의 검토를 요합니다</span>
+        <span style={{ fontSize:8.5, color:"#1e293b" }}>SIMULATION ENGINE v3.1 · Timoshenko Thermal Stress Model</span>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+
+</script>
+</body>
+</html>
